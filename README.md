@@ -1,6 +1,6 @@
 # Arkangel Skills
 
-Shared library of **skills** for the AI agents we use at Arkangel (Claude Code, Hermes Agent, and any runtime compatible with [agentskills.io](https://agentskills.io)).
+Shared library of **skills** for the AI agents we use at Arkangel (Claude Code, Hermes Agent, and any runtime compatible with [skill.sh](https://skill.sh)).
 
 The idea is simple: whenever someone solves a repeatable problem with an agent — an EPS audit, a clinical review flow, a deployment command, a regulatory checklist — they package it as a **skill** and push it here. That way the next person who needs it doesn't start from scratch.
 
@@ -162,7 +162,7 @@ If something doesn't fit, create the category. Don't over-engineer.
 
 ## Compatibility
 
-The skills in this repo are **portable** across runtimes because they use the open standard from [agentskills.io](https://agentskills.io):
+The skills in this repo are **portable** across runtimes because they follow the open standard from [skill.sh](https://skill.sh):
 
 - **Claude Code** — uses `name` and `description` from the frontmatter; ignores the rest.
 - **Hermes Agent** — uses `name`, `description`, `platforms`, `metadata.hermes.*`, `required_environment_variables`.
@@ -176,7 +176,7 @@ Write for the common denominator: any human new to Arkangel should be able to re
 
 - [Claude Code skills docs](https://docs.claude.com/en/docs/claude-code/skills)
 - [Hermes Agent skills docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)
-- [agentskills.io](https://agentskills.io) — community hub, 647+ public skills for inspiration
+- [skill.sh](https://skill.sh) — open standard for portable agent skills
 
 ---
 
