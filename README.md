@@ -1,65 +1,65 @@
 # Arkangel Skills
 
-Biblioteca compartida de **skills** para los agentes de IA que usamos en Arkangel (Claude Code, Hermes Agent, y cualquier runtime compatible con [agentskills.io](https://agentskills.io)).
+Shared library of **skills** for the AI agents we use at Arkangel (Claude Code, Hermes Agent, and any runtime compatible with [agentskills.io](https://agentskills.io)).
 
-La idea es simple: cada vez que alguien resuelve un problema repetible con un agente —una auditoría de EPS, un flujo de revisión clínica, un comando de despliegue, un checklist regulatorio— lo empaqueta como **skill** y lo sube acá. Así el siguiente que lo necesite no parte de cero.
-
----
-
-## ¿Qué es una skill?
-
-Una skill es una carpeta con instrucciones en lenguaje natural que el agente carga **solo cuando son relevantes**. Formalmente: un `SKILL.md` con frontmatter YAML + markdown, opcionalmente acompañado de scripts, plantillas o referencias.
-
-No es código que se ejecuta a ciegas — es conocimiento procedural que el agente decide cuándo aplicar.
+The idea is simple: whenever someone solves a repeatable problem with an agent — an EPS audit, a clinical review flow, a deployment command, a regulatory checklist — they package it as a **skill** and push it here. That way the next person who needs it doesn't start from scratch.
 
 ---
 
-## Estructura del repo
+## What is a skill?
+
+A skill is a folder with natural-language instructions that the agent loads **only when relevant**. Formally: a `SKILL.md` with YAML frontmatter + markdown, optionally accompanied by scripts, templates, or references.
+
+It's not code that runs blindly — it's procedural knowledge the agent decides when to apply.
+
+---
+
+## Repo structure
 
 ```
 skills/
-├── README.md                   # este archivo
-├── CONTRIBUTING.md             # cómo aportar
+├── README.md                   # this file
+├── CONTRIBUTING.md             # how to contribute
 ├── templates/
-│   └── skill-template/         # plantilla en blanco, copiala para empezar
+│   └── skill-template/         # blank template, copy it to start
 │       └── SKILL.md
 ├── examples/
-│   └── eps-audit/              # skill de ejemplo
+│   └── eps-audit/              # example skill
 │       └── SKILL.md
-└── <categoria>/                # medical, engineering, ops, research, ...
-    └── <nombre-skill>/
-        ├── SKILL.md            # requerido
-        ├── references/         # docs de apoyo (opcional)
-        ├── templates/          # plantillas de salida (opcional)
-        ├── scripts/            # helpers ejecutables (opcional)
-        └── assets/             # imágenes, datos (opcional)
+└── <category>/                 # medical, engineering, ops, research, ...
+    └── <skill-name>/
+        ├── SKILL.md            # required
+        ├── references/         # supporting docs (optional)
+        ├── templates/          # output templates (optional)
+        ├── scripts/            # executable helpers (optional)
+        └── assets/             # images, data (optional)
 ```
 
-**Convenciones:**
-- Nombres en `kebab-case`: `eps-audit`, `clinical-note-reviewer`, `deploy-staging`.
-- Agrupa por categoría (`medical/`, `engineering/`, `ops/`, `research/`, `sales/`). Si no encaja, crea una nueva categoría.
-- Una skill = una carpeta. No mezcles varias en un solo `SKILL.md`.
+**Conventions:**
+- Names in `kebab-case`: `eps-audit`, `clinical-note-reviewer`, `deploy-staging`.
+- Group by category (`medical/`, `engineering/`, `ops/`, `research/`, `sales/`). If it doesn't fit, create a new category.
+- One skill = one folder. Don't mix several in a single `SKILL.md`.
 
 ---
 
-## Cómo crear una skill en 5 pasos
+## How to create a skill in 5 steps
 
-### 1. Copia la plantilla
+### 1. Copy the template
 
 ```bash
-cp -r templates/skill-template medical/mi-skill
+cp -r templates/skill-template medical/my-skill
 ```
 
-### 2. Edita `SKILL.md`
+### 2. Edit `SKILL.md`
 
-El archivo tiene dos partes: **frontmatter YAML** (metadata que el agente lee para decidir si cargarla) y **cuerpo markdown** (las instrucciones).
+The file has two parts: **YAML frontmatter** (metadata the agent reads to decide whether to load it) and **markdown body** (the instructions).
 
 ```markdown
 ---
-name: mi-skill
-description: Resumen breve + CUÁNDO usarla. El agente decide cargar la skill leyendo esto, así que sé específico sobre los triggers.
+name: my-skill
+description: Brief summary + WHEN to use it. The agent decides to load the skill by reading this, so be specific about the triggers.
 version: 1.0.0
-author: tu-nombre@arkangel.ai
+author: your-name@arkangel.ai
 platforms: [macos, linux]
 metadata:
   hermes:
@@ -68,118 +68,118 @@ metadata:
     requires_toolsets: [terminal]
 ---
 
-# Mi Skill
+# My Skill
 
 ## When to Use
-Condiciones concretas. Ej: "Cuando el usuario pide auditar una cuenta de EPS en formato RIPS".
+Concrete conditions. Ex: "When the user asks to audit an EPS account in RIPS format".
 
 ## Procedure
-1. Paso uno — específico y accionable.
-2. Paso dos.
-3. Paso tres.
+1. Step one — specific and actionable.
+2. Step two.
+3. Step three.
 
 ## Pitfalls
-- Fallos conocidos y cómo evitarlos.
-- Casos borde que pasaron y costaron tiempo.
+- Known failures and how to avoid them.
+- Edge cases that happened and cost time.
 
 ## Verification
-Cómo confirmar que el skill funcionó (output esperado, comandos de validación).
+How to confirm the skill worked (expected output, validation commands).
 ```
 
-### 3. Regla de oro del `description`
+### 3. Golden rule of `description`
 
-El `description` es **lo único** que el agente ve al decidir si cargar la skill. Debe responder:
-- **Qué hace** la skill (una frase).
-- **Cuándo usarla** (triggers concretos, no vaguedades).
+The `description` is **the only thing** the agent sees when deciding whether to load the skill. It must answer:
+- **What** the skill does (one sentence).
+- **When to use it** (concrete triggers, no vagueness).
 
-Malo: `"Audit skill"`
-Bueno: `"Audita cuentas de cobro de EPS colombianas en formato RIPS contra resolución 2175. Úsala cuando el usuario pide revisar glosas, validar códigos CUPS/CIE-10, o detectar inconsistencias en facturación."`
+Bad: `"Audit skill"`
+Good: `"Audits Colombian EPS billing accounts in RIPS format against resolution 2175. Use it when the user asks to review glosas, validate CUPS/CIE-10 codes, or detect billing inconsistencies."`
 
-### 4. Prueba la skill localmente
+### 4. Test the skill locally
 
-**Con Claude Code:**
+**With Claude Code:**
 ```bash
-# Copia la carpeta a tu directorio de skills personal o de proyecto
-cp -r medical/mi-skill ~/.claude/skills/
-# O para un proyecto: .claude/skills/
+# Copy the folder to your personal or project skills directory
+cp -r medical/my-skill ~/.claude/skills/
+# Or for a project: .claude/skills/
 ```
 
-Luego en Claude Code invocala: `/mi-skill` o simplemente describe la tarea y deja que la cargue sola.
+Then invoke it from Claude Code: `/my-skill` or simply describe the task and let it load on its own.
 
-**Con Hermes Agent:**
+**With Hermes Agent:**
 ```bash
-cp -r medical/mi-skill ~/.hermes/skills/medical/
-hermes chat --toolsets skills -q "usa mi-skill para..."
+cp -r medical/my-skill ~/.hermes/skills/medical/
+hermes chat --toolsets skills -q "use my-skill to..."
 ```
 
-### 5. Abre un PR
+### 5. Open a PR
 
 ```bash
-git checkout -b add/mi-skill
-git add medical/mi-skill
-git commit -m "Add mi-skill: <qué hace en una línea>"
-git push origin add/mi-skill
+git checkout -b add/my-skill
+git add medical/my-skill
+git commit -m "Add my-skill: <what it does in one line>"
+git push origin add/my-skill
 gh pr create --fill
 ```
 
-Al menos una persona del equipo revisa antes de mergear.
+At least one teammate reviews before merging.
 
 ---
 
-## Qué hace una skill **buena**
+## What makes a **good** skill
 
-1. **Trigger claro** — el `description` dice exactamente cuándo usarla.
-2. **Procedimiento específico** — pasos accionables, no principios abstractos.
-3. **Captura pitfalls reales** — errores que ya cometiste, con la corrección.
-4. **Verificable** — una forma concreta de saber si funcionó.
-5. **Sin secretos** — claves, tokens, URLs internas van en variables de entorno, no en el `SKILL.md`.
+1. **Clear trigger** — the `description` says exactly when to use it.
+2. **Specific procedure** — actionable steps, not abstract principles.
+3. **Captures real pitfalls** — mistakes you've already made, with the fix.
+4. **Verifiable** — a concrete way to know if it worked.
+5. **No secrets** — keys, tokens, internal URLs go in environment variables, not in the `SKILL.md`.
 
-Si necesitas secretos, declaralos en el frontmatter:
+If you need secrets, declare them in the frontmatter:
 
 ```yaml
 required_environment_variables:
   - name: EPS_API_KEY
-    prompt: API key del conector de EPS
-    help: Pídesela a @infraestructura en Slack
+    prompt: API key for the EPS connector
+    help: Ask @infrastructure on Slack
     required_for: full functionality
 ```
 
 ---
 
-## Categorías sugeridas
+## Suggested categories
 
-| Categoría | Para qué |
+| Category | For what |
 |---|---|
-| `medical/` | Auditoría clínica, códigos CUPS/CIE-10, RIPS, guías de práctica, revisión de historia clínica |
-| `engineering/` | Despliegues, debugging, code review, migraciones de infra |
-| `ops/` | Procesos internos, onboarding, facturación, compliance |
-| `research/` | Experimentos, evaluación de modelos, benchmarking |
-| `sales/` | Propuestas, demos, seguimiento comercial |
+| `medical/` | Clinical audit, CUPS/CIE-10 codes, RIPS, practice guidelines, medical record review |
+| `engineering/` | Deployments, debugging, code review, infra migrations |
+| `ops/` | Internal processes, onboarding, billing, compliance |
+| `research/` | Experiments, model evaluation, benchmarking |
+| `sales/` | Proposals, demos, commercial follow-up |
 
-Si algo no encaja, crea la categoría. No sobreingenieres.
-
----
-
-## Compatibilidad
-
-Las skills de este repo son **portables** entre runtimes porque usan el estándar abierto de [agentskills.io](https://agentskills.io):
-
-- **Claude Code** — usa `name` y `description` del frontmatter; ignora el resto.
-- **Hermes Agent** — usa `name`, `description`, `platforms`, `metadata.hermes.*`, `required_environment_variables`.
-- **Otros runtimes compatibles** — leen el subset que entiendan.
-
-Escribe para el denominador común: que un humano nuevo en Arkangel pueda leer el `SKILL.md` y entender qué hace y cómo se usa.
+If something doesn't fit, create the category. Don't over-engineer.
 
 ---
 
-## Recursos
+## Compatibility
+
+The skills in this repo are **portable** across runtimes because they use the open standard from [agentskills.io](https://agentskills.io):
+
+- **Claude Code** — uses `name` and `description` from the frontmatter; ignores the rest.
+- **Hermes Agent** — uses `name`, `description`, `platforms`, `metadata.hermes.*`, `required_environment_variables`.
+- **Other compatible runtimes** — read whatever subset they understand.
+
+Write for the common denominator: any human new to Arkangel should be able to read the `SKILL.md` and understand what it does and how to use it.
+
+---
+
+## Resources
 
 - [Claude Code skills docs](https://docs.claude.com/en/docs/claude-code/skills)
 - [Hermes Agent skills docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)
-- [agentskills.io](https://agentskills.io) — hub comunitario, 647+ skills públicas para inspiración
+- [agentskills.io](https://agentskills.io) — community hub, 647+ public skills for inspiration
 
 ---
 
-## Contacto
+## Contact
 
-Dudas, propuestas de categorías nuevas, o skills que no sabes cómo empaquetar → abre un issue o escribe en `#ai-tooling`.
+Questions, proposals for new categories, or skills you're not sure how to package → open an issue or write in `#ai-tooling`.
