@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-financial-audit
 description: Runs the financial and anti-fraud audit of a Colombian medical invoice (active IPS contract with modality, affiliate plan and applicable tariff sheet, SOAT/ISS/proprietary manual with correct UVB/UVR, CUPS/CUM/INVIMA homologation, liquidation with surcharges and surgical access rules, packages vs. events, coverage limits and grace periods, copays, and 14 anti-fraud rules covering DIAN consecutive numbering, double-billing SOAT+EPS+ARL, overlapping stays, post-mortem services, upcoding, and unbundling). Publishes findings to the destination software. Use it when the user asks to audit tariffs/contracts/fraud or run the financial sub-agent of the pipeline.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:

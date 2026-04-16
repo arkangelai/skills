@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-medical-audit
 description: Runs the clinical-pertinence audit of a Colombian medical invoice (valid CIE-10 diagnosis, adherence to MinSalud Guías de Práctica Clínica, signed medical order with RETHUS-registered professional, procedures with indication and operative note, medications with correct dose/duration, justified diagnostic aids, inpatient stay with admission criteria and daily progress, and epicrisis with discharge plan). Publishes findings with citations to the clinical history in the destination software. Use it when the user asks to audit the clinical side of a case, review procedure pertinence, or run the medical sub-agent of the pipeline.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:

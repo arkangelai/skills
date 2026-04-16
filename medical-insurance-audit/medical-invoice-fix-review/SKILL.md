@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-fix-review
 description: Reads human comments left on a medical-invoice glosa in the destination software, interprets the auditor's intent (modify finding, add, remove, change causal, adjust amount, approve as-is), applies the changes to the consolidated output, invokes claim-denial-generator to produce the next PDF version, and manages the workflow labels until the auditor explicitly approves with `claim-denial-ready`. Use it when a case has `needs-human-review` or `needs-fix-review` and a human left comments.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:

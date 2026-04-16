@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-consolidator-audit
 description: Consolidates the findings of the three audits (admin, medical, financial) for a Colombian medical invoice, deduplicates redundant findings across auditors, prioritizes by severity and disputed amount, computes a global confidence score, assigns Anexo 6 causales (Res. 3047/2008 codes 1-7 with subcausales) to each finding, determines the case zone (green/yellow/red), and applies workflow labels (auto-approve, needs-human-review, auto-denial, needs-fix-review) in the destination software. Use it once the three audits have run and the case must advance to glosa generation or human review.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:

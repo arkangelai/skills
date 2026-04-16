@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-gmail-intake
 description: Watches a Gmail inbox with `gogcli`, classifies emails as medical invoices, downloads attachments (DIAN invoice XML, RIPS, clinical history, epicrisis, authorization, supporting documents), extracts invoice metadata, and files the case in the destination software with a RAD number. Use it when the user wants to automatically process medical invoices sent by IPS via email, configure the pipeline's initial watcher, or debug cases that landed on `medical-invoice/error`.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:

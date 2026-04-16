@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-admin-audit
 description: Runs the administrative audit of a filed Colombian medical invoice (patient identity, BDUA affiliation, IPS contract, RIPS structure, DIAN invoice, prior authorization, signed clinical history, cross-document consistency, and filing timeliness). Emits findings with traceable evidence and publishes them to the destination software. Use it when the user asks to audit the administrative side of a case, resume a failed audit, or run the admin sub-agent of the pipeline.
-version: 1.0.0
+version: 1.1.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
