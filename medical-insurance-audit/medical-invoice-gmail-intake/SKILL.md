@@ -43,6 +43,56 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 
 **Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a case with the same invoice number already exists in the destination software.
 
+## Input / Output Contract
+
+**Input (one of):**
+```json
+{ "mode": "push",      "message_id": "18f...", "thread_id": "18f...", "label_id": "Label_23" }
+{ "mode": "poll",      "label": "$GMAIL_WATCH_LABEL", "max": 50 }
+{ "mode": "reprocess", "message_id": "18f..." }
+```
+
+**Output:**
+```json
+{
+  "status": "filed | not_applicable | error | duplicate",
+  "message_id": "18f...",
+  "case_id": "c_abc123 | null",
+  "rad": "20260414-0007 | null",
+  "label_aplicado": "0. Recibida",
+  "archivos_radicados": [
+    { "name": "factura.xml",
+      "doc_type": "invoice_xml | rips | clinical_history | epicrisis | authorization | supporting | other",
+      "sha256_hex": "ab12...",
+      "size_bytes": 12034 }
+  ],
+  "metadatos": { "ips_nit": "...", "invoice_number": "...", "invoice_cuv": "...", "total_amount": 0 },
+  "errors": [ { "stage": "xml_parse | rips_parse | file_case | attach", "code": "MISSING_CUV", "detail": "..." } ],
+  "duplicate_of_case_id": "c_xyz | null"
+}
+```
+
+`sha256_hex` is the lowercase 64-char hex of SHA-256 over the raw attachment bytes as received from Gmail (pre-extraction for ZIPs; post-extraction for ZIP members).
+
+## Label State Machine
+
+This skill applies **only** the entry-state labels. Downstream stages own their labels. A failed pipeline must NOT advance the label.
+
+```
+(none) -> [0. Recibida]      (terminal for this skill, when filed)
+       -> [not-applicable]   (terminal)
+       -> [error]            (reprocessable)
+
+           |
+           v  (downstream)
+       [1. Auditando] -> [2. Auditada] -> [3. Glosada] -> [4. Notificada]
+```
+
+Invariants:
+- This skill applies at most ONE of `{0. Recibida, not-applicable, error}`.
+- Never apply a downstream label (`1. Auditando`, etc.) from this skill.
+- Never regress state on downstream failure (a failed audit stays at `1. Auditando`, never reverts to `0. Recibida`).
+
 ## Procedure
 
 1. **Verify tools and credentials.**
@@ -85,13 +135,36 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 
    If it **does** match → continue.
 
-4. **Download attachments to a working directory.**
+3.5. **Idempotency pre-check (cheap, before any parsing).** Look up `message_id` in `processed_ids.json` (local ledger). If present, skip and return `status="duplicate"` without re-fetching attachments. The CUV-based check in step 7 stays as second line of defense (catches re-sends with new message_id but same factura).
+
+   ```bash
+   if jq -e --arg mid "$MESSAGE_ID" '.[] | select(. == $mid)' processed_ids.json > /dev/null; then
+     echo "duplicate"; exit 0
+   fi
+   ```
+
+4. **Download attachments to a working directory and classify.**
    ```bash
    WORK_DIR="/tmp/intake/$MESSAGE_ID"
    mkdir -p "$WORK_DIR"
    gogcli messages attachments download "$MESSAGE_ID" --out "$WORK_DIR"
    ```
-   Inventory the downloaded files and normalize names (no spaces, lowercase).
+
+   **ZIP handling.** Extract recursively (depth cap 2 for nested zips). Use 7z with optional password from body regex `contraseña:\s*(\S+)`. Skip `.eml` files (treat outer zip as `supporting`). Normalize filenames with Unicode NFD + strip combining chars (handles `factura ñ.xml`).
+
+   **Attachment classification (first-match-wins):**
+
+   | Rule | doc_type |
+   |---|---|
+   | filename matches `/factura.*\.xml$/i` or contains UBL namespace | `invoice_xml` |
+   | filename matches `/rips.*\.(json|zip)$/i` or contains `US.txt|AF.txt|AC.txt|AP.txt` | `rips` |
+   | PDF first-page text contains `epicrisis|resumen de atencion|resumen de hospitalizacion` | `epicrisis` |
+   | PDF first-page text contains `historia clinica|evolucion medica|nota de ingreso` | `clinical_history` |
+   | PDF first-page text contains `autorizacion|MIPRES|pertinencia` | `authorization` |
+   | filename matches `/soporte|orden|evidencia/i` | `supporting` |
+   | else | `other` |
+
+   Record which rule fired in the audit log.
 
 5. **Extract invoice metadata from the DIAN XML.**
    Required fields:
@@ -152,14 +225,24 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
    (multipart/form-data: file, doc_type=invoice_xml|rips|clinical_history|epicrisis|authorization|other)
    ```
 
-8. **Label the email and reply with an ACK.**
-   ```bash
-   gogcli messages modify "$MESSAGE_ID" \
-     --add-label medical-invoice/intake \
-     --add-label "medical-invoice/rad-$RAD"
+8. **Write to ledger BEFORE labeling, then label and reply.**
 
-   gogcli messages reply "$MESSAGE_ID" --body "ACK — Case filed with RAD $RAD. case_id: $CASE_ID."
+   The order matters: ledger first prevents reprocess on watcher restart mid-batch. Labeling LAST means partial failures stay re-processable.
+
+   ```bash
+   # 1. Append to ledger first
+   jq --arg mid "$MESSAGE_ID" '. += [$mid]' processed_ids.json > processed_ids.json.new && mv processed_ids.json.new processed_ids.json
+
+   # 2. Apply state label (only after ALL API calls succeeded above)
+   gogcli messages modify "$MESSAGE_ID" \
+     --add-label "0. Recibida" \
+     --add-label "rad-$RAD"
+
+   # 3. ACK reply (best-effort -- failure here does NOT roll back state)
+   gogcli messages reply "$MESSAGE_ID" --body "ACK — Caso filtrado con RAD $RAD. case_id: $CASE_ID." || echo "ACK reply failed; continuing"
    ```
+
+   On startup, reconcile `processed_ids.json` against Gmail labels to catch ledger-without-label or label-without-ledger inconsistencies.
 
 9. **Return the output payload.**
    ```json
@@ -184,14 +267,29 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 - **Symptom:** `total_amount` differs between XML and the RIPS sum. **Cause:** the IPS included copays in the XML but not in RIPS (or vice versa). **Fix:** do NOT fix it here — pass both values to the case and let `financial-auditor` resolve it.
 - **Symptom:** `gogcli` fails with `invalid_grant`. **Cause:** the OAuth token expired. **Fix:** `gogcli auth refresh` or regenerate with `gogcli auth init`.
 - **Symptom:** the invoice number has leading zeros in the XML but not in RIPS. **Cause:** the IPS pads inconsistently. **Fix:** when filing, store both (`invoice_number_raw`, `invoice_number_normalized` without padding) and use the normalized one for uniqueness.
+- **Symptom:** same `message_id` processed twice on watcher restart mid-batch. **Cause:** ledger written after labeling. **Fix:** ledger write BEFORE labeling; reconcile against Gmail labels on startup.
+- **Symptom:** email has `0. Recibida` label but no case exists in the destination software. **Cause:** label applied before case creation succeeded. **Fix:** labeling is the LAST step, strictly after all REST API calls succeed.
+- **Symptom:** ZIP contains an `.eml` file -- treated as recursable archive. **Fix:** do not recurse into `.eml`; classify outer zip as `supporting`.
+- **Symptom:** two emails with same `invoice_number` but different CUV (nota credito + re-emision). **Cause:** uniqueness keyed on invoice_number alone. **Fix:** uniqueness is on CUV, not invoice_number; link via `related_case_id`.
+- **Symptom:** non-ASCII filenames (`factura ñ.xml`). **Fix:** Unicode NFD + strip combining chars before saving to disk.
+- **Symptom:** reply on prior thread (`In-Reply-To` present) misclassified as new factura. **Fix:** if email references a `processed_ids.json` entry, route to `fix-review`, not intake.
+- **Symptom:** watcher fires before Gmail finishes uploading attachments (count < what body claims). **Fix:** if attachment count < count in body "adjunto X archivos", re-fetch after 30s.
+- **Symptom:** failed downstream stage (e.g. crashed audit) sets the email to `error`, but a sweeper later interprets `error` as "intake error" and re-files. **Fix:** documented invariant -- intake never sets `error` from a downstream failure; downstream owns its own labels. A separate sweeper re-enqueues stale `1. Auditando` cases > 30min.
+- **Symptom:** `gogcli` returns `invalid_grant` mid-poll (token expired). **Fix:** stop watcher, emit `AUTH_EXPIRED`, do NOT mark in-flight messages as `error`. Surface visibly (dashboard banner / Slack / stderr). Silent failure is the worst outcome.
+- **Symptom:** `gogcli` returns 5xx intermittently. **Fix:** exponential backoff (1/2/4/8s, 4 attempts), do NOT label during retry.
+- **Symptom:** label-name collision (manual label has different id than `gogcli`-created). **Fix:** resolve by name at startup, cache id, assert uniqueness or fail fast with `ambiguous_label`.
 
 ## Verification
 
-- After running the skill, the email has exactly **one** of the labels `medical-invoice/{intake|not-applicable|error}`.
+- After running the skill, the email has exactly **one** of the labels `{0. Recibida, not-applicable, error}`.
 - If filed: `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}` returns the case with all mandatory fields populated and every attachment in `attachments[]`.
-- The Gmail thread has an ACK reply with the RAD.
+- `processed_ids.json` contains `message_id` (no duplicates).
+- The Gmail thread has an ACK reply with the RAD (or a logged ACK-failure if the reply API failed).
+- `status="error"` -> Gmail thread has a reply listing the missing minimums.
+- `status="duplicate"` -> `duplicate_of_case_id` populated, no new case created.
 - No other case exists in the software with the same `invoice_cuv` (uniqueness).
-- Each attachment's `sha256` in the output matches the file uploaded to the software.
+- Each attachment's `sha256_hex` in the output matches the file uploaded to the software.
+- No email has both `0. Recibida` and `error` simultaneously.
 
 ## References
 

@@ -32,6 +32,32 @@ The question it answers: **what did the human ask for and how do I apply it to t
 
 **Do not use:** if no new comments exist (polling with no work); if the case already has `claim-denial-ready`; if the comment does not concern the glosa (e.g. general chat).
 
+## Routing Policy (when does fix-review run?)
+
+`fix-review` runs only on cases the consolidator routed to human review. The router applies:
+
+| Tier | Causales found | Flow |
+|---|---|---|
+| **Auto-send** | only `Facturacion`, `Tarifas`, `Autorizacion` | consolidator -> denial-generator -> sender directly. fix-review NOT invoked. |
+| **Always-review** | any of `Soportes`, `Cobertura`, `Pertinencia` | case routed to `needs-human-review`. fix-review runs when the auditor leaves comments. |
+
+Auto-send cases can also be manually flagged via a human comment that asks for review on the `claim-denial-ready` document; in that case fix-review runs after the manual flag.
+
+## Editable vs Immutable Finding Fields
+
+Restrict patches to the editable subset. Reject patches to immutable fields with `400 forbidden_field`.
+
+| Field | Editable | Notes |
+|---|---|---|
+| `finding_id`, `rule_ids`, `cups`, `descripcion_servicio`, `valor_facturado`, `detected_by`, `created_at` | NO | Core identity / provenance |
+| `causal_familia` | NO | Derived from `causal` -- do not patch directly |
+| `causal`, `subcausal` | YES | Re-classify Anexo 6 code |
+| `valor_objetado` | YES | Constraint: `0 <= v <= valor_facturado` |
+| `decision`, `resultado` | YES | `pass` == remove_finding |
+| `motivo`, `justificacion` | YES | 10-2000 chars |
+| `evidencia` | YES (append-only) | Never delete prior entries |
+| `last_modified_at`, `last_modified_by`, `human_override` | AUTO | Set by this skill on every edit |
+
 ## Procedure
 
 1. **Detect new comments.**
@@ -83,23 +109,48 @@ The question it answers: **what did the human ask for and how do I apply it to t
 
    If the destination software does not support JSON Patch, use `PATCH` with the full updated object.
 
-   **Always recompute** after the patch:
-   - `case_summary.score` = Σ weights of active findings.
-   - `case_summary.total_objetado` = Σ `valor_objetado`.
-   - `case_summary.total_a_pagar` = `invoice_total - total_objetado`.
-   - `case_summary.zona` based on new values.
-
-5. **Record in the audit-log** for traceability.
+   **Always recompute** after the patch (integer COP -- no decimals):
    ```
+   active = [f for f in consolidated_findings if f.resultado == "fail"]
+   total_objetado = sum(f.valor_objetado for f in active)
+   total_a_pagar  = invoice_total - total_objetado
+   score          = sum(CAUSAL_WEIGHTS[f.causal] for f in active)
+
+   zona = "verde"     if score < 30
+        = "amarilla"  if 30 <= score < 70
+        = "roja"      if score >= 70
+   ```
+
+   `CAUSAL_WEIGHTS` lives in `$REF_DATA_PATH/causal_weights.json`, versioned with the ruleset.
+
+   **Invariants (enforce, rollback on failure):**
+   - `total_objetado >= 0`
+   - `total_objetado <= invoice_total`
+   - `total_a_pagar >= 0`
+   - `total_a_pagar + total_objetado == invoice_total` (integer equality)
+   - Every finding: `0 <= valor_objetado <= valor_facturado`
+   - Per-item: `Σ valor_objetado for item_cups <= item.total_price`
+
+   Round-trip: GET `/consolidated` after PATCH must match the recomputed resumen before invoking `claim-denial-generator`.
+
+5. **Record in the audit-log** for traceability (append-only; 5-year retention per Res 3047-08).
+
+   Capture **before/after** values for every change so the auditor can reconstruct the decision trail:
+   ```json
    POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audit-log
    {
-     "actor": "fix-review",
-     "triggered_by_comment": "comment_id",
+     "actor": "fix-review-bot",
+     "triggered_by_comment": "cm_456",
+     "comment_author": "ana.medica@sura.com.co",
      "intent": "modify_finding",
-     "changes_applied": [...],
      "finding_id": "fx-003",
-     "author_original": "auditor@eps.com",
-     "timestamp": "..."
+     "changes": [
+       { "field": "valor_objetado", "old": 1200000, "new": 1500000 },
+       { "field": "justificacion", "old": "...", "new": "..." }
+     ],
+     "consolidated_version_before": 4,
+     "consolidated_version_after": 5,
+     "timestamp": "2026-04-14T12:34:56Z"
    }
    ```
    Never overwrite history — always append.
@@ -108,20 +159,20 @@ The question it answers: **what did the human ask for and how do I apply it to t
    If there were changes → run `medical-invoice-claim-denial-generator` to produce `v{n+1}`.
    If only `ask_clarification` or `ambiguous` → do NOT regenerate.
 
-7. **Reply to the auditor.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/comments
-   {
-     "reply_to": "comment_id",
-     "author": "fix-review-bot",
-     "body": "Applied: changed finding #3 amount from $1,200,000 to $1,500,000. Version v2 generated. Please review."
-   }
-   ```
+7. **Reply to the auditor (Spanish, standardized templates).**
 
-   If the intent was `ambiguous`:
-   ```
-   body: "I could not interpret your comment on finding #3. Could you clarify whether you want to change the amount, the causal, or add evidence?"
-   ```
+   | Intent | Template |
+   |---|---|
+   | `modify_finding` | "Aplicado: {campo} del hallazgo #{n} cambiado de `{old}` a `{new}`. Version v{n+1} generada." |
+   | `add_finding` | "Agregado hallazgo nuevo #{n} (causal {c}, objetado ${v}). Version v{n+1}." |
+   | `remove_finding` | "Hallazgo #{n} marcado como `pass`. Version v{n+1}." |
+   | `change_causal` | "Causal del #{n}: {old} -> {new}. `human_override=true`. Version v{n+1}." |
+   | `adjust_value` | "Valor objetado del #{n}: ${old} -> ${new}. Total objetado: ${tot}." |
+   | `add_evidence` | "Evidencia agregada al #{n}: {ref}. Version v{n+1}." |
+   | `approve` honored | "Aprobado. Caso {RAD} listo (`claim-denial-ready`). Documento final: v{n}." |
+   | `approve` stale | "No puedo aprobar: documento v{n} es anterior a los ultimos cambios. Regenerando v{n+1}." |
+   | `approve` wrong role | "Solo auditores medicos o financieros pueden aprobar. Tu rol: {role}." |
+   | `needs_clarification` | "No logre interpretar tu comentario. A cual hallazgo y que cambio?" |
 
 8. **Handle final approval.**
    If intent = `approve`:
@@ -129,12 +180,17 @@ The question it answers: **what did the human ask for and how do I apply it to t
    DELETE /cases/{id}/labels/needs-human-review
    DELETE /cases/{id}/labels/needs-fix-review
    POST   /cases/{id}/labels   { "name": "claim-denial-ready" }
-   PATCH  /cases/{id}          { "status": "claim_denial_ready" }
+   PATCH  /cases/{id}          { "status": "claim_denial_ready", "approved_by": "<author>", "approved_at": "..." }
    ```
 
-   **Requirement**: `approve` is only honored if:
-   - The comment author has the auditor role (not another bot).
-   - At least one PDF version exists (`v1` or later).
+   **Pre-flight checks (all must pass):**
+   - The comment author has an auditor role (medical or financial).
+   - At least one document version exists (`v1` or later).
+   - The latest document version is fresh: `latest_document.generated_at >= consolidated.updated_at` (no edits since last regen). If stale, regenerate `v{n+1}` first, then approve.
+   - No newer edit-comment has arrived since this approve was queued (chronological order; defer approve if mixed-batch).
+   - Approve must use an explicit token from a closed set: `aprobar`, `listo`, `enviar`, `OK`, `go`, `aprobado`. Hedged language ("probemos") -> `needs_clarification`.
+
+   **On approve, remove BOTH** `needs-human-review` AND `needs-fix-review`. Final label set must be exactly `{claim-denial-ready}`.
 
 9. **Update `last_processed_at`.** Save the timestamp of the latest comment processed into case metadata so the next run does not reprocess.
 
@@ -147,16 +203,33 @@ The question it answers: **what did the human ask for and how do I apply it to t
 - **Symptom:** bot loops with another bot. **Cause:** both reply to comments. **Fix:** skip if `author` ends in `-bot`; only process human comments.
 - **Symptom:** applied changes do not appear in `v2`. **Cause:** PDF regenerated before the PATCH confirmed. **Fix:** PATCH → `GET /consolidated` to verify → only then invoke skill 7.
 - **Symptom:** human asks to change the causal but the finding has multiple `rule_ids` mapping to different causales. **Cause:** dedup merged findings with potentially different causales. **Fix:** allow manual causal override; leave a note in `justificacion` that it was a human override.
-- **Symptom:** `approve` bypass by an unauthorized author. **Cause:** role not validated. **Fix:** query the author's role in the software; if not auditor, treat as `ask_clarification`.
+- **Symptom:** `approve` bypass by an unauthorized author. **Cause:** role not validated. **Fix:** query the author's role in the software; if not auditor, reply with the wrong-role template.
+- **Symptom:** concurrent auditor edits cause lost updates (no ETag). **Fix:** `If-Match: {etag}` on PATCH; on 409, refetch + replay + retry.
+- **Symptom:** stale document at approval (regen failed silently between PATCH and approve). **Fix:** pre-flight `latest_document.generated_at >= consolidated.updated_at`. If stale, force regen before allowing approve.
+- **Symptom:** `valor_objetado > valor_facturado` (typo: 15M vs 1.5M). **Fix:** invariant + rollback + reply showing both numbers for human confirmation.
+- **Symptom:** index mismatch (UI 1-indexed, API 0-indexed). **Fix:** 1-indexed everywhere except the JSON-Patch path boundary; unit-test conversions.
+- **Symptom:** ambiguous CUPS match (two lines share a CUPS). **Fix:** if > 1 candidate, reply listing candidates with indexes; do NOT patch.
+- **Symptom:** auditor regrets an approval. **Fix:** allow `reopen` intent on `claim-denial-ready` (only before `claim-denial-sent`); back to `needs-fix-review`.
+- **Symptom:** auditor asks "revert mi ultimo cambio". **Fix:** add `revert` intent; inverse-apply the last audit-log entry by that author within 24h.
+- **Symptom:** duplicate evidence ref added on append. **Fix:** dedup before patching `evidencia`; no-op + reply "Esa evidencia ya estaba registrada."
+- **Symptom:** PDF regen crash advances label anyway. **Fix:** label change is the LAST step, gated on regen success. On failure, leave label at `needs-human-review`, log, reply "Error regenerando documento, reintentando."
+- **Symptom:** `add_finding` missing required fields. **Fix:** require `{causal, valor_objetado, motivo, justificacion}` minimum; else reply asking for the missing fields.
+- **Symptom:** two auditors approve simultaneously. **Fix:** second approve is a no-op; reply "Ya aprobado por {first} a las {time}."
+- **Symptom:** threaded comment "eso esta bien" on a specific finding misread as case-level approve. **Fix:** case-scope `approve` requires a case-level comment. Threaded comments on a finding are `acknowledge` only.
+- **Symptom:** orphan label on approve (only removed one of two review labels). **Fix:** on approve, remove BOTH; assert final label set is exactly `{claim-denial-ready}`.
 
 ## Verification
 
-- Every new comment produces an `audit-log` entry with a classified `intent`.
-- If changes occurred: a new PDF version (`v{n+1}`) exists more recent than any processed comment.
-- If `intent=approve` and valid: the case's current labels include `claim-denial-ready` and exclude `needs-human-review` / `needs-fix-review`.
-- `total_objetado ≥ 0` and `≤ invoice_total` after each change.
-- Every consolidated change has an `audit-log` entry with non-empty `triggered_by_comment`.
+- Every new comment produces an `audit-log` entry with a classified `intent` and before/after values for any field changes.
+- If changes occurred: a new document version (`v{n+1}`) exists with `generated_at >= consolidated.updated_at`.
+- If `intent=approve` and valid: case labels include `claim-denial-ready` and exclude both `needs-human-review` and `needs-fix-review`.
+- After every change: `total_objetado >= 0`, `total_objetado <= invoice_total`, `total_a_pagar >= 0`, `total_objetado + total_a_pagar == invoice_total`.
+- Every finding: `0 <= valor_objetado <= valor_facturado`.
+- No finding has `resultado=fail` AND `valor_objetado=0` (vacuous glosa).
+- For every `item_cups`: `Σ valor_objetado <= item.total_price`.
 - The same `comment_id` was not processed twice (idempotent via `last_processed_at`).
+- Every `human_override == true` finding has a matching audit-log entry.
+- On pipeline crash: label STILL `needs-human-review` (not advanced); audit log has an `error` entry.
 
 ## References
 

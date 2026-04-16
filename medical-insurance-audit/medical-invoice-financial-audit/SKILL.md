@@ -54,9 +54,25 @@ The question it answers: **does the billed amount match the contract and the app
    - `$REF_DATA_PATH/bdua.json` — affiliate plan, IBC (for copays).
    - `$REF_DATA_PATH/ruaf_snapshot.json` — mortality (for post-mortem checks).
 
-3. **Extract invoice transactions.** Internal shape: `items[] = {cups, description, quantity, unit_price, total_price, access_route?, specialty?}`.
+3. **Extract invoice transactions.** Internal shape: `items[] = {item_index, cups, description, quantity, unit_price, total_price, access_route?, specialty?}`. Always keep both `item_index` (1-based position in the invoice) and `cups` so findings can match downstream regardless of re-ordering.
 
-4. **Run the TARIFF-FRAUD checklist.**
+4. **`valor_objetado` calculation rule (read this first).** Findings emit a `valor_objetado` integer in COP. The formula depends on the causal:
+
+   | Causal | Formula | Worked example |
+   |---|---|---|
+   | **Tarifas** (FIN.13–16) | `(unit_billed − unit_contract) × cantidad` — **excess only** | H30104 billed 6,000,000, contract 5,430,500, qty 1 → `valor_objetado = 569,500`, **NOT** 6,000,000 |
+   | **Facturacion** (FIN.17–19, FIN.31–33, FIN.36, FIN.38–41) | `total_price` of the offending line — **full value** | 890201 phantom-billed → 95,000 |
+   | **Autorizacion** | `total_price` of unauthorized item — full value | D08005 without auth → 720,000 |
+   | **Cobertura** (exclusion or cap) | Exclusion: `total_price`. Cap: `amount_over_cap` | Plan cap 5M, billed 6.2M → 1,200,000 |
+   | **Soportes / Pertinencia** | `total_price` (or partial units with explicit basis) | UCI 5 days billed, 3 justified → 2 × 1,925,000 |
+
+   Invariants (enforced in step 5):
+   - Tarifas: `valor_objetado < item.total_price` (strict). If not, you have miscalculated.
+   - All causales: `valor_objetado ≤ item.total_price`.
+   - Never use the full billed amount for a Tarifas finding. If contract tariff is zero, re-classify as Cobertura.
+   - For per-diem CUPS (S10101 estancia general 285,000/dia, S10102 UCI 1,925,000/dia) and per-vial CUPS (M00102 185,000/vial), **normalize unit first**: `expected = unit_contract × cantidad_dias` or `× n_vials` BEFORE computing the delta.
+
+5. **Run the TARIFF-FRAUD checklist.**
 
    ### Group A — Active contract (Weight 3, critical)
    - **FIN.01** Contract active on `service_date` with verified signatures.
@@ -120,29 +136,59 @@ The question it answers: **does the billed amount match the contract and the app
    - **FIN.41** Medication/supply quantities proportional to the institutional benchmark.
    - **FIN.42** IPS shows no recurring pattern of deviation (glosas, upcoding, duplication).
 
-5. **Build and publish `financial_audit`.** Standard shape.
+6. **Build and publish `financial_audit`.** Findings are **item-keyed** (one entry per audited line item, including conformes), with the rule that detected the issue nested under `rule_ids`:
    ```json
    {
      "audit_type": "financial",
-     "score": <>,
+     "score": <int>,
      "zona": "verde|amarilla|roja",
      "opinion": "<financial summary>",
      "findings": [
        {
-         "rule_id": "FIN.13",
+         "item": 1,
+         "codigo_cups": "H30104",
+         "hallazgo": "glosa",
+         "causal": "Tarifas",
+         "valor_facturado": 6000000,
+         "valor_objetado": 569500,
+         "valor_a_reconocer": 5430500,
+         "calculation_basis": "excess_only",
+         "rule_ids": ["FIN.13"],
          "severidad": "critica",
          "peso": 3,
          "resultado": "fail",
-         "evidencia": "CUPS 890201: tarifario_contractual.csv precio_base=85000 (UVB 2026 v2); invoice charged 120000 (Δ +41.2%, above 5% threshold)",
-         "valor_objetado": 35000,
+         "motivo": "Honorarios cirugia grupo 4 facturados por encima de tarifa contractual",
+         "evidencia": "H30104: tarifario_contractual.csv precio_base=5430500 × qty 1 = 5430500; invoice charged 6000000 (delta +569500, +10.5% over 5% threshold)",
          "nota": "Base tariff overcharge"
+       },
+       {
+         "item": 2,
+         "codigo_cups": "S10102",
+         "hallazgo": "conforme",
+         "causal": null,
+         "valor_facturado": 9625000,
+         "valor_objetado": 0,
+         "valor_a_reconocer": 9625000,
+         "rule_ids": [],
+         "resultado": "pass"
        }
      ]
    }
    ```
 
-6. **Mandatory financial evidence: show the calculation.** Format:
-   `{CUPS}: expected={X} (source); charged={Y}; delta={Y-X} ({pct}%)`.
+   **Causal vocabulary** is the strict 6-set: `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map your rule findings as follows:
+   - FIN.01–FIN.16, FIN.37 (upcoding -- excess between codes) → `Tarifas`
+   - FIN.17–FIN.19, FIN.31–FIN.33, FIN.36 (phantom), FIN.38 (unbundling), FIN.39–FIN.41 → `Facturacion`
+   - FIN.04–FIN.06, FIN.20–FIN.22 (cap, grace, preexistencia) → `Cobertura`
+   - FIN.34 (post-mortem) → `Facturacion` (service did not occur)
+   - FIN.35 (double SOAT/EPS/ARL) → `Facturacion`
+
+   **Phantom billing is `Facturacion`, NOT `Soportes`.** Soportes is for services that happened but documents are incomplete. If the service did not occur at all, the causal is `Facturacion`.
+
+   **Always emit a finding for every billed item**, including passes (`hallazgo="conforme"`, `valor_objetado=0`, `causal=null`). Downstream consumers (consolidator, dashboard, Excel) require full item coverage.
+
+7. **Mandatory financial evidence: show the calculation.** Format:
+   `{CUPS}: expected={unit}*{qty}={expected} (source); charged={charged}; delta={charged-expected} ({pct}%)`. Numbers in `evidencia` must be internally consistent within 1 COP of `valor_objetado`.
 
 ## Pitfalls
 
@@ -154,11 +200,22 @@ The question it answers: **does the billed amount match the contract and the app
 - **Symptom:** FIN.37 upcoding misdetected. **Cause:** the HC describes a complex procedure but the simple one was billed (subcoding, not upcoding) — direction inverted. **Fix:** detect both directions; subcoding is a minor finding (the IPS loses money) but still report it for traceability.
 - **Symptom:** many FIN.31 findings (consecutive numbering) for a large batch. **Cause:** the IPS bills in batches and the consecutive jumps across clients. **Fix:** FIN.31 must evaluate consecutive numbering **from this issuer to this EPS**, not globally.
 - **Symptom:** score explodes by accumulation in anti-fraud when a single root cause triggers multiple findings (e.g. wrong date → fires FIN.30, FIN.31, FIN.32). **Cause:** no cascade suppression. **Fix:** do NOT suppress here — `consolidator-audit` will dedup. Report all.
+- **Symptom:** `valor_objetado` equals the full billed amount on a Tarifas finding. **Cause:** agent used `item.total_price` instead of the excess delta. **Fix:** Tarifas uses `(unit_billed − unit_contract) × cantidad`. If the contract tariff is zero or absent, re-classify as Cobertura.
+- **Symptom:** finding references "item 3" only; the consolidator cannot match it. **Cause:** referencing by line number alone. **Fix:** always emit `codigo_cups` as the primary identifier (CUPS + description disambiguates when two lines share a CUPS).
+- **Symptom:** phantom-billed service is flagged as `Soportes`. **Cause:** confusion between "missing documents" and "service did not occur". **Fix:** if there is no clinical evidence the service was rendered, causal is `Facturacion` (FIN.36). Soportes is for services that happened with incomplete docs.
+- **Symptom:** per-diem S10102 (1,925,000/dia) compared as a single unit against a 5-day stay. **Cause:** unit not normalized. **Fix:** `expected = unit_contract × cantidad_dias` BEFORE computing the delta.
+- **Symptom:** multi-error factura produces 3 findings on the same item. **Cause:** worry about double-counting. **Fix:** do NOT suppress here. The consolidator deduplicates by `(item_cups, causal)` and caps per-item objetado at `item.total_price`. Report all.
+- **Symptom:** `valor_objetado` is negative (subcoding). **Cause:** IPS billed less than the tariff. **Fix:** keep the sign and report with `severidad=baja`, `nota="subcoding, IPS self-discount"`. Do NOT flip to positive.
+- **Symptom:** FIN.13 passes because line total matches the contract, but `cantidad` is inflated (10 vials billed, 3 used). **Cause:** only validated unit price. **Fix:** validate both `unit_price` AND `cantidad` against clinical evidence. Inflated quantity with correct unit → causal `Facturacion`, not `Tarifas`.
 
 ## Verification
 
 - `GET /cases/{case_id}/audits?type=financial` returns exactly 1 record with 42 evaluated rules.
-- Every finding with `resultado=fail` has an explicit calculation in `evidencia` (expected, charged, delta).
+- The `findings[]` array has **one entry per invoice item** (conformes included), not just failures.
+- Every finding with `hallazgo="glosa"` has both `causal` (from the strict 6-set) and `codigo_cups` matching an item in the invoice.
+- Every finding with `resultado="fail"` has an explicit calculation in `evidencia` (expected, charged, delta) consistent with `valor_objetado` within 1 COP.
+- For Tarifas findings: `valor_objetado < item.total_price` (strict). If equal, the agent miscalculated.
+- Per item: `valor_a_reconocer + valor_objetado == item.total_price` (conservation of money).
 - Total `valor_objetado` ≤ `invoice_total`.
 - Any failing critical rule → `zona=roja`.
 - The skill did NOT read `admin_audit` nor `medical_audit` (independence).

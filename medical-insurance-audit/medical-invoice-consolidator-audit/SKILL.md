@@ -52,14 +52,15 @@ The question it answers: **given what the three audits found, which findings are
 2. **Collect every finding with `resultado=fail` or `conditional`.**
    Ignore `pass` — they do not produce findings for a glosa.
 
-3. **Deduplicate by "root cause".**
+3. **Deduplicate by `(item_cups, causal)`.**
 
-   Two findings are duplicates when:
-   - They share the same documentary evidence (same file + same section), or
-   - They point to the same `invoice_item` (CUPS + quantity + date), or
-   - Their semantic description is equivalent (LLM check above a similarity threshold).
+   Two findings are duplicates only when **both** match:
+   - Same `codigo_cups` (or both case-level for invoice-wide rules), AND
+   - Same `causal` (Sura vocabulary -- see step 6).
 
-   When merging:
+   This is critical for multi-error facturas: the same CUPS can have **independent** glosas under different causales (e.g. H30104 with FIN.13 Tarifas + FIN.36 phantom Facturacion → KEEP BOTH). Same CUPS + same causal across two auditors IS a duplicate.
+
+   When merging duplicates:
    - `rule_ids` = list of every rule_id that detected the same finding (e.g. `["ADMIN.15", "FIN.20"]`).
    - `severidad` = maximum across merged.
    - `peso` = maximum.
@@ -67,14 +68,16 @@ The question it answers: **given what the three audits found, which findings are
    - `evidencia` = formatted concatenation with source attribution.
    - `auditores_detectaron` = list (`["admin", "financial"]`).
 
+   After all merges: enforce per-item cap `Σ valor_objetado for item_cups ≤ item.total_price`. If exceeded, reduce the lowest-severity contribution proportionally.
+
 4. **Compute per-finding confidence** (0–1).
    ```
    confidence = 0.4 × evidence_clarity
-              + 0.4 × unanimity (auditors that detected it / 3)
+              + 0.4 × unanimity (auditors_detected / auditors_capable)
               + 0.2 × citation_quality (exact file+page?)
    ```
    - `evidence_clarity`: 1 if the evidence contains a literal quote, 0.7 for a specific reference, 0.4 if generic.
-   - `unanimity`: if 2+ auditors detected it → very high confidence.
+   - `unanimity`: denominator is `auditors_capable_of_detecting`, NOT a hardcoded 3. FIN.* rules are capable=financial only; MED.* capable=medical only; ADMIN.* capable=admin only; cross-cutting rules capable=all 3. A FIN.13 finding detected only by financial → unanimity = 1.0, not 0.33.
    - `citation_quality`: 1 if file+page, 0.5 if file only, 0 if neither.
 
 5. **Prioritize findings** in this order:
@@ -82,23 +85,24 @@ The question it answers: **given what the three audits found, which findings are
    - Within the same severity: `valor_objetado` descending.
    - Within the same amount: `confianza` descending.
 
-6. **Assign an Anexo 6 causal to each finding** (Res. 3047 Art. 5):
+6. **Translate to canonical causal vocabulary.**
 
-   | Causal | Name | Typical triggers |
+   Sub-agents emit findings using the **Sura strict 6-set**: `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. The consolidator emits BOTH `causal` (Sura) and `causal_anexo6` (Res. 3047 codes 1-7 with subcausal) on every finding.
+
+   Translation table (Sura → Anexo 6):
+
+   | Sura causal | Anexo 6 code | Anexo 6 name |
    |---|---|---|
-   | **1** | No cobertura contractual | FIN.06 (plan excludes), FIN.22 (pre-existing), ADMIN.07 (wrong modality) |
-   | **2** | No pertinencia clínica | MED.04-06 (GPC), MED.10-13 (procedures), MED.14-15 (medications) |
-   | **3** | Documentación incompleta | ADMIN.08-11 (RIPS), ADMIN.17-19 (HC), MED.11 (operative note), MED.16 |
-   | **4** | Cobro duplicado | FIN.21 (repeated study), FIN.33 (overlap), FIN.38 (unbundling) |
-   | **5** | Tarifa incorrecta | FIN.07-09 (manual/UVB), FIN.13-16 (liquidation), FIN.23-25 (copays) |
-   | **6** | Agotamiento de cobertura | FIN.20 (caps), FIN.21 (grace period) |
-   | **7** | Genérica / devolución | ADMIN.12-14 (DIAN invoice), ADMIN.24 (timeliness), FIN.29-31 (dates/consecutive) |
+   | `Cobertura` (exclusion) | `1` | No cobertura contractual |
+   | `Cobertura` (cap exceeded) | `6` | Agotamiento de cobertura |
+   | `Pertinencia` | `2` | No pertinencia clinica |
+   | `Soportes` | `3` | Documentacion incompleta |
+   | `Facturacion` (duplicate / unbundling) | `4` | Cobro duplicado |
+   | `Tarifas` | `5` | Tarifa incorrecta |
+   | `Autorizacion` | `7` | Generica (subcausal: falta autorizacion) |
+   | `Facturacion` (phantom / dx-change / post-mortem) | `7` | Generica (subcausal: improcedencia) |
 
-   Rules:
-   - Use the deterministic mapping table first.
-   - If a finding could map to multiple causales, pick the most severe by this ranking: 4 > 2 > 5 > 1 > 3 > 6 > 7.
-   - If no mapping applies → mark the finding as `needs-human-review` (do not force a causal).
-   - Assign the **subcausal** if Anexo 6 defines one (e.g. `3.1` clinical documentation, `3.2` administrative documentation).
+   Use the deterministic mapping. Assign `subcausal` if Anexo 6 defines one (e.g. `3.1` clinical documentation, `3.2` administrative documentation). If sub-agents disagree on causal for the same `(item_cups)`, treat as a contradiction and flag the case for `needs-fix-review`.
 
 7. **Compute zone and amounts.**
    - `score` = Σ `peso` of deduplicated findings with `resultado=fail`.
@@ -140,28 +144,35 @@ The question it answers: **given what the three audits found, which findings are
    }
    ```
 
-9. **Apply workflow labels.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/labels
-   ```
+9. **Causal-based forced routing (evaluate FIRST, before the matrix).**
 
-   Decision matrix:
+   If any deduplicated finding has `causal in {Soportes, Cobertura, Pertinencia}`, the case **must** route to `needs-human-review` regardless of zone, confidence, or contradictions. Set `case_status = "Pendiente revision"`, `forced_human_review = true`, and `forced_human_review_reason` listing the triggering causales.
 
-   | Zone | Global confidence | Contradictions between auditors | Label |
-   |---|---|---|---|
-   | Green | ≥ 0.7 | No | `auto-approve` |
-   | Green | < 0.7 | - | `needs-human-review` |
-   | Yellow | any | - | `needs-human-review` |
-   | Red | ≥ 0.7 | No | `auto-denial` |
-   | Red | ≥ 0.7 | Yes (e.g. admin says OK, financial says fraud) | `needs-fix-review` |
-   | Red | < 0.7 | - | `needs-human-review` |
+   Rationale: these three causales involve subjective judgment (clinical text reading, contract interpretation, clinical appropriateness) and have high reversal risk if auto-sent. The other three (`Facturacion`, `Tarifas`, `Autorizacion`) are objective and safe to auto-route.
 
-   Always add: `consolidated`.
+10. **Apply workflow labels** (only if `forced_human_review = false`).
+    ```
+    POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/labels
+    ```
 
-10. **Update the case status.**
+    Decision matrix (only applies when all glosa causales are in `{Facturacion, Tarifas, Autorizacion}`):
+
+    | Zone | Global confidence | Contradictions | Label | case_status |
+    |---|---|---|---|---|
+    | Green | ≥ 0.7 | No | `auto-approve` | `Lista para enviar` |
+    | Green | < 0.7 | - | `needs-human-review` | `Pendiente revision` |
+    | Yellow | any | No | `auto-route-send` | `Lista para enviar` |
+    | Yellow | any | Yes | `needs-fix-review` | `Pendiente revision` |
+    | Red | ≥ 0.7 | No | `auto-denial` | `Lista para enviar` |
+    | Red | ≥ 0.7 | Yes | `needs-fix-review` | `Pendiente revision` |
+    | Red | < 0.7 | - | `needs-human-review` | `Pendiente revision` |
+
+    First matching row wins. Always add: `consolidated`.
+
+11. **Update the case status.**
     ```
     PATCH {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-    { "status": "consolidated", "zona": "...", "score": ..., "total_objetado": ... }
+    { "status": "consolidated", "zona": "...", "score": ..., "total_objetado": ..., "case_status": "Lista para enviar | Pendiente revision" }
     ```
 
 ## Pitfalls
@@ -173,15 +184,26 @@ The question it answers: **given what the three audits found, which findings are
 - **Symptom:** yellow zone but a critical rule fails. **Cause:** zone logic evaluated before the critical-rule gate. **Fix:** a critical with high confidence ALWAYS forces red.
 - **Symptom:** two labels applied simultaneously (`auto-denial` and `needs-human-review`). **Cause:** previous label not removed. **Fix:** before applying, `DELETE /cases/{id}/labels/*` for mutually exclusive labels.
 - **Symptom:** contradictions between auditors go undetected (`needs-fix-review` never fires). **Cause:** contradiction check compares only `fail` findings, missing when one says `pass` and another `fail` on the same item. **Fix:** cross by invoice_item as well; if admin passes and financial fails on the same item → contradiction.
+- **Symptom:** Soportes finding gets auto-approved (Green zone + high confidence). **Cause:** the causal-routing pre-rule (step 9) was skipped. **Fix:** ALWAYS evaluate the `{Soportes, Cobertura, Pertinencia}` trigger BEFORE the zone/confidence matrix. These causales force `Pendiente revision` regardless of any other signal.
+- **Symptom:** same CUPS, two causales (Tarifas + Facturacion), merged into one finding. **Cause:** dedup keyed only on `invoice_item`. **Fix:** dedup key is `(item_cups, causal)` -- different causales on the same item are independent glosas, not duplicates.
+- **Symptom:** financial-only finding (FIN.13) has confidence 0.5 because unanimity is 1/3. **Cause:** denominator hardcoded to 3. **Fix:** denominator is `auditors_capable_of_detecting`. FIN.* capable=financial only → unanimity 1.0.
+- **Symptom:** per-item `Σ valor_objetado > item.total_price`. **Cause:** multiple causales on the same item summed without cap. **Fix:** after dedup, cap the lowest-severity contribution so the per-item sum equals `item.total_price`.
+- **Symptom:** phantom-billing finding mapped to Anexo 6.3 (documentacion incompleta). **Cause:** confused with Soportes. **Fix:** phantom/impossible service → Anexo 6.7 (Generica). Soportes → 6.3.
+- **Symptom:** consolidation runs with only 2 of 3 audits present. **Cause:** orchestrator dispatched the consolidator early. **Fix:** validate ALL three `audit_type` values exist; else abort and leave a case note.
+- **Symptom:** `Lista para enviar` glosas list includes one with `valor_objetado = 0`. **Fix:** drop zero-value findings from the send list; keep them only in the audit trail.
 
 ## Verification
 
 - `GET /cases/{case_id}/consolidated` returns an object with `consolidated_findings[]` and `case_summary`.
-- Every finding has a `causal` ∈ `{1,2,3,4,5,6,7}` OR is flagged `needs-human-review`.
-- No two findings with the same `evidencia` and different `finding_id` (dedup correct).
-- `total_objetado ≤ invoice_total`.
-- Exactly one decision label applied (`auto-approve`, `needs-human-review`, `auto-denial`, `needs-fix-review`).
-- If `zona=roja` with a high-confidence critical, label is `auto-denial` or `needs-fix-review`, never `auto-approve`.
+- Every finding has both `causal` (Sura strict 6-set) and `causal_anexo6` (numeric 1-7).
+- Every finding references a `codigo_cups` matching an item in the invoice (or `case_level=true` for invoice-wide findings).
+- For every `item_cups`: `Σ valor_objetado ≤ item.total_price`.
+- Any finding with `causal in {Soportes, Cobertura, Pertinencia}` → `case_status = "Pendiente revision"` and `forced_human_review = true`.
+- `case_status` ∈ `{"Lista para enviar", "Pendiente revision"}`, exactly one.
+- No two findings with the same `(item_cups, causal)` and different `finding_id` (dedup correct).
+- `total_facturado − total_objetado = total_a_pagar` within 1 COP.
+- Exactly one decision label applied (`auto-approve`, `auto-route-send`, `auto-denial`, `needs-human-review`, `needs-fix-review`).
+- If `zona=roja` with a high-confidence critical, label is `auto-denial` or `needs-fix-review` or `needs-human-review`, never `auto-approve`.
 - Case status is `consolidated`.
 
 ## References

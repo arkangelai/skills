@@ -111,6 +111,8 @@ The question it answers: **is the expediente formally complete and consistent en
    - **ADMIN.27** No documents with suspicious metadata (creation date after filing).
 
 5. **Assemble the `admin_audit` object.**
+
+   Findings are **item-keyed** (one entry per audited line item, including conformes), with the rule that detected the issue nested under `rule_ids`. Invoice-wide rules (e.g. ADMIN.12 CUV missing, ADMIN.24 timeliness) emit `case_level: true` instead of `item`/`codigo_cups`.
    ```json
    {
      "audit_type": "admin",
@@ -119,17 +121,65 @@ The question it answers: **is the expediente formally complete and consistent en
      "opinion": "<2-3 line summary>",
      "findings": [
        {
-         "rule_id": "ADMIN.07",
-         "severidad": "critica|mayor|media|baja",
+         "item": 1,
+         "codigo_cups": "H30104",
+         "hallazgo": "glosa",
+         "causal": "Soportes",
+         "valor_facturado": 5430500,
+         "valor_objetado": 5430500,
+         "valor_a_reconocer": 0,
+         "rule_ids": ["ADMIN.19"],
+         "severidad": "critica",
          "peso": 3,
-         "resultado": "pass|fail|conditional",
-         "evidencia": "contratos_ips.json: NIT 900... is not active as of 2026-03-15",
+         "resultado": "fail",
+         "motivo": "Procedimiento quirurgico sin nota operatoria adjunta",
+         "evidencia": "epicrisis.pdf p.3: cita CUPS H30104; carpeta soportes/ no contiene operative_note_*.pdf",
+         "nota": "Surgical CUPS missing operative note"
+       },
+       {
+         "item": 2,
+         "codigo_cups": "S10102",
+         "hallazgo": "conforme",
+         "causal": null,
+         "valor_facturado": 9625000,
          "valor_objetado": 0,
-         "nota": "IPS billed without an active contract"
+         "valor_a_reconocer": 9625000,
+         "rule_ids": [],
+         "resultado": "pass"
+       },
+       {
+         "case_level": true,
+         "hallazgo": "glosa",
+         "causal": "Facturacion",
+         "valor_objetado": 0,
+         "rule_ids": ["ADMIN.12"],
+         "severidad": "critica",
+         "peso": 3,
+         "resultado": "fail",
+         "motivo": "Factura sin CUV/CUFE valido",
+         "evidencia": "factura.xml: tag /Invoice/cbc:UUID@schemeID is missing"
        }
      ]
    }
    ```
+
+   **Causal vocabulary** (Sura strict 6-set): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map ADMIN.* rules to causales as follows:
+   - ADMIN.01–ADMIN.03 (identity), ADMIN.20–ADMIN.23 (cross-doc consistency) → `Facturacion`
+   - ADMIN.04–ADMIN.05 (BDUA, plan compatibility) → `Cobertura`
+   - ADMIN.06–ADMIN.07 (contract, modality) → `Facturacion`
+   - ADMIN.08–ADMIN.11 (RIPS structure) → `Soportes`
+   - ADMIN.12–ADMIN.14 (DIAN invoice) → `Facturacion`
+   - ADMIN.15–ADMIN.16 (authorization) → `Autorizacion`
+   - ADMIN.17–ADMIN.19 (HC, epicrisis, operative note) → `Soportes`
+   - ADMIN.24–ADMIN.27 (timeliness, traceability) → `Facturacion`
+
+   **Always emit a finding for every billed item**, including passes (`hallazgo="conforme"`, `valor_objetado=0`, `causal=null`). Downstream consumers (consolidator, dashboard, Excel) require full item coverage.
+
+   **Match items by `codigo_cups` first**, item index as tiebreaker. The extract step and the audit step are separate Claude calls -- item indexes can drift.
+
+   **Missing-attachment handling.** If a rule requires an attachment that is not present (e.g. ADMIN.15 needs the authorization PDF), emit `resultado="conditional"` rather than `fail`. Add `motivo: "Soporte requerido no adjunto"` and let consolidator/human-review request it.
+
+   **Multi-causal per item.** A single item can carry multiple findings under different causales (e.g. missing nota operatoria under Soportes AND wrong CUPS code under Facturacion). Emit one finding per (item, causal) pair.
 
    **Zone calculation:**
    - Green: 0-5 weight points lost.
@@ -162,11 +212,22 @@ The question it answers: **is the expediente formally complete and consistent en
 - **Symptom:** the admin audit was published but the consolidator does not see it. **Cause:** the aggregate object was published but not the individual findings (only one of the two endpoints). **Fix:** always publish both (step 6).
 - **Symptom:** BDUA says affiliate is inactive but they are actually active. **Cause:** local BDUA snapshot is stale (annual sync). **Fix:** if the critical BDUA rule fails, set `resultado=conditional` and let human-review query BDUA online.
 - **Symptom:** score fine, green zone, yet a critical rule failed. **Cause:** incorrect calculation — a failed critical forces the red zone. **Fix:** zone logic must first check if any Weight 3 rule has `resultado=fail`.
+- **Symptom:** consolidator drops items because there is no entry for them. **Cause:** skill emitted findings only for failures. **Fix:** emit one finding per invoice item (conforme entries included). Use `hallazgo="conforme"`, `valor_objetado=0`, `causal=null` for passes.
+- **Symptom:** finding references "item 3" but no CUPS, consolidator cannot match it. **Cause:** referencing by line number alone. **Fix:** always emit `codigo_cups` as the primary identifier; item index as tiebreaker only.
+- **Symptom:** required attachment is missing (e.g. authorization PDF), skill marks it `fail` and the case is wrongly auto-denied. **Fix:** missing soporte → `resultado="conditional"` so human review can request it.
+- **Symptom:** GPC catalog or BDUA reference data is absent, agent hallucinates rule outcomes. **Fix:** pre-check ref_data availability; if missing, emit `resultado="conditional"` with `motivo: "Catalog X not available, requires online lookup"`.
+- **Symptom:** multi-causal item (missing nota operatoria + wrong CUPS) produces only one finding. **Fix:** emit one finding per (item, causal) pair. Consolidator handles per-item caps.
 
 ## Verification
 
-- `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits?type=admin` returns exactly one record with all 27 rules evaluated (each with a `resultado`).
-- Every finding has a non-empty, citable `evidencia`.
+- `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits?type=admin` returns exactly one record.
+- The `findings[]` array has **one entry per invoice item** (conformes included), plus any `case_level=true` findings for invoice-wide rules.
+- Every finding with `hallazgo="glosa"` has both `causal` (from the strict 6-set) and `codigo_cups` (or `case_level=true`).
+- Every finding has a non-empty, citable `evidencia` (file + section/line/page).
+- Per item: `valor_a_reconocer + valor_objetado == item.total_price` (conservation of money).
+- For every `item_cups`: `Σ valor_objetado ≤ item.total_price`.
+- No two findings share the same `(item_cups, causal)` (multi-causal per item allowed; same-causal duplicates not).
+- All 27 rules are evaluated (recorded in `rule_ids` of relevant findings; rules that pass for all items are reflected in the conforme entries).
 - The sum `Σ peso × (1 if fail else 0)` matches `score`.
 - No critical rule with `resultado=fail` coexists with `zona=verde|amarilla` (invariant).
 - The skill did NOT read `medical_audit` nor `financial_audit` (independence is verifiable in logs).

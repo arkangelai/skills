@@ -104,26 +104,67 @@ The question it answers: **was what was billed clinically necessary, appropriate
    - **MED.28** Referral/counter-referral with documented response.
    - **MED.29** Clinical outcome documented (success, complications, readmissions, adverse events).
 
-5. **Build and publish `medical_audit`.** Same shape as `admin_audit`:
+5. **Build and publish `medical_audit`.**
+
+   Findings are **item-keyed** (one entry per audited line item, including conformes), with the rule that detected the issue nested under `rule_ids`:
    ```json
    {
      "audit_type": "medical",
-     "score": <>,
+     "score": <int>,
      "zona": "verde|amarilla|roja",
      "opinion": "<2-3 line clinical summary>",
      "findings": [
        {
-         "rule_id": "MED.11",
+         "item": 4,
+         "codigo_cups": "M00102",
+         "hallazgo": "glosa",
+         "causal": "Pertinencia",
+         "valor_facturado": 1800000,
+         "valor_objetado": 1060000,
+         "valor_a_reconocer": 740000,
+         "rule_ids": ["MED.14", "MED.15"],
          "severidad": "critica",
          "peso": 3,
          "resultado": "fail",
-         "evidencia": "HC p.12: no operative note for CUPS 471001 (colecistectomy) billed on 2026-03-10",
-         "valor_objetado": 850000,
-         "nota": "Surgical procedure without operative note — Res. 1995 requirement"
+         "motivo": "Remifentanilo seleccionado sin justificacion frente a alternativa de primera linea (fentanilo)",
+         "evidencia": "epicrisis.pdf p.4 'EVOLUCION CLINICA': sin nota de justificacion para remifentanilo; GPC anestesia: fentanilo es primera linea para procedimientos ambulatorios.",
+         "nota": "Pertinence flag: cheaper PBS alternative not used"
+       },
+       {
+         "item": 5,
+         "codigo_cups": "D08004",
+         "hallazgo": "conforme",
+         "causal": null,
+         "valor_facturado": 380000,
+         "valor_objetado": 0,
+         "valor_a_reconocer": 380000,
+         "rule_ids": [],
+         "resultado": "pass"
        }
      ]
    }
    ```
+
+   **Causal vocabulary** (Sura strict 6-set): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map MED.* rules:
+   - MED.01–MED.06 (CIE-10, GPC adherence) → `Pertinencia`
+   - MED.07–MED.09 (orden medica, RETHUS, prescription) → `Soportes`
+   - MED.10, MED.13 (procedure indication, quantity) → `Pertinencia`
+   - MED.11–MED.12 (operative note, consent) → `Soportes`
+   - MED.14–MED.15, MED.17 (medication pertinence, dose, supply proportionality) → `Pertinencia`
+   - MED.16 (administration record) → `Soportes`
+   - MED.18 (non-PBS without authorization) → `Cobertura`
+   - MED.19–MED.21 (diagnostic aid pertinence) → `Pertinencia`
+   - MED.22–MED.25 (admission, stay, interconsult) → `Pertinencia`
+   - MED.26–MED.29 (epicrisis, discharge) → `Soportes`
+
+   **Always emit a finding for every billed item**, including passes (`hallazgo="conforme"`, `valor_objetado=0`, `causal=null`).
+
+   **Match items by `codigo_cups` first**, item index as tiebreaker.
+
+   **Missing-attachment / catalog handling.** If a rule needs the GPC catalog or RETHUS lookup and ref_data is absent, emit `resultado="conditional"` -- never hallucinate.
+
+   **Multi-causal per item.** A single item may carry both a Pertinencia finding (e.g. unjustified medication) and a Soportes finding (e.g. missing administration record). Emit one entry per (item, causal) pair.
+
    Publish via `POST /cases/{case_id}/audits` plus each finding individually.
 
 6. **Mandatory evidence citation.**
@@ -143,12 +184,18 @@ The question it answers: **was what was billed clinically necessary, appropriate
 
 ## Verification
 
-- `GET /cases/{case_id}/audits?type=medical` returns exactly 1 record with 29 evaluated rules.
+- `GET /cases/{case_id}/audits?type=medical` returns exactly 1 record.
+- The `findings[]` array has **one entry per invoice item** (conformes included).
+- Every finding with `hallazgo="glosa"` has both `causal` (from the strict 6-set) and `codigo_cups` matching an item in the invoice.
 - Every finding with `resultado=fail` has `evidencia` referencing a specific file and location.
+- Per item: `valor_a_reconocer + valor_objetado == item.total_price`.
+- For every `item_cups`: `Σ valor_objetado ≤ item.total_price`.
+- Multi-causal per item allowed (e.g. one Pertinencia + one Soportes); same-causal duplicates are not.
+- All 29 rules represented (in `rule_ids` of relevant findings; rules that pass for all items are reflected via the conforme entries).
 - Weighted sum matches `score`.
 - If `zona=roja`, at least one critical rule failed OR score ≥16.
 - The skill did NOT read `admin_audit` nor `financial_audit` (independence).
-- If HC OCR failed, there is exactly one `conditional` finding and the skill aborted the rest of the evaluation.
+- If HC OCR failed or GPC/RETHUS catalog is absent, findings affected emit `resultado=conditional` (never hallucinate).
 
 ## References
 
