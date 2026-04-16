@@ -1,8 +1,8 @@
 # Medical Insurance Audit — Skills Pipeline
 
-Eight modular skills that implement the end-to-end audit pipeline for Colombian medical invoices (EPS–IPS), from Gmail intake to glosa (claim denial) delivery.
+Nine modular skills that implement the end-to-end audit pipeline for Colombian medical invoices (EPS–IPS), from Gmail intake to glosa (claim denial) delivery.
 
-Each skill is **modular and independent** — they can run standalone or be chained together by an orchestrator.
+Each skill is **modular and independent** — they can run standalone, or be chained together by the included **`medical-invoice-audit-orchestrator`** skill (the entry point for "audit invoice X" / "what state is case Y in" type requests).
 
 Domain terms that remain in Spanish are proper nouns from Colombian healthcare regulation (glosa, RAD, RIPS, EPS, IPS, CUPS, BDUA, RETHUS, MIPRES, DIAN, causal, Anexo 6).
 
