@@ -56,7 +56,7 @@ The question it answers: **given what the three audits found, which findings are
 
    Two findings are duplicates only when **both** match:
    - Same `codigo_cups` (or both case-level for invoice-wide rules), AND
-   - Same `causal` (Sura vocabulary -- see step 6).
+   - Same `causal` (canonical 6-set vocabulary -- see step 6).
 
    This is critical for multi-error facturas: the same CUPS can have **independent** glosas under different causales (e.g. H30104 with FIN.13 Tarifas + FIN.36 phantom Facturacion → KEEP BOTH). Same CUPS + same causal across two auditors IS a duplicate.
 
@@ -87,11 +87,11 @@ The question it answers: **given what the three audits found, which findings are
 
 6. **Translate to canonical causal vocabulary.**
 
-   Sub-agents emit findings using the **Sura strict 6-set**: `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. The consolidator emits BOTH `causal` (Sura) and `causal_anexo6` (Res. 3047 codes 1-7 with subcausal) on every finding.
+   Sub-agents emit findings using the **canonical 6-set**: `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. This internal vocabulary is shared across all sub-agents (admin, medical, financial). The consolidator emits BOTH `causal` (internal 6-set) and `causal_anexo6` (Res. 3047 codes 1-7 with subcausal) on every finding.
 
-   Translation table (Sura → Anexo 6):
+   Translation table (internal 6-set → Anexo 6):
 
-   | Sura causal | Anexo 6 code | Anexo 6 name |
+   | Causal interno | Anexo 6 code | Anexo 6 name |
    |---|---|---|
    | `Cobertura` (exclusion) | `1` | No cobertura contractual |
    | `Cobertura` (cap exceeded) | `6` | Agotamiento de cobertura |
@@ -195,7 +195,7 @@ The question it answers: **given what the three audits found, which findings are
 ## Verification
 
 - `GET /cases/{case_id}/consolidated` returns an object with `consolidated_findings[]` and `case_summary`.
-- Every finding has both `causal` (Sura strict 6-set) and `causal_anexo6` (numeric 1-7).
+- Every finding has both `causal` (internal 6-set) and `causal_anexo6` (numeric 1-7).
 - Every finding references a `codigo_cups` matching an item in the invoice (or `case_level=true` for invoice-wide findings).
 - For every `item_cups`: `Σ valor_objetado ≤ item.total_price`.
 - Any finding with `causal in {Soportes, Cobertura, Pertinencia}` → `case_status = "Pendiente revision"` and `forced_human_review = true`.

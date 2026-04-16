@@ -83,7 +83,7 @@ The question it answers: **how do I turn the consolidated output into a legal, t
    | 10 | Motivo / Observacion | 50 | text wrap |
    | 11 | Evidencia requerida | 30 | text wrap |
 
-   Header row: white text on Sura-blue fill (`#0033A0`), bold, centered.
+   Header row: white text on EPS brand fill (configurable; example `#0033A0`), bold, centered.
 
    Row coloring:
    - Glosa row: light red fill `#FCE5E5`. Decision cell red bold (`#DA1414`).

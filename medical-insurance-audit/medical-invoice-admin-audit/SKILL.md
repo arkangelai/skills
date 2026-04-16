@@ -163,7 +163,7 @@ The question it answers: **is the expediente formally complete and consistent en
    }
    ```
 
-   **Causal vocabulary** (Sura strict 6-set): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map ADMIN.* rules to causales as follows:
+   **Causal vocabulary** (canonical 6-set used across all sub-agents): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map ADMIN.* rules to causales as follows:
    - ADMIN.01–ADMIN.03 (identity), ADMIN.20–ADMIN.23 (cross-doc consistency) → `Facturacion`
    - ADMIN.04–ADMIN.05 (BDUA, plan compatibility) → `Cobertura`
    - ADMIN.06–ADMIN.07 (contract, modality) → `Facturacion`

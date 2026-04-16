@@ -15,13 +15,13 @@ required_environment_variables:
     help: The account needs gmail.send scope and, optionally, directory access
     required_for: full functionality
   - name: GMAIL_SENDER_ADDRESS
-    prompt: Address the glosa is sent from (e.g. auditoria@sura.com.co)
+    prompt: Address the glosa is sent from (e.g. auditoria@{eps-domain}.com.co)
     required_for: full functionality
   - name: GMAIL_SENDER_DISPLAY_NAME
-    prompt: RFC 5322 display name (e.g. "Auditoria Medica Sura")
+    prompt: RFC 5322 display name (e.g. "Auditoria Medica {EPS}")
     required_for: full functionality
   - name: EPS_NAME
-    prompt: EPS short name to use in body and subject (e.g. Sura)
+    prompt: EPS short name to use in body and subject
     required_for: full functionality
   - name: DEST_SOFTWARE_BASE_URL
     prompt: Base URL of the destination software
@@ -104,7 +104,7 @@ The question it answers: **how do I formally deliver the glosa to the IPS with t
    - `email_legal_cc` from `contratos_ips.json`.
    - EPS internal archive mailbox.
 
-   Demo seed mapping (for sura-demo):
+   Common Colombian IPS contacts (starter list -- override with your own `contratos_ips.json`):
    - Hospital San Jose → `facturacion@hospitalsanjose.com.co`
    - Clinica Las Americas → `cuentas@lasamericas.com.co`
    - Hospital Pablo Tobon Uribe → `facturacion@hptu.org.co`
@@ -126,7 +126,7 @@ The question it answers: **how do I formally deliver the glosa to the IPS with t
    ```
    From: {GMAIL_SENDER_DISPLAY_NAME} <{GMAIL_SENDER_ADDRESS}>
    ```
-   Example: `Auditoria Medica Sura <auditoria@sura.com.co>`. Plain `auditoria@sura.com.co` reads as cold/automated; the display-name form is more institutional.
+   Example: `Auditoria Medica EPS XYZ <auditoria@epsxyz.com.co>`. Plain `auditoria@epsxyz.com.co` reads as cold/automated; the display-name form is more institutional.
 
    **Body (plain text, brief, no specific amounts):**
    ```
@@ -244,7 +244,7 @@ The question it answers: **how do I formally deliver the glosa to the IPS with t
 - **Symptom:** inconsistent state after partial failure (XLSX sent, label not updated). **Cause:** error between step 5 and 7. **Fix:** if send succeeded but the software API failed, retry the update with backoff; do NOT resend the email.
 - **Symptom:** body says total objetado $3.2M, attachment says $3.15M -- IPS challenges legally. **Cause:** body included specific amounts that diverged from the regenerated XLSX. **Fix:** body never quotes amounts. All figures live only in the attachment.
 - **Symptom:** subject `[GLOSA] RAD ...` lands in IPS spam. **Cause:** bracket prefixes triggered Bayesian filters. **Fix:** subject is exactly `Resultado de auditoria - Factura {num_factura}` -- no brackets.
-- **Symptom:** sender shows as `auditoria@sura.com.co` only (no name), reads as automated. **Fix:** RFC 5322 display-name form: `Auditoria Medica Sura <auditoria@sura.com.co>`.
+- **Symptom:** sender shows as the bare email only (no name), reads as automated. **Fix:** RFC 5322 display-name form: `Auditoria Medica {EPS_NAME} <{GMAIL_SENDER_ADDRESS}>`.
 - **Symptom:** XLSX arrives with content-type `application/octet-stream`. **Cause:** missing `--attach-mime`. **Fix:** explicit `--attach-mime "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"`.
 - **Symptom:** `notification_date` is one day earlier than the actual send. **Cause:** UTC time on a late-afternoon send. **Fix:** always store with `-05:00` offset (Bogota); compute the 15-dias-habiles deadline from local date.
 - **Symptom:** v2 resend blocked because case has `claim-denial-sent` from v1. **Cause:** label-only check, ignored that document version advanced. **Fix:** abort only if `highest_sent_version >= highest_document_version`. v2 must be allowed to send when v1 is the only sent version and v2 was just generated.
@@ -257,7 +257,7 @@ The question it answers: **how do I formally deliver the glosa to the IPS with t
 - The case has label `4. Notificada` and not `claim-denial-ready` / `3. Auditada`.
 - `GET /cases/{id}/claim-denial-delivery` returns the delivery with a non-empty `sent_message_id`.
 - In Gmail, the message exists in `SENT` with correct `X-Case-Id`, `X-RAD`, `X-Claim-Denial-Version` headers.
-- The `From` header is RFC 5322 display-name form (`Auditoria Medica Sura <auditoria@sura.com.co>`).
+- The `From` header is RFC 5322 display-name form (`Auditoria Medica {EPS_NAME} <{GMAIL_SENDER_ADDRESS}>`).
 - Subject is exactly `Resultado de auditoria - Factura {num_factura}` (no bracket prefixes).
 - Body contains no money amounts (numbers only in attachment).
 - Primary attachment is XLSX with mime `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`. PDF (when present) is secondary.

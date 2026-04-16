@@ -141,7 +141,7 @@ Restrict patches to the editable subset. Reject patches to immutable fields with
    {
      "actor": "fix-review-bot",
      "triggered_by_comment": "cm_456",
-     "comment_author": "ana.medica@sura.com.co",
+     "comment_author": "ana.medica@eps.com.co",
      "intent": "modify_finding",
      "finding_id": "fx-003",
      "changes": [

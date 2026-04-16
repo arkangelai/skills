@@ -145,7 +145,7 @@ The question it answers: **was what was billed clinically necessary, appropriate
    }
    ```
 
-   **Causal vocabulary** (Sura strict 6-set): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map MED.* rules:
+   **Causal vocabulary** (canonical 6-set used across all sub-agents): `Facturacion | Tarifas | Soportes | Autorizacion | Cobertura | Pertinencia`. Map MED.* rules:
    - MED.01–MED.06 (CIE-10, GPC adherence) → `Pertinencia`
    - MED.07–MED.09 (orden medica, RETHUS, prescription) → `Soportes`
    - MED.10, MED.13 (procedure indication, quantity) → `Pertinencia`
