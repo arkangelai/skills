@@ -42,6 +42,72 @@ The question it answers: **how do I formally deliver the glosa to the IPS with t
 
 **Do not use:** if the case still has `needs-human-review` or `needs-fix-review` (not yet approved); if it already has `claim-denial-sent` (avoid duplicates, confirm with the user).
 
+## Input Contract
+
+The skill reads the approved `output.json` and the latest PDF version:
+
+```json
+{
+  "output": {
+    "caso_id": "RAD-YYYYMMDD-{num_factura}",
+    "factura": {
+      "num_factura": "<string>",
+      "prestador": "<string>",
+      "prestador_nit": "<string>",
+      "paciente_nombre": "<string>",
+      "paciente_documento": "<tipo> <numero>",
+      "fecha_atencion": "YYYY-MM-DD",
+      "fecha_factura": "YYYY-MM-DD",
+      "diagnostico_principal": "<CIE-10> - <descripcion>",
+      "plan_afiliado": "ORO | PLATA | BASICO",
+      "total_facturado": 0
+    },
+    "hallazgos": [ /* approved state */ ],
+    "resumen": {
+      "total_facturado": 0,
+      "total_aprobado": 0,
+      "total_glosado": 0,
+      "concepto_final": "NO_APTA | DEVOLUCION",
+      "accion_requerida": "...",
+      "resumen_ejecutivo": "..."
+    }
+  },
+  "pdf": {
+    "document_id": "<uuid>",
+    "version": "v1 | v2 | ...",
+    "pdf_url": "https://.../cases/{caso_id}/documents/{doc_id}/content",
+    "sha256": "<hex>"
+  },
+  "source_message_id": "<gmail-message-id | null>"
+}
+```
+
+Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `claim-denial-ready` label exists.
+
+## Output Contract
+
+```json
+{
+  "caso_id": "RAD-YYYYMMDD-{num_factura}",
+  "rad": "<string>",
+  "version_enviada": "v1 | v2 | ...",
+  "sent_at": "YYYY-MM-DDTHH:MM:SS-05:00",
+  "sent_message_id": "<gmail-message-id>",
+  "thread_id": "<gmail-thread-id>",
+  "recipient_to": "<email>",
+  "recipient_cc": ["<email>"],
+  "status": "claim_denial_sent"
+}
+```
+
+**`notification_date`** (set on the case as `PATCH /cases/{caso_id}`) is the legal base date for the 15 business-day IPS response deadline per Res. 3047/2008 Art. 6. It must match `sent_at` date exactly.
+
+**Email body invariants:**
+- Subject format: `[GLOSA] RAD {rad} — Factura {num_factura} — IPS {prestador}`
+- Body must include: `total_facturado`, `total_objetado`, `total_aprobado` (formatted as `$X.XXX.XXX` with Colombian locale), list of causales with item counts, and the "15 días hábiles" deadline reference.
+- PDF attached as `application/pdf` with filename `glosa_{rad}_{version}.pdf`.
+- Headers: `In-Reply-To: {source_message_id}` (if available), `X-Case-Id: {caso_id}`, `X-RAD: {rad}`.
+
 ## Procedure
 
 1. **Pre-flight checks.**

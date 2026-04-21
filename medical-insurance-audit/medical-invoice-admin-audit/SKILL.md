@@ -37,6 +37,67 @@ The question it answers: **is the expediente formally complete and consistent en
 
 **Do not use:** if the case is not yet filed (skill 1 missing); if the case already has `admin_audit` published and a re-audit was not requested.
 
+## Input Contract
+
+**Template:** `metadata_input.json` produced by `medical-invoice-gmail-intake` — 8 flat fields (`caso_id`, `fecha_radicacion`, `num_factura`, `prestador_nit`, `prestador_nombre`, `pagador_nit`, `pagador_nombre`, `documentos`). See `../medical-invoice-gmail-intake/metadata_input.json` for the canonical shape.
+
+Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contratos_ips.json` (IPS contracts). Fetches each document listed in `documentos` from the destination software.
+
+## Output Contract
+
+**Template:** `checklist_base.json` in this directory — DAMA-UK instrument, 27 rules (A01–A27). For SOAT cases use `checklist_soat_base.json` instead. See `checklist_base.md` for rule descriptions and evidence requirements.
+
+Load the template and fill every rule's nullable fields:
+- `resultado`: `"pass" | "fail" | "n/a"`
+- `evidencia`: citable string — file + page/section + literal quote
+- `confianza`: float 0.0–1.0
+- `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
+
+Then fill `meta` and append `cierre`:
+
+```json
+{
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-admin-v1" },
+  "cierre": {
+    "score_total": 100.0,
+    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "clasificacion": "Administrativo",
+    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
+    "resumen_ejecutivo": "<2-3 oraciones>"
+  }
+}
+```
+
+Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+
+**Rules for `resultado`:**
+- `pass` — rule satisfied with evidence.
+- `fail` — rule violated; `glosa_sugerida` must be populated.
+- `n/a` — rule does not apply to this service type (e.g. SOAT rule on a non-SOAT invoice).
+
+**Rules for `confianza`:**
+- `≥ 0.95`: direct document quote or verified system query (DIAN, BDUA).
+- `0.80–0.94`: specific document reference without literal quote.
+- `0.75–0.79`: strong inference with partial evidence.
+- `< 0.75` on any `critica` rule → `concepto_final` forced to `ESCALAR_HUMANO`.
+
+**`glosa_sugerida` shape (only when `resultado = fail`):**
+```json
+{
+  "causal_num": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+  "causal_nombre": "<nombre causal Res. 3047 Anexo 6>",
+  "texto": "<1-2 oraciones trazables con cita>",
+  "valor_glosado": 0,
+  "moneda": "COP"
+}
+```
+
+**`concepto_final` decision logic:**
+- `NO_APTA`: any `critica` rule with `fail` that is not subsanable (e.g. missing HC entirely).
+- `DEVOLUCION`: any `critica` rule with `fail` that is subsanable by submitting documents.
+- `ESCALAR_HUMANO`: any `critica` rule with `confianza < 0.75`, or ambiguous evidence.
+- `APTA`: all applicable rules `pass` and no escalation trigger.
+
 ## Procedure
 
 1. **Read the case from the destination software.**

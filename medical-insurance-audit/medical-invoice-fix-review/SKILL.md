@@ -32,6 +32,76 @@ The question it answers: **what did the human ask for and how do I apply it to t
 
 **Do not use:** if no new comments exist (polling with no work); if the case already has `claim-denial-ready`; if the comment does not concern the glosa (e.g. general chat).
 
+## Input Contract
+
+The skill reads the current `output.json` from the consolidator plus the human comment objects:
+
+```json
+{
+  "output": {
+    "caso_id": "RAD-YYYYMMDD-{num_factura}",
+    "factura": { /* ... */ },
+    "hallazgos": [ /* current state, may have been patched by prior fix-review runs */ ],
+    "resumen": { /* current state */ }
+  },
+  "comments": [
+    {
+      "comment_id": "<uuid>",
+      "author": "<email>",
+      "author_role": "auditor | viewer | bot",
+      "text": "<human comment text>",
+      "target_item": 1,
+      "created_at": "YYYY-MM-DDTHH:MM:SS-05:00"
+    }
+  ]
+}
+```
+
+Comments must be processed in ascending chronological order. Only comments where `author_role = auditor` can trigger `approve`. Skip comments where `author` ends in `-bot`.
+
+## Output Contract
+
+**When changes were applied:**
+
+```json
+{
+  "caso_id": "RAD-YYYYMMDD-{num_factura}",
+  "comments_processed": [
+    {
+      "comment_id": "<uuid>",
+      "intent": "modify_finding | add_finding | remove_finding | change_causal | adjust_value | add_evidence | approve | ask_clarification | ambiguous",
+      "target_item": 1,
+      "changes_applied": [
+        { "op": "replace", "path": "/hallazgos/2/valor_objetado", "value": 1500000 }
+      ]
+    }
+  ],
+  "output_updated": {
+    "hallazgos": [ /* full updated array */ ],
+    "resumen": {
+      "total_facturado": 0,
+      "total_aprobado": 0,
+      "total_glosado": 0,
+      "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+      "accion_requerida": "..."
+    }
+  },
+  "pdf_regenerated": true,
+  "new_pdf_version": "v2",
+  "last_processed_at": "YYYY-MM-DDTHH:MM:SS-05:00"
+}
+```
+
+**When `intent = approve` (and valid):** the `output.json` is not modified. The case label changes to `claim-denial-ready` and the returned object includes `{ "approved": true, "approved_by": "<email>", "pdf_version_approved": "v2" }`.
+
+**When no changes (only clarifications or ambiguous):** `pdf_regenerated: false`, `new_pdf_version: null`.
+
+**Money invariants after every patch:**
+- `resumen.total_glosado = sum(hallazgos[].valor_objetado)` — always recomputed.
+- `resumen.total_aprobado = factura.total_facturado − resumen.total_glosado`.
+- `hallazgos[].valor_objetado ≥ 0` always — if a patch would make it negative, reject and reply asking for clarification.
+- `resumen.total_glosado ≤ factura.total_facturado` always.
+
 ## Procedure
 
 1. **Detect new comments.**

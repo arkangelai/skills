@@ -36,6 +36,62 @@ The question it answers: **was what was billed clinically necessary, appropriate
 
 **Do not use:** if the case does not have HC or epicrisis attached; if `medical_audit` is already published and a re-audit was not requested.
 
+## Input Contract
+
+**Template:** same `metadata_input.json` shape as admin-audit — see `../medical-invoice-gmail-intake/metadata_input.json`.
+
+Additionally the skill resolves the applicable GPC before running rules:
+1. Extracts `diagnostico_principal` (CIE-10) from `factura.pdf`.
+2. Looks up the CIE-10 in `guias-clinicas/INDEX.md` (this skill's directory) to find the applicable GPC file.
+3. Loads `guias-clinicas/{gpc_file}.md` for criteria, indications, and standard of care.
+4. If no GPC matches → `meta.gpc_aplicada = null`, M04 → `n/a`, `concepto_final = ESCALAR_HUMANO`.
+
+## Output Contract
+
+**Template:** `checklist_base.json` in this directory — PERT-CLIN instrument, 29 rules (M01–M29). See `checklist_base.md` for rule descriptions and evidence requirements.
+
+Load the template and fill every rule's nullable fields:
+- `resultado`: `"pass" | "fail" | "n/a"`
+- `evidencia`: `"{file} p.{N}[, section X][, line Y]: <literal quote>"` — use absence format when not found
+- `confianza`: float 0.0–1.0
+- `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
+
+Then fill `meta` and append `cierre`:
+
+```json
+{
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or null>" },
+  "cierre": {
+    "score_total": 100.0,
+    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "clasificacion": "Clinico",
+    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
+    "resumen_ejecutivo": "<2-3 oraciones con GPC referenciada>"
+  }
+}
+```
+
+Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+
+**`resultado`, `confianza`, and `glosa_sugerida`** follow the same rules as admin-audit. Evidence must cite the clinical document: `"HC ingreso p.3: motivo consulta dolor hipocondrio derecho..."`.
+
+**Absence as evidence:** If looking for an operative note and it is not found after searching the full HC PDF by content keywords (`NOTA OPERATORIA`, `DESCRIPCIÓN QUIRÚRGICA`), the evidence must state: `"HC pp.1-40: no se encontro nota operatoria para CUPS {X}"`.
+
+**`concepto_final` specifics:**
+- M06 (`fail`) → always `ESCALAR_HUMANO` (GPC deviation without justification requires human clinical judgment).
+- HC OCR failure → single `conditional` finding, abort remaining rules, `ESCALAR_HUMANO`.
+
+**`glosa_sugerida` shape (only when `resultado = fail`):**
+```json
+{
+  "causal_num": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+  "causal_nombre": "<nombre causal Res. 3047 Anexo 6>",
+  "texto": "<1-2 oraciones con cita de HC y regla GPC>",
+  "valor_glosado": 0,
+  "moneda": "COP"
+}
+```
+
 ## Procedure
 
 1. **Read the case and clinical attachments.**

@@ -39,6 +39,79 @@ The question it answers: **does the billed amount match the contract and the app
 
 **Do not use:** if the case does not have an XML invoice or RIPS attached; if `financial_audit` is already published and a re-audit was not requested.
 
+## Input Contract
+
+**Template:** same `metadata_input.json` shape — see `../medical-invoice-gmail-intake/metadata_input.json`.
+
+Additionally the skill resolves two reference hierarchies from this skill's directory before running any rules:
+
+**Plan resolution** (determines coverage rules, exclusions, caps, and carency):
+1. Extract `plan_afiliado` (ORO / PLATA / BASICO) from BDUA using `paciente_documento`.
+2. Load `planes/INDEX.md` → identify plan file.
+3. Load `planes/plan_{id}.md` for the applicable coverage rules.
+
+**Tariff resolution** (ordered by precedence):
+1. Load `tarifarios/INDEX.md` — defines the precedence order.
+2. Contract-specific tariff (e.g. `tarifarios/tarifario_contrato_eps_2026.csv`) — highest priority.
+3. ISS 2001 tariff (`tarifarios/tarifario_iss_2001.csv`) — fallback if the contract references it.
+4. SOAT 2026 tariff (`tarifarios/tarifario_soat_2026.csv`) — legal floor for SOAT cases only.
+
+The resolved `plan_afiliado` and `tarifario_aplicado` are written to `meta` before any rules run.
+
+## Output Contract
+
+**Template:** `checklist_base.json` in this directory — FIN-CTR instrument, 42 rules (F01–F42). See `checklist_base.md` for rule descriptions and evidence requirements.
+
+Load the template and fill every rule's nullable fields:
+- `resultado`: `"pass" | "fail" | "n/a"`
+- `evidencia`: explicit calculation — `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"` — never generic descriptions
+- `confianza`: float 0.0–1.0
+- `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
+
+Then fill `meta` and append `cierre`:
+
+```json
+{
+  "meta": {
+    "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-financiero-v1",
+    "plan_afiliado": "ORO | PLATA | BASICO",
+    "tarifario_aplicado": "<nombre completo del tarifario resuelto>"
+  },
+  "cierre": {
+    "score_total": 100.0,
+    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "clasificacion": "Financiero",
+    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
+    "resumen_ejecutivo": "<2-3 oraciones con tarifario y plan referenciados>",
+    "valor_facturado": 0,
+    "valor_aprobado": 0,
+    "valor_glosado": 0
+  }
+}
+```
+
+Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+
+**Evidence format for tariff rules (mandatory):** `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"`. Never use generic descriptions like "tariff mismatch".
+
+**`resultado`, `confianza`** follow the same rules as admin-audit. `confianza < 0.75` on any `critica` rule → `ESCALAR_HUMANO`.
+
+**`glosa_sugerida` shape (only when `resultado = fail`):**
+```json
+{
+  "causal_num": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+  "causal_nombre": "<nombre causal Res. 3047 Anexo 6>",
+  "texto": "<1-2 oraciones con calculo y referencia contractual>",
+  "valor_glosado": 0,
+  "moneda": "COP"
+}
+```
+
+**`cierre` financial fields:**
+- `valor_facturado`: sum of all invoice line items (integer COP).
+- `valor_aprobado`: `valor_facturado − valor_glosado`.
+- `valor_glosado`: sum of `glosa_sugerida.valor_glosado` across all failing rules. Must be `≤ valor_facturado`.
+
 ## Procedure
 
 1. **Read the case and attachments.**

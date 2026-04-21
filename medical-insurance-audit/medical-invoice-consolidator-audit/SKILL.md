@@ -41,6 +41,40 @@ The question it answers: **given what the three audits found, which findings are
 
 **Do not use:** if any of the three audits is missing; if the case already has `consolidated_findings` and a reconsolidation was not requested.
 
+## Input Contract
+
+Reads the three filled checklists published by the parallel audit skills:
+
+| Instrumento | Skill | Template shape |
+|---|---|---|
+| `DAMA-UK` (admin) | `medical-invoice-admin-audit` | `../medical-invoice-admin-audit/checklist_base.json` — 27 rules (A01–A27) |
+| `PERT-CLIN` (médico) | `medical-invoice-medical-audit` | `../medical-invoice-medical-audit/checklist_base.json` — 29 rules (M01–M29) |
+| `FIN-CTR` (financiero) | `medical-invoice-financial-audit` | `../medical-invoice-financial-audit/checklist_base.json` — 42 rules (F01–F42) |
+
+Fetch via `GET /cases/{case_id}/audits` — validate that all three `instrumento` values are present; abort if any is missing.
+
+Also reads `factura.pdf` directly to populate the `factura` block in the output. The `factura` block is **never copied from `metadata_input.json`** — fields like `paciente_nombre`, `paciente_documento`, `diagnostico_principal`, and `total_facturado` come from the invoice document, not from the filing envelope.
+
+## Output Contract
+
+**Template:** `output.json` in this directory — canonical structure for `hallazgos[]` (per CUPS item) and `resumen`. See `output.md` for detailed field-by-field specifications.
+
+The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Publish to `POST /cases/{caso_id}/consolidated` and persist as `output.json`.
+
+**`hallazgo` values:**
+- `conforme`: all three layers passed for this item. `capa`, `regla_aplicada`, `severidad`, `glosa_sugerida` are all `null`; `valor_objetado = 0`.
+- `glosa`: formal objection with evidence; `valor_objetado > 0`, `glosa_sugerida` populated.
+- `devolucion`: formal defect subsanable by document submission; `valor_objetado = 0` until the IPS responds.
+
+**Money invariant:** `total_glosado = sum(hallazgos[].valor_objetado)`. Per item, `valor_a_reconocer = valor_facturado − valor_objetado`. Never double-count: when a rule from multiple layers flags the same item, take `max(valor_glosado)` per item, not the sum.
+
+**`concepto_final` decision logic (evaluated in order; first match wins):**
+1. `NO_APTA` + `accion_requerida: "Rechazo"` — any `critica` rule with `resultado = fail` that is not subsanable by document submission (e.g. missing HC entirely, expired contract, patient not covered on service date).
+2. `DEVOLUCION` + `accion_requerida: "Complemento"` — any `critica` rule with `resultado = fail` that is subsanable by the IPS submitting additional documents (e.g. missing authorization, missing operative note).
+3. `ESCALAR_HUMANO` + `accion_requerida: "Escalar"` — any `critica` rule with `confianza < 0.75`, OR anti-fraud rules F32–F36 with `confianza < 0.9`.
+4. `APTA` + `accion_requerida: null` — all rules pass, `tasa_objecion = 0.0`, no devoluciones.
+5. `APTA` + `accion_requerida: "Correccion"` — some glosas exist but all are partial and subsanable (`tasa_objecion > 0` but no critical fails).
+
 ## Procedure
 
 1. **Read the three audits for the case.**
