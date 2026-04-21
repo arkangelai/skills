@@ -129,93 +129,34 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 3. **Extract invoice transactions.** Internal shape: `items[] = {cups, description, quantity, unit_price, total_price, access_route?, specialty?}`.
 
-4. **Run the TARIFF-FRAUD checklist.**
+4. **Run the FIN-CTR rule checklist.**
 
-   ### Group A — Active contract (Weight 3, critical)
-   - **FIN.01** Contract active on `service_date` with verified signatures.
-   - **FIN.02** Modality identified (event/PGP/cápita/paquete/global).
-   - **FIN.03** Annexes and amendments current and versioned.
+   Load `checklist_base.json` (42 rules F01–F42) and follow `checklist_base.md` for each rule, using the resolved `plan_afiliado` and `tarifario_aplicado` from the Input Contract step. Fill the four nullable fields per `checklist_base.md §2.2`:
 
-   ### Group B — Affiliate plan (Weight 3, critical)
-   - **FIN.04** Correct plan ID (Oro/Plata/Básico/Complementario) from BDUA.
-   - **FIN.05** Plan-specific tariff sheet applied (not generic).
-   - **FIN.06** Plan coverages and exclusions compatible with billed services.
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` when the rule doesn't apply to the billing modality (e.g. F19 PGP/cápita for an event-based contract).
+   - **`evidencia`**: mandatory explicit calculation for tariff rules. Format: `"{CUPS}: esperado={X} ({fuente, línea CSV}); cobrado={Y}; delta={Y-X} ({pct}%)"`. For anti-fraud rules (F32–F42), follow the evidence templates in `checklist_base.md §5` exactly — each pattern has a required format.
+   - **`confianza`**: `0.95+` for exact numeric comparisons, `0.80–0.95` for plan coverage interpretation, `<0.80` for any anti-fraud rule forces escalation.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `checklist_base.md §8`.
 
-   ### Group C — Applicable tariff manual (Weight 3, critical)
-   - **FIN.07** Correct manual per contract (SOAT, ISS 2001, proprietary).
-   - **FIN.08** Manual version valid on `service_date`.
-   - **FIN.09** Correct UVB/UVR factor by contract and date.
+   Anti-fraud thresholds (F29–F42) per `checklist_base.md §4` and §6:
+   - F32–F36 `fail` with `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
+   - Any F29–F42 `fail` with `confianza < 0.9` → `concepto_final = "ESCALAR_HUMANO"`.
+   - Anti-fraud finding with `valor_objetado > $10.000.000 COP` → always escalate regardless of confidence.
 
-   ### Group D — Coding (Weight 2/3)
-   - **FIN.10** CUPS correctly homologated to manual code.
-   - **FIN.11** Medications with valid CUM/ATC and current INVIMA.
-   - **FIN.12** Supplies/devices homologated to the contract list.
+   See `checklist_base.md §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
 
-   ### Group E — Liquidation (Weight 2/3)
-   - **FIN.13** Base tariff without over/under-charging (delta ≤ `TARIFF_DEVIATION_THRESHOLD_PCT`).
-   - **FIN.14** Correct surcharges applied (night/holiday/urgency/specialty).
-   - **FIN.15** Surgical liquidation per **access route** (same/different route, simultaneous surgeries).
-   - **FIN.16** Professional fees (surgeon, assistant, anesthetist) per specialty and manual.
+5. **Compute `cierre` y publicar el checklist.**
 
-   ### Group F — Packages vs. events (Weight 2/3)
-   - **FIN.17** Package-included services not billed as separate events.
-   - **FIN.18** Out-of-package events contractually justified.
-   - **FIN.19** PGP/cápita services not billed individually.
+   Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.3` and §4:
+   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over rules with `resultado ≠ "n/a"`.
+   - `concepto_final` — follow decision logic in `checklist_base.md §4`. Key thresholds: tariff deviation >10% → `NO_APTA`; 2–10% → `APTA` with partial glosa; <2% → `APTA`.
+   - `clasificacion`: `"Financiero"`.
+   - `valor_facturado`, `valor_aprobado`, `valor_glosado`: compute from the invoice items and all failing rule `valor_glosado` values. `valor_glosado ≤ valor_facturado` always; if not, there is a calculation error — escalate.
+   - `resumen_ejecutivo`: 1–2 sentences mentioning the tariff applied, the plan, and total disputed amount.
 
-   ### Group G — Coverages and limits (Weight 2, major)
-   - **FIN.20** Annual caps not exceeded without explicit authorization.
-   - **FIN.21** Grace periods respected.
-   - **FIN.22** Pre-existing conditions excluded per contract.
+6. **Publish the checklist.**
 
-   ### Group H — Copays (Weight 2, major)
-   - **FIN.23** Copay / moderating fee computed on affiliate IBC and within legal caps.
-   - **FIN.24** Amount collected from patient recorded and subtracted from the EPS invoice.
-   - **FIN.25** Exemptions applied (pregnant, minors, high-cost disease).
-
-   ### Group I — Financial close (Weight 1/2)
-   - **FIN.26** Billed total reconciles with contractual liquidation.
-   - **FIN.27** Filing within contractual/legal window.
-   - **FIN.28** IPS historical behavior within acceptable thresholds (glosa rate, upcoding).
-
-   ### Group J — Anti-fraud (14 rules) ⚠️
-   - **FIN.29** Issue date within contract and legal validity.
-   - **FIN.30** Issue date after service date (not pre-emitted) and within a reasonable window.
-   - **FIN.31** DIAN consecutive number with no gaps/repetitions against other invoices of the period.
-   - **FIN.32** Patient not simultaneously billed by multiple IPS on the same date (cross-check against destination software).
-   - **FIN.33** Inpatient stays do not overlap across institutions (physical impossibility).
-   - **FIN.34** No post-mortem services (cross `ruaf_snapshot.json`).
-   - **FIN.35** No double-billing SOAT+EPS+ARL without contractual justification.
-   - **FIN.36** Every service has execution evidence (no phantom billing).
-   - **FIN.37** No unjustified upcoding (CUPS more expensive than what is documented).
-   - **FIN.38** No unbundling (disaggregation of packaged procedures).
-   - **FIN.39** Professional not billed for physically impossible concurrent services (two simultaneous surgeries).
-   - **FIN.40** No suspicious diagnosis changes that increase coverage across invoice versions.
-   - **FIN.41** Medication/supply quantities proportional to the institutional benchmark.
-   - **FIN.42** IPS shows no recurring pattern of deviation (glosas, upcoding, duplication).
-
-5. **Build and publish `financial_audit`.** Standard shape.
-   ```json
-   {
-     "audit_type": "financial",
-     "score": <>,
-     "zona": "verde|amarilla|roja",
-     "opinion": "<financial summary>",
-     "findings": [
-       {
-         "rule_id": "FIN.13",
-         "severidad": "critica",
-         "peso": 3,
-         "resultado": "fail",
-         "evidencia": "CUPS 890201: tarifario_contractual.csv precio_base=85000 (UVB 2026 v2); invoice charged 120000 (Δ +41.2%, above 5% threshold)",
-         "valor_objetado": 35000,
-         "nota": "Base tariff overcharge"
-       }
-     ]
-   }
-   ```
-
-6. **Mandatory financial evidence: show the calculation.** Format:
-   `{CUPS}: expected={X} (source); charged={Y}; delta={Y-X} ({pct}%)`.
+   `POST /cases/{case_id}/audits` with the full filled checklist, plus each individual finding. Mandatory financial evidence shows the explicit calculation — `checklist_base.md §2.2` details the required format per rule type.
 
 ## Pitfalls
 

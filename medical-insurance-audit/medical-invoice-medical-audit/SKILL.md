@@ -113,73 +113,32 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    - `estancia[]` (admission, daily progress notes, discharge).
    - `epicrisis` (discharge plan, recommendations, alarm signs).
 
-4. **Run the PERT-CLIN checklist.**
+4. **Run the PERT-CLIN rule checklist.**
 
-   ### Group A — Diagnosis (Weight 3, critical)
-   - **MED.01** Main CIE-10 code is **valid** (exists in the current catalog and has the minimum specificity — e.g. `K35` is invalid, must be `K35.0`, `K35.2`, etc.).
-   - **MED.02** Main CIE-10 is **documented** in the HC with clinical criteria (not just the code).
-   - **MED.03** Secondary diagnoses related or justified.
+   Load `checklist_base.json` (29 rules M01–M29) and follow `checklist_base.md` for each rule. Fill the four nullable fields per `checklist_base.md §2.3`:
 
-   ### Group B — GPC adherence (Weight 3, critical)
-   - **MED.04** Management (procedures, medications, aids) matches the current GPC for the CIE-10 (`gpc_resumidas.json`).
-   - **MED.05** Any deviation from the GPC is **explicitly justified** in the HC with clinical reasoning.
-   - **MED.06** No underuse (omission of standard of care) nor overuse (unsupported interventions).
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — `"n/a"` only when the rule structurally cannot apply (e.g. M11 operative note for a case with no surgical CUPS).
+   - **`evidencia`**: specific to the clinical domain. Reference the loaded GPC for rules M04, M06, M10, M14, M19, M22. Examples:
+     - `"HC evolución 2026-04-10 08:30: 'BNP 380 pg/mL en descenso. Se continúa furosemida IV.' — criterio de estancia GPC_falla_cardiaca §3.2"`.
+     - `"Ecocardiograma 2026-04-09, FEVI 32% — consistente con GPC_falla_cardiaca §2 criterios Framingham"`.
+     - Absence: `"HC pp.1-40: no se encontró nota operatoria (búsqueda: 'NOTA OPERATORIA', 'DESCRIPCIÓN QUIRÚRGICA') para CUPS {X}"`.
+   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` forces human escalation.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 
-   ### Group C — Medical order (Weight 3, critical)
-   - **MED.07** Medical order with signature + date + time.
-   - **MED.08** Professional with current RETHUS registration for the required specialty.
-   - **MED.09** CUPS + dose + route + frequency + duration specific (no generic orders).
+   Two hard rules regardless of confidence:
+   - **M06 `fail` always forces `concepto_final = "ESCALAR_HUMANO"`** — GPC deviation without HC justification requires a human medical auditor.
+   - **HC OCR failure** → emit a single `conditional` finding and abort all remaining rules → `ESCALAR_HUMANO`.
 
-   ### Group D — Procedure pertinence (Weight 3, critical)
-   - **MED.10** Clear clinical indication documented for each CUPS.
-   - **MED.11** Complete operative note (pre/post diagnosis, findings, technique, time, incidents, surgeon + assistants).
-   - **MED.12** Procedure-specific informed consent, signed beforehand.
-   - **MED.13** Billed quantity matches what is documented in operative notes.
+   See `checklist_base.md §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
 
-   ### Group E — Medications (Weight 3, critical)
-   - **MED.14** Appropriate indication for the diagnosis (per GPC).
-   - **MED.15** Correct dose/route/frequency/duration per clinical standard.
-   - **MED.16** Complete administration record (date, time, dose, responsible professional).
-   - **MED.17** Supplies proportional to the procedure (no more gauze/syringes than reasonable).
-   - **MED.18** Non-PBS with current MIPRES and explicit justification.
+5. **Compute `cierre` and publish the checklist.**
 
-   ### Group F — Diagnostic aids (Weight 2, major)
-   - **MED.19** Each aid has a clear diagnostic intent in the HC.
-   - **MED.20** Result incorporated into the management plan.
-   - **MED.21** No unjustified duplication (same study repeated without cause).
+   Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.4` and §4:
+   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over rules with `resultado ≠ "n/a"`.
+   - `concepto_final` — follow decision logic in `checklist_base.md §4`. Key overrides: M06 fail → always `ESCALAR_HUMANO`; any critical with `confianza < 0.75` → `ESCALAR_HUMANO`.
+   - `clasificacion`: `"Clinico"`.
+   - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding.
 
-   ### Group G — Inpatient stay and consults (Weight 2/3)
-   - **MED.22** Admission criterion documented (GPC or scale such as APACHE/NEWS).
-   - **MED.23** Daily progress justifies continued stay (no "waiting for a bed" days).
-   - **MED.24** Timely discharge when criteria are met.
-   - **MED.25** Interconsultations with indication + documented response.
-
-   ### Group H — Epicrisis and continuity (Weight 2, major)
-   - **MED.26** Complete epicrisis (summary, discharge plan, recommendations, alarm signs).
-   - **MED.27** Discharge prescription consistent with inpatient care.
-   - **MED.28** Referral/counter-referral with documented response.
-   - **MED.29** Clinical outcome documented (success, complications, readmissions, adverse events).
-
-5. **Build and publish `medical_audit`.** Same shape as `admin_audit`:
-   ```json
-   {
-     "audit_type": "medical",
-     "score": <>,
-     "zona": "verde|amarilla|roja",
-     "opinion": "<2-3 line clinical summary>",
-     "findings": [
-       {
-         "rule_id": "MED.11",
-         "severidad": "critica",
-         "peso": 3,
-         "resultado": "fail",
-         "evidencia": "HC p.12: no operative note for CUPS 471001 (colecistectomy) billed on 2026-03-10",
-         "valor_objetado": 850000,
-         "nota": "Surgical procedure without operative note — Res. 1995 requirement"
-       }
-     ]
-   }
-   ```
    Publish via `POST /cases/{case_id}/audits` plus each finding individually.
 
 6. **Mandatory evidence citation.**
