@@ -1,0 +1,7 @@
+.cache/
+data/**/*.pdf
+data/**/*.zip
+data/**/*.xlsx
+data/addendum/
+data/conversion/
+data/icd10pcs/

@@ -1,0 +1,288 @@
+{
+  "_meta": {
+    "descripcion": "Casos de prueba para el CUPS 2026 lookup tool",
+    "fuente": "Resolución 2706 del 23 dic 2025 — MinSalud Colombia",
+    "vigencia": "2026-01-01",
+    "total_codigos_en_catalogo": 9459,
+    "uso": "python3 test_cups.py"
+  },
+
+  "validate": {
+    "_descripcion": "Verificación de existencia de códigos. status debe ser 'valid' o 'invalid'.",
+
+    "validos": [
+      {
+        "codigo": "01.0.1.01",
+        "descripcion_esperada": "PUNCIÓN CISTERNAL, VÍA LATERAL",
+        "status": "valid",
+        "seccion": "Sistema nervioso — quirúrgico",
+        "nota": "Procedimiento de referencia para el sistema nervioso"
+      },
+      {
+        "codigo": "01.1.3.02",
+        "descripcion_esperada": "BIOPSIA ABIERTA (CRANEOTOMÍA) DE CEREBRO",
+        "status": "valid",
+        "seccion": "Sistema nervioso — quirúrgico",
+        "nota": "Biopsia cerebral de alta complejidad"
+      },
+      {
+        "codigo": "07.0.0.01",
+        "descripcion_esperada": "EXPLORACIÓN DE ÁREA SUPRARRENAL VÍA ABIERTA",
+        "status": "valid",
+        "seccion": "Sistema endocrino — quirúrgico"
+      },
+      {
+        "codigo": "13.0.0.03",
+        "descripcion_esperada": "EXTRACCIÓN EXTRACAPSULAR ASISTIDA DE CRISTALINO",
+        "status": "valid",
+        "seccion": "Sistema visual — quirúrgico",
+        "nota": "Cirugía de cataratas — frecuente en cuentas oftalmológicas"
+      },
+      {
+        "codigo": "23.0.1.01",
+        "descripcion_esperada": "EXODONCIA DE DIENTE PERMANENTE UNIRRADICULAR",
+        "status": "valid",
+        "seccion": "Nariz, boca y faringe — quirúrgico"
+      },
+      {
+        "codigo": "87.0.0.01",
+        "descripcion_esperada": "RADIOGRAFÍA DE CRÁNEO SIMPLE",
+        "status": "valid",
+        "seccion": "Imagenología",
+        "nota": "Primer código de la sección 87 — imagenología convencional"
+      },
+      {
+        "codigo": "88.1.1.12",
+        "descripcion_esperada": "ECOGRAFÍA CEREBRAL TRANSFONTANELAR CON TRANSDUCTOR DE 7.MHZ O MÁS",
+        "status": "valid",
+        "seccion": "Imagenología — ecografía"
+      },
+      {
+        "codigo": "89.0.1.02",
+        "descripcion_esperada": "ATENCIÓN (VISITA) DOMICILIARIA, POR MEDICINA ESPECIALIZADA",
+        "status": "valid",
+        "seccion": "Consulta y monitorización"
+      },
+      {
+        "codigo": "90.1.0.01",
+        "descripcion_esperada": "ANTIBIOGRAMA (DISCO)",
+        "status": "valid",
+        "seccion": "Laboratorio clínico — microbiología",
+        "nota": "Prueba de sensibilidad antibiótica — frecuente en sepsis e infecciones"
+      },
+      {
+        "codigo": "90.2.1.01",
+        "descripcion_esperada": "CÉLULAS L.E.",
+        "status": "valid",
+        "seccion": "Laboratorio clínico — hematología"
+      },
+      {
+        "codigo": "90.3.6.02",
+        "descripcion_esperada": "AMONIO",
+        "status": "valid",
+        "seccion": "Laboratorio clínico — química sanguínea",
+        "nota": "Descripción corta legítima — nombre del analito"
+      },
+      {
+        "codigo": "90.3.6.08",
+        "descripcion_esperada": "ZINC",
+        "status": "valid",
+        "seccion": "Laboratorio clínico — química sanguínea",
+        "nota": "Descripción corta legítima — nombre del analito"
+      },
+      {
+        "codigo": "90.4.5.04",
+        "descripcion_esperada": "ESTRIOL",
+        "status": "valid",
+        "seccion": "Laboratorio clínico — hormonas"
+      },
+      {
+        "codigo": "99.0.1.01",
+        "descripcion_esperada": "GRUPO MÁXIMO DE TREINTA PERSONAS, SESIÓN MÁXIMO DE CIENTO VEINTE MINUTOS",
+        "status": "valid",
+        "seccion": "Procedimientos misceláneos — educación grupal"
+      },
+      {
+        "codigo": "99.8.7.01",
+        "descripcion_esperada": "SOPORTE ANESTÉSICO PARA CONSULTA O APOYO DIAGNÓSTICO",
+        "status": "valid",
+        "seccion": "Procedimientos misceláneos — anestesia"
+      }
+    ],
+
+    "invalidos": [
+      {
+        "codigo": "01.0.1.99",
+        "status": "invalid",
+        "razon": "Subcategoría inexistente dentro de un grupo válido"
+      },
+      {
+        "codigo": "00.0.0.01",
+        "status": "invalid",
+        "razon": "El grupo 00 no existe en CUPS — los quirúrgicos empiezan en 01"
+      },
+      {
+        "codigo": "55.5.5.55",
+        "status": "invalid",
+        "razon": "Código completamente inventado"
+      },
+      {
+        "codigo": "99.9.9.99",
+        "status": "invalid",
+        "razon": "Código fuera del rango existente"
+      },
+      {
+        "codigo": "87.0.0.99",
+        "status": "invalid",
+        "razon": "La subcategoría .99 no existe en la sección 87"
+      },
+      {
+        "codigo": "E11.9",
+        "status": "invalid",
+        "razon": "Código ICD-10-CM, no CUPS — error frecuente de confusión entre clasificaciones"
+      },
+      {
+        "codigo": "A41.9",
+        "status": "invalid",
+        "razon": "Código ICD-10-CM (sepsis), no CUPS"
+      }
+    ]
+  },
+
+  "lookup": {
+    "_descripcion": "Verificación de campos del registro completo devuelto por 'lookup'.",
+    "casos": [
+      {
+        "codigo": "90.1.0.01",
+        "campos_esperados": {
+          "codigo":      "90.1.0.01",
+          "descripcion": "ANTIBIOGRAMA (DISCO)",
+          "grupo":       "90",
+          "categoria":   "90.1.0"
+        }
+      },
+      {
+        "codigo": "87.0.0.01",
+        "campos_esperados": {
+          "codigo":      "87.0.0.01",
+          "descripcion": "RADIOGRAFÍA DE CRÁNEO SIMPLE",
+          "grupo":       "87",
+          "categoria":   "87.0.0"
+        }
+      },
+      {
+        "codigo": "01.0.1.01",
+        "campos_esperados": {
+          "codigo":      "01.0.1.01",
+          "descripcion": "PUNCIÓN CISTERNAL, VÍA LATERAL",
+          "grupo":       "01",
+          "categoria":   "01.0.1"
+        }
+      }
+    ]
+  },
+
+  "search": {
+    "_descripcion": "Búsquedas por término clínico — deben retornar resultados relevantes.",
+    "casos": [
+      {
+        "terminos":          ["biopsia", "cerebro"],
+        "minimo_resultados": 3,
+        "primer_resultado_contiene": "BIOPSIA",
+        "nota": "Biopsias cerebrales — procedimientos neuroquirúrgicos"
+      },
+      {
+        "terminos":          ["radiografía"],
+        "minimo_resultados": 5,
+        "primer_resultado_contiene": "RADIOGRAFÍA",
+        "nota": "Imágenes diagnósticas convencionales"
+      },
+      {
+        "terminos":          ["antibiograma"],
+        "minimo_resultados": 1,
+        "primer_resultado_contiene": "ANTIBIOGRAMA",
+        "nota": "Prueba de laboratorio frecuente en infecciones"
+      },
+      {
+        "terminos":          ["ecografía"],
+        "minimo_resultados": 5,
+        "primer_resultado_contiene": "ECOGRAFÍA",
+        "nota": "Imagenología por ultrasonido"
+      },
+      {
+        "terminos":          ["exodoncia"],
+        "minimo_resultados": 2,
+        "primer_resultado_contiene": "EXODONCIA",
+        "nota": "Procedimientos odontológicos frecuentes en cuentas de urgencias"
+      },
+      {
+        "terminos":          ["laparoscopia"],
+        "minimo_resultados": 1,
+        "primer_resultado_contiene": "LAPAROSCOP",
+        "nota": "Cirugía mínimamente invasiva"
+      },
+      {
+        "terminos":          ["hemograma"],
+        "minimo_resultados": 1,
+        "nota": "Laboratorio clínico — prueba de sangre completa"
+      }
+    ]
+  },
+
+  "seccion": {
+    "_descripcion": "Exploración de secciones del catálogo — verificar que retornan códigos.",
+    "casos": [
+      {
+        "prefijo":         "01",
+        "minimo_codigos":  50,
+        "descripcion":     "Sistema nervioso — procedimientos quirúrgicos"
+      },
+      {
+        "prefijo":         "87",
+        "minimo_codigos":  10,
+        "descripcion":     "Imagenología convencional (radiografías, contrastes)"
+      },
+      {
+        "prefijo":         "88",
+        "minimo_codigos":  20,
+        "descripcion":     "Imagenología avanzada (ecografía, TAC, resonancia)"
+      },
+      {
+        "prefijo":         "90",
+        "minimo_codigos":  200,
+        "descripcion":     "Laboratorio clínico — la sección más grande del catálogo"
+      },
+      {
+        "prefijo":         "90.1",
+        "minimo_codigos":  5,
+        "descripcion":     "Laboratorio — microbiología"
+      },
+      {
+        "prefijo":         "99",
+        "minimo_codigos":  10,
+        "descripcion":     "Procedimientos misceláneos"
+      }
+    ]
+  },
+
+  "normalizacion": {
+    "_descripcion": "El tool debe aceptar distintos formatos de entrada y normalizarlos correctamente.",
+    "casos": [
+      {
+        "entrada":    "010101",
+        "normalizado": "01.0.1.01",
+        "nota": "Sin puntos — 6 dígitos compactos (XX+X+X+XX)"
+      },
+      {
+        "entrada":    "  90.1.0.01  ",
+        "normalizado": "90.1.0.01",
+        "nota": "Espacios externos"
+      },
+      {
+        "entrada":    "87.0.0.01",
+        "normalizado": "87.0.0.01",
+        "nota": "Formato canónico — sin cambios"
+      }
+    ]
+  }
+}
