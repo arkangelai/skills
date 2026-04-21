@@ -1,0 +1,10 @@
+{
+  "caso_id": null,
+  "fecha_radicacion": null,
+  "num_factura": null,
+  "prestador_nit": null,
+  "prestador_nombre": null,
+  "pagador_nit": null,
+  "pagador_nombre": null,
+  "documentos": []
+}

@@ -1,0 +1,473 @@
+{
+  "instrumento": "PERT-CLIN",
+  "descripcion": "Auditoria de pertinencia clinica. Verifica que cada servicio facturado este indicado, soportado en evidencia, y alineado con las guias de practica clinica vigentes para la patologia del paciente y el servicio prestado.",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null,
+    "gpc_aplicada": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Diagnostico y justificacion clinica",
+      "reglas": [
+        {
+          "id": "M01",
+          "nombre": "Diagnostico principal CIE-10",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El diagnostico principal esta codificado en CIE-10 vigente y corresponde al cuadro clinico documentado en la HC.",
+          "evidencia_requerida": "HC, epicrisis, RIPS.",
+          "dimensiones": ["Pertinencia", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M02",
+          "nombre": "Diagnosticos secundarios relacionados",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Los diagnosticos secundarios estan documentados y explican comorbilidades o complicaciones que motivan servicios adicionales.",
+          "evidencia_requerida": "HC, notas de evolucion.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M03",
+          "nombre": "Motivo de consulta y anamnesis",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Motivo de consulta, anamnesis y examen fisico completos soportan la hipotesis diagnostica y el plan de manejo.",
+          "evidencia_requerida": "HC de ingreso.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Adherencia a guias de practica clinica",
+      "reglas": [
+        {
+          "id": "M04",
+          "nombre": "GPC vigente aplicada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El manejo clinico se ajusta a la GPC vigente (MinSalud o sociedad cientifica reconocida) para la patologia principal.",
+          "evidencia_requerida": "HC, protocolo institucional, GPC referenciada (carpeta guias-clinicas/).",
+          "dimensiones": ["Evidencia", "Adherencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M05",
+          "nombre": "Protocolo institucional alineado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Se aplico el protocolo institucional vigente, alineado con la GPC nacional y las politicas de seguridad del paciente.",
+          "evidencia_requerida": "Protocolo IPS.",
+          "dimensiones": ["Adherencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M06",
+          "nombre": "Desviacion de guia justificada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cualquier desviacion de la GPC esta documentada con justificacion clinica explicita (junta medica, interconsulta o nota ampliada).",
+          "evidencia_requerida": "Nota de evolucion, acta de junta medica.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Orden medica y prescripcion",
+      "reglas": [
+        {
+          "id": "M07",
+          "nombre": "Orden medica firmada y trazable",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada servicio facturado tiene orden medica con fecha, firma y registro profesional vigente (RETHUS).",
+          "evidencia_requerida": "Orden medica, RETHUS.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M08",
+          "nombre": "Profesional con competencia",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El profesional que ordena o ejecuta tiene la especialidad y competencia requerida para el servicio (p.ej. especialista para CUPS restringido).",
+          "evidencia_requerida": "RETHUS, registro profesional.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M09",
+          "nombre": "Orden legible y especifica",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La orden medica contiene indicacion precisa (CUPS, dosis, via, frecuencia, duracion) y es legible.",
+          "evidencia_requerida": "Orden medica.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Pertinencia de procedimientos",
+      "reglas": [
+        {
+          "id": "M10",
+          "nombre": "Procedimiento indicado clinicamente",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada procedimiento facturado tiene indicacion clinica clara, soportada en HC y acorde con GPC.",
+          "evidencia_requerida": "HC, nota quirurgica, GPC.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M11",
+          "nombre": "Nota operatoria completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los procedimientos quirurgicos cuentan con nota operatoria completa: diagnostico, hallazgos, tecnica, incidentes, cirujano y ayudantes.",
+          "evidencia_requerida": "Nota quirurgica, registro de anestesia.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M12",
+          "nombre": "Consentimiento informado especifico",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Existe consentimiento informado firmado especifico para procedimientos mayores o con riesgo, previo al acto.",
+          "evidencia_requerida": "Consentimiento, HC.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M13",
+          "nombre": "Cantidad acorde a lo realizado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La cantidad facturada del procedimiento coincide con lo registrado en HC y nota operatoria, sin duplicidad.",
+          "evidencia_requerida": "HC, nota operatoria.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Medicamentos e insumos",
+      "reglas": [
+        {
+          "id": "M14",
+          "nombre": "Medicamento pertinente al diagnostico",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El medicamento prescrito tiene indicacion aprobada acorde con el diagnostico y la GPC vigente.",
+          "evidencia_requerida": "HC, orden, GPC, vademecum.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M15",
+          "nombre": "Dosis, via y duracion adecuadas",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Dosis, via de administracion y duracion se ajustan a estandares clinicos para la indicacion y condicion del paciente.",
+          "evidencia_requerida": "Orden medica, kardex, vademecum.",
+          "dimensiones": ["Seguridad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M16",
+          "nombre": "Registro de administracion completo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Cada dosis facturada tiene registro de administracion con fecha, hora, dosis y profesional responsable.",
+          "evidencia_requerida": "Hoja de medicamentos, kardex.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M17",
+          "nombre": "Insumos proporcionales al procedimiento",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Los insumos facturados son consistentes con el procedimiento realizado, con cantidades estandar o justificacion de variacion.",
+          "evidencia_requerida": "Nota operatoria, listado de insumos.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M18",
+          "nombre": "Medicamentos no PBS con autorizacion",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Medicamentos fuera del PBS tienen justificacion clinica explicita y autorizacion (MIPRES u otra) antes de su uso.",
+          "evidencia_requerida": "MIPRES, HC, autorizacion.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "Ayudas diagnosticas",
+      "reglas": [
+        {
+          "id": "M19",
+          "nombre": "Ayuda diagnostica justificada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada solicitud de laboratorio o imagen tiene justificacion clinica en HC orientada al diagnostico o seguimiento.",
+          "evidencia_requerida": "HC, orden.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M20",
+          "nombre": "Resultado incorporado al manejo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El resultado de la ayuda diagnostica esta documentado en HC y se refleja en la conducta clinica posterior.",
+          "evidencia_requerida": "HC, notas de evolucion.",
+          "dimensiones": ["Continuidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M21",
+          "nombre": "Sin duplicidad injustificada",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La frecuencia de solicitud de la misma ayuda diagnostica es razonable, sin duplicidad no justificada clinicamente.",
+          "evidencia_requerida": "HC, historial de ordenes.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Estancia hospitalaria e interconsultas",
+      "reglas": [
+        {
+          "id": "M22",
+          "nombre": "Criterio de ingreso documentado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El criterio de hospitalizacion o de ingreso a UCI esta documentado y cumple con la GPC o escala de criterios (APACHE, NEWS, etc.).",
+          "evidencia_requerida": "HC de ingreso, escala aplicada.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M23",
+          "nombre": "Estancia justificada dia a dia",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada dia de estancia cuenta con evolucion medica que justifica clinicamente la permanencia del paciente.",
+          "evidencia_requerida": "Evolucion diaria.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M24",
+          "nombre": "Egreso o traslado con criterio",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El traslado o egreso de UCI u hospitalizacion tiene criterio clinico documentado y registro explicito.",
+          "evidencia_requerida": "Nota de traslado o egreso.",
+          "dimensiones": ["Continuidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M25",
+          "nombre": "Interconsultas pertinentes y respondidas",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las interconsultas solicitadas tienen indicacion clinica clara y respuesta documentada dentro de tiempos razonables.",
+          "evidencia_requerida": "Interconsulta, respuesta.",
+          "dimensiones": ["Pertinencia", "Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Alta, continuidad y resultado",
+      "reglas": [
+        {
+          "id": "M26",
+          "nombre": "Epicrisis con plan de egreso",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Epicrisis completa con diagnostico final, resumen de manejo, tratamientos, recomendaciones y signos de alarma.",
+          "evidencia_requerida": "Epicrisis.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M27",
+          "nombre": "Formula de egreso consistente",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La formula de egreso es consistente con el manejo hospitalario y el diagnostico de egreso.",
+          "evidencia_requerida": "Formula, epicrisis.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M28",
+          "nombre": "Referencia o contrarreferencia trazable",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Si hubo remision, existe trazabilidad completa del proceso referencia-contrarreferencia con respuesta de la institucion receptora.",
+          "evidencia_requerida": "Referencia, respuesta.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "M29",
+          "nombre": "Desenlace clinico documentado",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "Se documentan desenlaces clinicos relevantes: exito del manejo, complicaciones, reingresos tempranos o eventos adversos.",
+          "evidencia_requerida": "HC, registros de calidad.",
+          "dimensiones": ["Calidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    }
+  ],
+  "cierre": {
+    "score_total": null,
+    "concepto_final": null,
+    "clasificacion": null,
+    "accion_requerida": null,
+    "resumen_ejecutivo": null
+  }
+}

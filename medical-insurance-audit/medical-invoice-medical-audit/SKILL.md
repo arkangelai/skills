@@ -36,6 +36,62 @@ The question it answers: **was what was billed clinically necessary, appropriate
 
 **Do not use:** if the case does not have HC or epicrisis attached; if `medical_audit` is already published and a re-audit was not requested.
 
+## Input Contract
+
+**Template:** same `metadata_input.json` shape as admin-audit — see `../medical-invoice-gmail-intake/metadata_input.json`.
+
+Additionally the skill resolves the applicable GPC before running rules:
+1. Extracts `diagnostico_principal` (CIE-10) from `factura.pdf`.
+2. Looks up the CIE-10 in `guias-clinicas/INDEX.md` (this skill's directory) to find the applicable GPC file.
+3. Loads `guias-clinicas/{gpc_file}.md` for criteria, indications, and standard of care.
+4. If no GPC matches → `meta.gpc_aplicada = null`, M04 → `n/a`, `concepto_final = ESCALAR_HUMANO`.
+
+## Output Contract
+
+**Template:** `checklist_base.json` in this directory — PERT-CLIN instrument, 29 rules (M01–M29). See `checklist_base.md` for rule descriptions and evidence requirements.
+
+Load the template and fill every rule's nullable fields:
+- `resultado`: `"pass" | "fail" | "n/a"`
+- `evidencia`: `"{file} p.{N}[, section X][, line Y]: <literal quote>"` — use absence format when not found
+- `confianza`: float 0.0–1.0
+- `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
+
+Then fill `meta` and append `cierre`:
+
+```json
+{
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or null>" },
+  "cierre": {
+    "score_total": 100.0,
+    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "clasificacion": "Clinico",
+    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
+    "resumen_ejecutivo": "<2-3 oraciones con GPC referenciada>"
+  }
+}
+```
+
+Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+
+**`resultado`, `confianza`, and `glosa_sugerida`** follow the same rules as admin-audit. Evidence must cite the clinical document: `"HC ingreso p.3: motivo consulta dolor hipocondrio derecho..."`.
+
+**Absence as evidence:** If looking for an operative note and it is not found after searching the full HC PDF by content keywords (`NOTA OPERATORIA`, `DESCRIPCIÓN QUIRÚRGICA`), the evidence must state: `"HC pp.1-40: no se encontro nota operatoria para CUPS {X}"`.
+
+**`concepto_final` specifics:**
+- M06 (`fail`) → always `ESCALAR_HUMANO` (GPC deviation without justification requires human clinical judgment).
+- HC OCR failure → single `conditional` finding, abort remaining rules, `ESCALAR_HUMANO`.
+
+**`glosa_sugerida` shape (only when `resultado = fail`):**
+```json
+{
+  "causal_num": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+  "causal_nombre": "<nombre causal Res. 3047 Anexo 6>",
+  "texto": "<1-2 oraciones con cita de HC y regla GPC>",
+  "valor_glosado": 0,
+  "moneda": "COP"
+}
+```
+
 ## Procedure
 
 1. **Read the case and clinical attachments.**
@@ -57,73 +113,32 @@ The question it answers: **was what was billed clinically necessary, appropriate
    - `estancia[]` (admission, daily progress notes, discharge).
    - `epicrisis` (discharge plan, recommendations, alarm signs).
 
-4. **Run the PERT-CLIN checklist.**
+4. **Run the PERT-CLIN rule checklist.**
 
-   ### Group A — Diagnosis (Weight 3, critical)
-   - **MED.01** Main CIE-10 code is **valid** (exists in the current catalog and has the minimum specificity — e.g. `K35` is invalid, must be `K35.0`, `K35.2`, etc.).
-   - **MED.02** Main CIE-10 is **documented** in the HC with clinical criteria (not just the code).
-   - **MED.03** Secondary diagnoses related or justified.
+   Load `checklist_base.json` (29 rules M01–M29) and follow `checklist_base.md` for each rule. Fill the four nullable fields per `checklist_base.md §2.3`:
 
-   ### Group B — GPC adherence (Weight 3, critical)
-   - **MED.04** Management (procedures, medications, aids) matches the current GPC for the CIE-10 (`gpc_resumidas.json`).
-   - **MED.05** Any deviation from the GPC is **explicitly justified** in the HC with clinical reasoning.
-   - **MED.06** No underuse (omission of standard of care) nor overuse (unsupported interventions).
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — `"n/a"` only when the rule structurally cannot apply (e.g. M11 operative note for a case with no surgical CUPS).
+   - **`evidencia`**: specific to the clinical domain. Reference the loaded GPC for rules M04, M06, M10, M14, M19, M22. Examples:
+     - `"HC evolución 2026-04-10 08:30: 'BNP 380 pg/mL en descenso. Se continúa furosemida IV.' — criterio de estancia GPC_falla_cardiaca §3.2"`.
+     - `"Ecocardiograma 2026-04-09, FEVI 32% — consistente con GPC_falla_cardiaca §2 criterios Framingham"`.
+     - Absence: `"HC pp.1-40: no se encontró nota operatoria (búsqueda: 'NOTA OPERATORIA', 'DESCRIPCIÓN QUIRÚRGICA') para CUPS {X}"`.
+   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` forces human escalation.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 
-   ### Group C — Medical order (Weight 3, critical)
-   - **MED.07** Medical order with signature + date + time.
-   - **MED.08** Professional with current RETHUS registration for the required specialty.
-   - **MED.09** CUPS + dose + route + frequency + duration specific (no generic orders).
+   Two hard rules regardless of confidence:
+   - **M06 `fail` always forces `concepto_final = "ESCALAR_HUMANO"`** — GPC deviation without HC justification requires a human medical auditor.
+   - **HC OCR failure** → emit a single `conditional` finding and abort all remaining rules → `ESCALAR_HUMANO`.
 
-   ### Group D — Procedure pertinence (Weight 3, critical)
-   - **MED.10** Clear clinical indication documented for each CUPS.
-   - **MED.11** Complete operative note (pre/post diagnosis, findings, technique, time, incidents, surgeon + assistants).
-   - **MED.12** Procedure-specific informed consent, signed beforehand.
-   - **MED.13** Billed quantity matches what is documented in operative notes.
+   See `checklist_base.md §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
 
-   ### Group E — Medications (Weight 3, critical)
-   - **MED.14** Appropriate indication for the diagnosis (per GPC).
-   - **MED.15** Correct dose/route/frequency/duration per clinical standard.
-   - **MED.16** Complete administration record (date, time, dose, responsible professional).
-   - **MED.17** Supplies proportional to the procedure (no more gauze/syringes than reasonable).
-   - **MED.18** Non-PBS with current MIPRES and explicit justification.
+5. **Compute `cierre` and publish the checklist.**
 
-   ### Group F — Diagnostic aids (Weight 2, major)
-   - **MED.19** Each aid has a clear diagnostic intent in the HC.
-   - **MED.20** Result incorporated into the management plan.
-   - **MED.21** No unjustified duplication (same study repeated without cause).
+   Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.4` and §4:
+   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over rules with `resultado ≠ "n/a"`.
+   - `concepto_final` — follow decision logic in `checklist_base.md §4`. Key overrides: M06 fail → always `ESCALAR_HUMANO`; any critical with `confianza < 0.75` → `ESCALAR_HUMANO`.
+   - `clasificacion`: `"Clinico"`.
+   - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding.
 
-   ### Group G — Inpatient stay and consults (Weight 2/3)
-   - **MED.22** Admission criterion documented (GPC or scale such as APACHE/NEWS).
-   - **MED.23** Daily progress justifies continued stay (no "waiting for a bed" days).
-   - **MED.24** Timely discharge when criteria are met.
-   - **MED.25** Interconsultations with indication + documented response.
-
-   ### Group H — Epicrisis and continuity (Weight 2, major)
-   - **MED.26** Complete epicrisis (summary, discharge plan, recommendations, alarm signs).
-   - **MED.27** Discharge prescription consistent with inpatient care.
-   - **MED.28** Referral/counter-referral with documented response.
-   - **MED.29** Clinical outcome documented (success, complications, readmissions, adverse events).
-
-5. **Build and publish `medical_audit`.** Same shape as `admin_audit`:
-   ```json
-   {
-     "audit_type": "medical",
-     "score": <>,
-     "zona": "verde|amarilla|roja",
-     "opinion": "<2-3 line clinical summary>",
-     "findings": [
-       {
-         "rule_id": "MED.11",
-         "severidad": "critica",
-         "peso": 3,
-         "resultado": "fail",
-         "evidencia": "HC p.12: no operative note for CUPS 471001 (colecistectomy) billed on 2026-03-10",
-         "valor_objetado": 850000,
-         "nota": "Surgical procedure without operative note — Res. 1995 requirement"
-       }
-     ]
-   }
-   ```
    Publish via `POST /cases/{case_id}/audits` plus each finding individually.
 
 6. **Mandatory evidence citation.**

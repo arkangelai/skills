@@ -1,0 +1,366 @@
+{
+  "instrumento": "SOAT-TEC",
+  "descripcion": "Auditoria tecnica para facturas ADRES-SOAT. Orientada a eventos de transito con soportes SIRAS, INFOPOL, RUNT y FURIPS. Pondera criticos por 3, mayores por 2, menores por 1. Aplica cuando el pagador real del evento es SOAT/ADRES.",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Paciente",
+      "reglas": [
+        {
+          "id": "S01",
+          "nombre": "Documento de identidad",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El documento del paciente coincide en HC, factura, FURIPS, XML y BDUA.",
+          "evidencia_requerida": "Copia del documento, pantallazos BDUA y sistemas internos.",
+          "dimensiones": ["Exactitud", "Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S02",
+          "nombre": "Datos demograficos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Nombre, fecha de nacimiento y sexo coinciden en HC, factura, FURIPS y XML.",
+          "evidencia_requerida": "HC, factura, FURIPS, XML.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Accidente",
+      "reglas": [
+        {
+          "id": "S03",
+          "nombre": "Registro SIRAS",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Existe registro SIRAS del evento, con fecha de reporte menor o igual a 24h del accidente.",
+          "evidencia_requerida": "PDF o numero de reporte SIRAS.",
+          "dimensiones": ["Validez", "Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S04",
+          "nombre": "Reporte a transito (INFOPOL)",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Existe soporte de reporte del accidente a la autoridad de transito (INFOPOL u otro), via correo o sistema.",
+          "evidencia_requerida": "Correo enviado o reporte descargado.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S05",
+          "nombre": "Validacion RUNT del vehiculo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Placa y datos del vehiculo coinciden con RUNT y son validos para SOAT.",
+          "evidencia_requerida": "Pantallazo de consulta RUNT.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Historia clinica",
+      "reglas": [
+        {
+          "id": "S06",
+          "nombre": "Epicrisis completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La epicrisis esta completa: motivo, mecanismo de trauma, evolucion, manejo y egreso.",
+          "evidencia_requerida": "Epicrisis en HC.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S07",
+          "nombre": "Soportes de procedimientos",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Todos los procedimientos facturados tienen nota quirurgica, soporte en HC y registros de enfermeria.",
+          "evidencia_requerida": "Notas quirurgicas, registros de enfermeria, consentimientos.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S08",
+          "nombre": "Pertinencia clinica",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Todos los CUPS facturados se encuentran documentados y relacionados con el evento de transito.",
+          "evidencia_requerida": "HC, listado de CUPS facturados.",
+          "dimensiones": ["Pertinencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "FURIPS",
+      "reglas": [
+        {
+          "id": "S09",
+          "nombre": "Campos diligenciados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "FURIPS 1 y 2 tienen los 102 campos obligatorios diligenciados y validos.",
+          "evidencia_requerida": "FURIPS 1 y 2.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S10",
+          "nombre": "Consistencia de fechas",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Fechas de ingreso, atencion, remision y egreso coinciden entre HC, factura, FURIPS y RIPS.",
+          "evidencia_requerida": "HC, factura, FURIPS, RIPS.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S11",
+          "nombre": "Valor total FURIPS",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El valor total de FURIPS coincide exactamente con la factura y con el XML.",
+          "evidencia_requerida": "FURIPS, factura, XML.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Facturacion",
+      "reglas": [
+        {
+          "id": "S12",
+          "nombre": "Coherencia XML-Factura",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El XML contiene los mismos datos de usuario, valores, codigos y fechas que la factura fisica.",
+          "evidencia_requerida": "XML, factura.",
+          "dimensiones": ["Consistencia", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S13",
+          "nombre": "Pagador correcto",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El pagador corresponde al caso: SOAT, rango diferencial o EPS (patologia de base) segun corresponda.",
+          "evidencia_requerida": "Busqueda en BDUA, certificado de agotamiento, autorizaciones EPS.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S14",
+          "nombre": "Autorizaciones EPS",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Servicios derivados de patologia de base tienen autorizacion EPS adjunta y registrada.",
+          "evidencia_requerida": "Autorizaciones EPS, HC.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "RIPS",
+      "reglas": [
+        {
+          "id": "S15",
+          "nombre": "Estructura RIPS",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los archivos RIPS (AF, AC, AP, AT, AM, AU, etc.) tienen estructura valida y sin errores de formato.",
+          "evidencia_requerida": "Archivos RIPS y reporte de validador.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S16",
+          "nombre": "Consistencia RIPS-Factura-FURIPS",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los registros RIPS coinciden en identificacion, servicios y valores con factura y FURIPS.",
+          "evidencia_requerida": "RIPS, factura, FURIPS.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Carpeta digital",
+      "reglas": [
+        {
+          "id": "S17",
+          "nombre": "Carpeta digital completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La carpeta digital contiene HC, factura, XML, RIPS, FURIPS, SIRAS, INFOPOL, certificados y anexos.",
+          "evidencia_requerida": "Repositorio documental (carpeta digital).",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Tarifas y liquidacion",
+      "reglas": [
+        {
+          "id": "S18",
+          "nombre": "Validacion de tarifas",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "Comparacion de tarifas liquidadas en la factura vs manual tarifario SOAT (UVB).",
+          "evidencia_requerida": "Comparativo de tarifas facturadas y descritas en el manual tarifario.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S19",
+          "nombre": "Liquidacion de vias de acceso",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "Liquidacion de procedimientos segun via de acceso (igual via, diferente via, diferente especialista).",
+          "evidencia_requerida": "Comparativo de cirugias segun liquidador de cirugias.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "nombre": "Global - Cierre",
+      "reglas": [
+        {
+          "id": "S20",
+          "nombre": "Consistencia global",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "No hay discrepancias entre sistemas en identificacion, fechas, diagnosticos, valores y pagador.",
+          "evidencia_requerida": "HC, factura, FURIPS, XML, RIPS, maestro de pacientes.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "S21",
+          "nombre": "Listo para radicar",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Todos los items criticos estan en estado OK y no existen fallas sin gestionar.",
+          "evidencia_requerida": "Checklist firmado y soportes completos.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    }
+  ],
+  "cierre": {
+    "score_total": null,
+    "concepto_final": null,
+    "clasificacion": null,
+    "accion_requerida": null,
+    "resumen_ejecutivo": null
+  }
+}

@@ -1,0 +1,444 @@
+{
+  "instrumento": "DAMA-UK",
+  "descripcion": "Auditoria tecnica generica de facturacion en salud. Aplica las siete dimensiones de calidad de datos DAMA-UK: Exactitud, Completitud, Consistencia, Validez, Unicidad, Oportunidad, Trazabilidad.",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Identificacion y unicidad",
+      "reglas": [
+        {
+          "id": "A01",
+          "nombre": "CUV valido y legible",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La factura incluye CUV valido y legible y cumple requisitos DIAN.",
+          "evidencia_requerida": "Factura con CUV / validacion DIAN.",
+          "dimensiones": ["Validez", "Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A02",
+          "nombre": "Numero de factura unico",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El numero de factura no esta duplicado en el periodo ni para el pagador.",
+          "evidencia_requerida": "Historico del sistema de facturacion del prestador y del pagador.",
+          "dimensiones": ["Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A03",
+          "nombre": "Fecha de expedicion coherente",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Fecha de expedicion coherente con la prestacion y con el periodo facturado.",
+          "evidencia_requerida": "Factura y soportes de atencion.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Usuario y derechos",
+      "reglas": [
+        {
+          "id": "A04",
+          "nombre": "Identificacion del usuario completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Tipo y numero de documento del usuario correctos y completos en factura y soportes.",
+          "evidencia_requerida": "Factura, HC y soporte de admision.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A05",
+          "nombre": "Derechos vigentes",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Usuario activo y con cobertura vigente al momento de la prestacion del servicio.",
+          "evidencia_requerida": "Consulta BDUA o soporte EPS equivalente.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A06",
+          "nombre": "Regimen y entidad coinciden",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Regimen y entidad responsable registrados coinciden con lo facturado.",
+          "evidencia_requerida": "BDUA, contrato.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Entidad responsable (pagador)",
+      "reglas": [
+        {
+          "id": "A07",
+          "nombre": "Pagador correcto",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La entidad facturada corresponde al responsable real del evento (EPS, SOAT, ARL, plan complementario).",
+          "evidencia_requerida": "Contrato, remision, BDUA, certificado de agotamiento SOAT si aplica.",
+          "dimensiones": ["Validez", "Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A08",
+          "nombre": "Autorizacion valida",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Autorizacion vigente, corresponde al usuario, al servicio y a la IPS asignada.",
+          "evidencia_requerida": "Numero y soporte de autorizacion.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A09",
+          "nombre": "Servicios dentro del alcance",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Los servicios facturados se encuentran dentro del alcance autorizado (codigos CUPS, cantidades, fechas).",
+          "evidencia_requerida": "Autorizacion y anexos.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Servicios facturados",
+      "reglas": [
+        {
+          "id": "A10",
+          "nombre": "Codificacion correcta",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "CUPS, medicamentos e insumos codificados correctamente y relacionados con la atencion prestada.",
+          "evidencia_requerida": "Factura, RIPS, soportes clinicos.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A11",
+          "nombre": "Coherencia clinica",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los servicios facturados corresponden al diagnostico, evolucion y orden medica documentados.",
+          "evidencia_requerida": "HC, epicrisis, orden medica.",
+          "dimensiones": ["Exactitud", "Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A12",
+          "nombre": "Cantidades y fechas coinciden",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Cantidades y fechas facturadas coinciden con la prestacion real registrada.",
+          "evidencia_requerida": "HC, registros de enfermeria, ayudas diagnosticas.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A13",
+          "nombre": "Procedimientos quirurgicos soportados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los procedimientos quirurgicos facturados cuentan con informe/nota quirurgica y trazabilidad del acto.",
+          "evidencia_requerida": "Informe quirurgico, registro de anestesia.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A14",
+          "nombre": "Traslado en ambulancia soportado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El traslado en ambulancia esta soportado y es coherente con lo facturado (fecha, origen, destino, tipo).",
+          "evidencia_requerida": "Soporte de ambulancia, resolucion de referencia.",
+          "dimensiones": ["Completitud", "Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A15",
+          "nombre": "Ayudas diagnosticas soportadas",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Resultados de laboratorio, imagenes y ayudas diagnosticas estan anexos y coinciden con lo facturado.",
+          "evidencia_requerida": "Resultados de ayudas diagnosticas.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Soportes clinicos y administrativos",
+      "reglas": [
+        {
+          "id": "A16",
+          "nombre": "Historia clinica completa y firmada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "HC completa, legible, firmada y soporta todos los servicios facturados.",
+          "evidencia_requerida": "HC, epicrisis.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A17",
+          "nombre": "Certificado o recibido del usuario",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Certificado de prestacion o recibido firmado por el usuario cuando aplique.",
+          "evidencia_requerida": "Certificado o recibido firmado.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A18",
+          "nombre": "Anexos tecnicos y envios",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Anexos tecnicos y evidencia de envio estan disponibles cuando aplique.",
+          "evidencia_requerida": "Correo, radicado, anexos.",
+          "dimensiones": ["Trazabilidad", "Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A19",
+          "nombre": "Record de anestesia (si aplica)",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Si hay procedimientos quirurgicos con anestesia, existe record o registro anestesico completo.",
+          "evidencia_requerida": "Registro de anestesia.",
+          "dimensiones": ["Completitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A20",
+          "nombre": "Hoja administracion de medicamentos",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los medicamentos administrados estan soportados en la hoja de medicamentos y coinciden con lo facturado.",
+          "evidencia_requerida": "Hoja de medicamentos, kardex.",
+          "dimensiones": ["Consistencia", "Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "Valores facturados",
+      "reglas": [
+        {
+          "id": "A21",
+          "nombre": "Tarifas conforme contrato",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Las tarifas aplicadas corresponden al contrato o manual tarifario vigente.",
+          "evidencia_requerida": "Contrato, manual tarifario aplicable.",
+          "dimensiones": ["Validez", "Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A22",
+          "nombre": "Calculos correctos",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Subtotales, copagos, cuotas moderadoras y total de la factura estan correctamente calculados.",
+          "evidencia_requerida": "Factura.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Oportunidad y trazabilidad",
+      "reglas": [
+        {
+          "id": "A23",
+          "nombre": "Emision dentro de plazos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La factura fue emitida dentro de los tiempos contractuales.",
+          "evidencia_requerida": "Factura y contrato.",
+          "dimensiones": ["Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A24",
+          "nombre": "Trazabilidad del expediente",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Se puede rastrear la cadena factura - soportes - radicacion con expediente completo.",
+          "evidencia_requerida": "Sistema del pagador, expediente del caso.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Cierre de auditoria",
+      "reglas": [
+        {
+          "id": "A25",
+          "nombre": "Concepto final definido",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Se define concepto final explicito: Apta o No apta (con detalle de glosas).",
+          "evidencia_requerida": "Registro de auditoria.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A26",
+          "nombre": "Clasificacion del hallazgo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Cada hallazgo queda clasificado por dimension dominante: Administrativo, Tecnico, Clinico o Financiero.",
+          "evidencia_requerida": "Registro de auditoria.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "A27",
+          "nombre": "Accion requerida asignada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Se asigna accion requerida para cada hallazgo: Correccion, Complemento, Rechazo o Escalar.",
+          "evidencia_requerida": "Registro de auditoria.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    }
+  ],
+  "cierre": {
+    "score_total": null,
+    "concepto_final": null,
+    "clasificacion": null,
+    "accion_requerida": null,
+    "resumen_ejecutivo": null
+  }
+}

@@ -39,6 +39,65 @@ The question it answers: **how do I turn the consolidated output into a legal, t
 
 **Do not use:** if the case has no `consolidated_findings` published; if the current label is `auto-approve` (no glosa needed).
 
+## Input Contract
+
+The skill reads the canonical `output.json` produced by `medical-invoice-consolidator-audit`:
+
+```json
+{
+  "caso_id": "RAD-YYYYMMDD-{num_factura}",
+  "factura": {
+    "num_factura": "<string>",
+    "prestador": "<string>",
+    "prestador_nit": "<string>",
+    "paciente_nombre": "<string>",
+    "paciente_documento": "<tipo> <numero>",
+    "fecha_atencion": "YYYY-MM-DD",
+    "fecha_factura": "YYYY-MM-DD",
+    "diagnostico_principal": "<CIE-10> - <descripcion>",
+    "plan_afiliado": "ORO | PLATA | BASICO",
+    "total_facturado": 0
+  },
+  "hallazgos": [ /* items with hallazgo = glosa | devolucion */ ],
+  "resumen": {
+    "total_facturado": 0,
+    "total_aprobado": 0,
+    "total_glosado": 0,
+    "concepto_final": "NO_APTA | DEVOLUCION",
+    "accion_requerida": "...",
+    "resumen_ejecutivo": "..."
+  }
+}
+```
+
+Pre-flight check: abort with clear error if `resumen.concepto_final = APTA` (no glosa to generate) or if `hallazgos` contains zero items with `hallazgo = glosa | devolucion`.
+
+## Output Contract
+
+The skill uploads the PDF to the destination software and returns:
+
+```json
+{
+  "document_id": "<uuid>",
+  "version": "v1 | v2 | ...",
+  "pdf_url": "https://.../cases/{caso_id}/documents/{doc_id}/content",
+  "caso_id": "RAD-YYYYMMDD-{num_factura}",
+  "estado_caso": "claim_denial_draft",
+  "findings_count": 0,
+  "total_objetado": 0
+}
+```
+
+**PDF mandatory sections** (the rendered document must contain all six):
+1. **Header** — EPS logo, "GLOSA FORMAL Res. 3047/2008 Art. 5", notification date, RAD, version.
+2. **Parties** — IPS (legal name + NIT + email) and EPS identification.
+3. **Disputed invoice** — `num_factura`, CUV, `fecha_atencion`, `fecha_factura`, patient, `total_facturado`.
+4. **Executive summary** — table with `total_facturado`, `total_objetado`, `total_aprobado`; causales applied with item counts.
+5. **Detailed findings** — one block per `hallazgo` item where `hallazgo ∈ {glosa, devolucion}`, including: `causal_num`, `causal_nombre`, `valor_objetado`, legal justification (Res. 3047 Anexo 6 reference), clinical/technical justification, and `evidencia` verbatim.
+6. **Right of response + signature** — "15 días hábiles (Art. 6 Res. 3047/2008)" deadline; `EPS_LEGAL_REPRESENTATIVE` name and title.
+
+**Versioning invariant:** each call creates a new version (`v{n+1}`). Never overwrite. The destination software must keep all versions in `documents[]`.
+
 ## Procedure
 
 1. **Read the consolidated output and case data.**

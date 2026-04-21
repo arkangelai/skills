@@ -37,6 +37,67 @@ The question it answers: **is the expediente formally complete and consistent en
 
 **Do not use:** if the case is not yet filed (skill 1 missing); if the case already has `admin_audit` published and a re-audit was not requested.
 
+## Input Contract
+
+**Template:** `metadata_input.json` produced by `medical-invoice-gmail-intake` — 8 flat fields (`caso_id`, `fecha_radicacion`, `num_factura`, `prestador_nit`, `prestador_nombre`, `pagador_nit`, `pagador_nombre`, `documentos`). See `../medical-invoice-gmail-intake/metadata_input.json` for the canonical shape.
+
+Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contratos_ips.json` (IPS contracts). Fetches each document listed in `documentos` from the destination software.
+
+## Output Contract
+
+**Template:** `checklist_base.json` in this directory — DAMA-UK instrument, 27 rules (A01–A27). For SOAT cases use `checklist_soat_base.json` instead. See `checklist_base.md` for rule descriptions and evidence requirements.
+
+Load the template and fill every rule's nullable fields:
+- `resultado`: `"pass" | "fail" | "n/a"`
+- `evidencia`: citable string — file + page/section + literal quote
+- `confianza`: float 0.0–1.0
+- `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
+
+Then fill `meta` and append `cierre`:
+
+```json
+{
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-admin-v1" },
+  "cierre": {
+    "score_total": 100.0,
+    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "clasificacion": "Administrativo",
+    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
+    "resumen_ejecutivo": "<2-3 oraciones>"
+  }
+}
+```
+
+Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+
+**Rules for `resultado`:**
+- `pass` — rule satisfied with evidence.
+- `fail` — rule violated; `glosa_sugerida` must be populated.
+- `n/a` — rule does not apply to this service type (e.g. SOAT rule on a non-SOAT invoice).
+
+**Rules for `confianza`:**
+- `≥ 0.95`: direct document quote or verified system query (DIAN, BDUA).
+- `0.80–0.94`: specific document reference without literal quote.
+- `0.75–0.79`: strong inference with partial evidence.
+- `< 0.75` on any `critica` rule → `concepto_final` forced to `ESCALAR_HUMANO`.
+
+**`glosa_sugerida` shape (only when `resultado = fail`):**
+```json
+{
+  "causal_num": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+  "causal_nombre": "<nombre causal Res. 3047 Anexo 6>",
+  "texto": "<1-2 oraciones trazables con cita>",
+  "valor_glosado": 0,
+  "moneda": "COP"
+}
+```
+
+**`concepto_final` decision logic:**
+- `NO_APTA`: any `critica` rule with `fail` that is not subsanable (e.g. missing HC entirely).
+- `DEVOLUCION`: any `critica` rule with `fail` that is subsanable by submitting documents.
+- `ESCALAR_HUMANO`: any `critica` rule with `confianza < 0.75`, or ambiguous evidence.
+- `APTA`: all applicable rules `pass` and no escalation trigger.
+
 ## Procedure
 
 1. **Read the case from the destination software.**
@@ -61,81 +122,30 @@ The question it answers: **is the expediente formally complete and consistent en
    - `$REF_DATA_PATH/bdua.json` — affiliation state.
    - `$REF_DATA_PATH/contratos_ips.json` — active IPS contracts.
 
-4. **Run the rule checklist (each rule emits a `finding`).**
+4. **Run the DAMA-UK rule checklist.**
 
-   ### Group A — Patient identity (Weight 3, critical)
-   - **ADMIN.01** Document (type + number) matches across XML invoice, RIPS (`US.txt`), clinical history, and BDUA.
-   - **ADMIN.02** First and last name match (exact match on RIPS and BDUA; accent-insensitive).
-   - **ADMIN.03** Date of birth / age consistent with document type (CC adult, TI minor, RC infant).
+   Load `checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a SOAT/ADRES payer in `contratos_ips.json`, load `checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
 
-   ### Group B — Affiliation (Weight 3, critical)
-   - **ADMIN.04** Patient active in BDUA on the **service date** (not the filing date).
-   - **ADMIN.05** BDUA plan compatible with the billed service (e.g. Básico plan does not cover high complexity).
+   For each rule, follow `checklist_base.md` §2.3 and §3. Fill the four nullable fields:
 
-   ### Group C — IPS contract (Weight 3, critical)
-   - **ADMIN.06** The IPS (by NIT) has an active contract with the EPS on the service date (`contratos_ips.json`).
-   - **ADMIN.07** Contractual modality (event/PGP/cápita/paquete) compatible with the billing type.
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` only when the rule structurally does not apply to this service type (e.g. A14 ambulance transport for a case with no transport).
+   - **`evidencia`**: citable and specific. Three valid formats (in order of preference):
+     1. Literal quote: `"Epicrisis p.3: 'paciente egresa estable el 2026-04-13...'"`.
+     2. Document reference: `"Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30, archivo autorizacion.pdf"`.
+     3. External query result: `"BDUA consultada 2026-04-21 14:28; afiliado activo, régimen contributivo, plan ORO"`.
+     Never use vague statements like `"se verifica en HC"` without a specific citation.
+   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use the causal map in `checklist_base.md §7` to assign `causal_num` and `causal_nombre`. `valor_glosado` may be `null` if the financial auditor will determine it.
 
-   ### Group D — RIPS structure (Weight 3, critical — Res. 1536/2022)
-   - **ADMIN.08** Minimum files present based on service type (`US`+`AF` always; `AC` for consultations, `AP` for procedures, `AH` for hospitalization, `AM` for medications, `AN` for newborns, `AT` for other services, `AU` for ER).
-   - **ADMIN.09** Column count per file is unique and consistent (no malformed rows).
-   - **ADMIN.10** Every `numFactura` in `AF.txt` exists in the detail files.
-   - **ADMIN.11** Every user in detail files exists in `US.txt`.
+   See `checklist_base.md §6` for filled pass/fail examples.
 
-   ### Group E — DIAN invoice (Weight 3, critical)
-   - **ADMIN.12** CUV/CUFE present and well-formed.
-   - **ADMIN.13** DIAN consecutive number with no gaps or collisions against other invoices from the same period.
-   - **ADMIN.14** Issue date on or after service date.
+5. **Compute `cierre` and complete the checklist.**
 
-   ### Group F — Prior authorization (Weight 2, major)
-   - **ADMIN.15** If the service requires authorization (high complexity, non-PBS, limits), the authorization PDF exists and covers the billed CUPS.
-   - **ADMIN.16** The authorization is valid on the service date.
-
-   ### Group G — Clinical history (Weight 3, critical — Res. 1995/1999)
-   - **ADMIN.17** HC signed by a professional with a legible RETHUS ID.
-   - **ADMIN.18** Epicrisis present if the case was inpatient.
-   - **ADMIN.19** Operative note present if there is a surgical CUPS.
-
-   ### Group H — Cross-document consistency (Weight 2, major)
-   - **ADMIN.20** XML invoice total = RIPS detail sum (tolerance ±$1).
-   - **ADMIN.21** Service date consistent across XML, RIPS, and HC.
-   - **ADMIN.22** CUPS in RIPS match the XML billing lines.
-   - **ADMIN.23** Quantities in RIPS consistent with HC (not more procedures than documented).
-
-   ### Group I — Timeliness (Weight 1, low)
-   - **ADMIN.24** Filing within the contractual window (typically 30 days post-discharge).
-   - **ADMIN.25** RIPS generated within 15 days post-care.
-
-   ### Group J — Traceability (Weight 1, low)
-   - **ADMIN.26** Every supporting document has a documentable origin (filename + modified date).
-   - **ADMIN.27** No documents with suspicious metadata (creation date after filing).
-
-5. **Assemble the `admin_audit` object.**
-   ```json
-   {
-     "audit_type": "admin",
-     "score": <total weight lost>,
-     "zona": "verde|amarilla|roja",
-     "opinion": "<2-3 line summary>",
-     "findings": [
-       {
-         "rule_id": "ADMIN.07",
-         "severidad": "critica|mayor|media|baja",
-         "peso": 3,
-         "resultado": "pass|fail|conditional",
-         "evidencia": "contratos_ips.json: NIT 900... is not active as of 2026-03-15",
-         "valor_objetado": 0,
-         "nota": "IPS billed without an active contract"
-       }
-     ]
-   }
-   ```
-
-   **Zone calculation:**
-   - Green: 0-5 weight points lost.
-   - Yellow: 6-15.
-   - Red: 16+.
-   - Any critical rule (Weight 3) failing → zone forced to at least red.
+   Once all rules are filled, compute and append the `cierre` block per `checklist_base.md §2.4`:
+   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over all rules with `resultado ≠ "n/a"`.
+   - `concepto_final` — follow decision logic in `checklist_base.md §4`.
+   - `clasificacion`: `"Administrativo"`.
+   - `resumen_ejecutivo`: 1–2 sentences mentioning any critical finding explicitly.
 
 6. **Publish the result to the destination software.**
    ```

@@ -1,0 +1,56 @@
+{
+  "caso_id": null,
+  "factura": {
+    "num_factura": null,
+    "prestador": null,
+    "prestador_nit": null,
+    "paciente_nombre": null,
+    "paciente_documento": null,
+    "fecha_atencion": null,
+    "fecha_factura": null,
+    "diagnostico_principal": null,
+    "plan_afiliado": null,
+    "total_facturado": null
+  },
+  "hallazgos": [
+    {
+      "item": null,
+      "codigo_cups": null,
+      "descripcion": null,
+      "valor_facturado": null,
+      "hallazgo": null,
+      "capa": null,
+      "regla_aplicada": null,
+      "severidad": null,
+      "valor_objetado": null,
+      "valor_a_reconocer": null,
+      "glosa_sugerida": {
+        "causal_num": null,
+        "causal_nombre": null,
+        "texto": null,
+        "valor_glosado": null,
+        "moneda": "COP"
+      },
+      "confianza": null,
+      "evidencia_requerida": null
+    }
+  ],
+  "resumen": {
+    "total_facturado": null,
+    "total_aprobado": null,
+    "total_glosado": null,
+    "num_items": null,
+    "num_conformes": null,
+    "num_glosas": null,
+    "num_devoluciones": null,
+    "tasa_objecion": null,
+    "glosas_por_capa": {
+      "administrativo": null,
+      "medico": null,
+      "financiero": null
+    },
+    "concepto_final": null,
+    "accion_requerida": null,
+    "resumen_ejecutivo": null
+  }
+}

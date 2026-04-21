@@ -43,6 +43,52 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 
 **Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a case with the same invoice number already exists in the destination software.
 
+## Input Contract
+
+The trigger is a Gmail message event (push notification or polling result). No structured JSON input is required by the caller. The skill reads directly from Gmail using `gogcli`.
+
+```
+Trigger: Gmail message arrival on label $GMAIL_WATCH_LABEL
+         OR explicit call with a specific message_id for reprocessing
+```
+
+## Output Contract
+
+On success, the skill files the case in the destination software and writes `metadata_input.json` for downstream audit skills:
+
+**Template:** `metadata_input.json` in this skill's directory — 8 fields, all initially `null`, filled by this skill.
+
+| Field | Type | Description |
+|---|---|---|
+| `caso_id` | string | `RAD-YYYYMMDD-{num_factura_normalizado}` |
+| `fecha_radicacion` | ISO datetime | Filing timestamp in `America/Bogota` |
+| `num_factura` | string | Invoice number from DIAN XML |
+| `prestador_nit` | string | IPS tax ID |
+| `prestador_nombre` | string | IPS legal name |
+| `pagador_nit` | string | EPS tax ID |
+| `pagador_nombre` | string | EPS legal name |
+| `documentos` | string[] | Relative paths of received files (only files actually present) |
+
+The skill also returns the envelope:
+
+```json
+{
+  "caso_id": "RAD-YYYYMMDD-{num_factura}",
+  "rad": "YYYYMMDD-NNNN",
+  "message_id": "<gmail-message-id>",
+  "label_aplicado": "medical-invoice/intake",
+  "archivos_radicados": [
+    { "name": "factura.pdf", "doc_type": "invoice_xml | rips | clinical_history | epicrisis | authorization | other", "sha256": "<hex>" }
+  ],
+  "metadatos": { /* filled metadata_input.json */ }
+}
+```
+
+`factura.pdf` is always required. `rips.csv` and `epicrisis.pdf` are required based on service type (see `input.md` in this directory for the full document requirements by service type). Optional files not present are simply omitted from `documentos`.
+
+On non-invoice emails: returns `{ "label_aplicado": "medical-invoice/not-applicable" }` and stops.
+On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "motivo": "<string>" }` and stops.
+
 ## Procedure
 
 1. **Verify tools and credentials.**

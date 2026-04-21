@@ -1,0 +1,671 @@
+{
+  "instrumento": "FIN-CTR",
+  "descripcion": "Auditoria tarifaria, contractual y antifraude. Cada EPS y asegurador tiene tarifarios especificos por plan (Oro, Plata, Basico) - la factura debe coincidir con el contrato del afiliado. Incluye controles antifraude: fechas, duplicidad multi-IPS, doble cobro SOAT/EPS/ARL, upcoding y unbundling.",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null,
+    "plan_afiliado": null,
+    "tarifario_aplicado": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Contrato vigente y modalidad",
+      "reglas": [
+        {
+          "id": "F01",
+          "nombre": "Contrato activo al momento de la atencion",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Existe contrato vigente entre IPS y pagador en la fecha exacta de prestacion del servicio, con firmas y vigencia verificadas.",
+          "evidencia_requerida": "Contrato, anexos, otrosies.",
+          "dimensiones": ["Validez", "Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F02",
+          "nombre": "Modalidad de contratacion identificada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Esta identificada la modalidad de contratacion para cada servicio facturado: evento, PGP, capita, paquete o pago global.",
+          "evidencia_requerida": "Contrato, anexo tecnico.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F03",
+          "nombre": "Anexos y otrosies vigentes aplicados",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Anexos tecnicos y otrosies vigentes aplicables al servicio estan identificados y versionados correctamente.",
+          "evidencia_requerida": "Otrosies, historico contractual.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Plan / producto del afiliado (Oro / Plata / Basico)",
+      "reglas": [
+        {
+          "id": "F04",
+          "nombre": "Identificacion del plan del afiliado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El plan especifico del afiliado (Oro, Plata, Basico, Complementario u otro) esta identificado y documentado con certificacion del pagador.",
+          "evidencia_requerida": "BDUA, certificacion del pagador.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F05",
+          "nombre": "Tarifario especifico del plan",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El tarifario aplicado corresponde al plan especifico del afiliado, no al tarifario generico ni al de otro plan del mismo pagador.",
+          "evidencia_requerida": "Tarifario del plan, contrato.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F06",
+          "nombre": "Coberturas y exclusiones del plan",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las coberturas y exclusiones propias del plan estan verificadas contra los servicios facturados.",
+          "evidencia_requerida": "Plan de beneficios del producto.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Tarifario aplicable / manual",
+      "reglas": [
+        {
+          "id": "F07",
+          "nombre": "Manual tarifario pactado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El manual tarifario aplicado (SOAT, ISS 2001, propio u otro) corresponde al pactado contractualmente para la modalidad.",
+          "evidencia_requerida": "Contrato, anexo tarifario.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F08",
+          "nombre": "Version vigente del manual",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La version del manual tarifario aplicada esta vigente en la fecha de prestacion del servicio.",
+          "evidencia_requerida": "Manual vigente, resolucion.",
+          "dimensiones": ["Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F09",
+          "nombre": "UVB / UVR / factor multiplicador",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El valor de UVB, UVR o factor multiplicador aplicado es el correspondiente a la vigencia y al contrato.",
+          "evidencia_requerida": "Resolucion de UVB vigente, contrato.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Codificacion y homologacion",
+      "reglas": [
+        {
+          "id": "F10",
+          "nombre": "CUPS homologado correctamente",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada CUPS facturado se homologa correctamente al codigo tarifario del manual contratado, sin alterar la equivalencia.",
+          "evidencia_requerida": "Tabla de homologacion, manual.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F11",
+          "nombre": "CUM / ATC de medicamentos valido",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Medicamentos facturados tienen codigo CUM / ATC valido y vigente en INVIMA, correspondiente al principio activo prescrito.",
+          "evidencia_requerida": "Base INVIMA / CUM.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F12",
+          "nombre": "Homologacion de insumos y dispositivos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Insumos y dispositivos estan homologados al codigo tarifario o a la lista contractual especifica.",
+          "evidencia_requerida": "Lista contractual, manual.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Liquidacion de servicios",
+      "reglas": [
+        {
+          "id": "F13",
+          "nombre": "Tarifa base correcta",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La tarifa base de cada servicio se calcula conforme al manual y contrato, sin sobrecosto ni descuento indebido.",
+          "evidencia_requerida": "Manual, liquidador.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F14",
+          "nombre": "Recargos aplicados correctamente",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Recargos por jornada nocturna, festivo, urgencia o especialidad se aplican segun reglas del manual y contrato.",
+          "evidencia_requerida": "Manual, contrato.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F15",
+          "nombre": "Liquidacion quirurgica por via de acceso",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Liquidacion de cirugias segun via de acceso (igual via, diferente via, diferente especialista) cumple reglas del manual.",
+          "evidencia_requerida": "Liquidador quirurgico, nota operatoria.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F16",
+          "nombre": "Honorarios profesionales conforme",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Honorarios del cirujano, ayudante y anestesiologo se facturan conforme al manual y a la especialidad registrada.",
+          "evidencia_requerida": "Manual, registro profesional.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "Paquetes y eventos",
+      "reglas": [
+        {
+          "id": "F17",
+          "nombre": "Servicios de paquete no duplicados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Servicios ya incluidos en un paquete contratado no estan facturados adicionalmente por evento separado.",
+          "evidencia_requerida": "Contrato paquete, factura.",
+          "dimensiones": ["Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F18",
+          "nombre": "Evento fuera de paquete justificado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Servicios facturados por evento fuera de un paquete cuentan con justificacion contractual explicita (exclusion del paquete).",
+          "evidencia_requerida": "Anexo, contrato, autorizacion.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F19",
+          "nombre": "PGP / capita sin cobros individuales",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Servicios bajo PGP o capita no se facturan adicionalmente por evento individual.",
+          "evidencia_requerida": "Liquidacion PGP, contrato.",
+          "dimensiones": ["Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Coberturas y limites",
+      "reglas": [
+        {
+          "id": "F20",
+          "nombre": "Topes anuales respetados",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Los topes anuales del plan (consultas, ayudas, medicamentos) no se superan sin autorizacion explicita del pagador.",
+          "evidencia_requerida": "Historico del afiliado, contrato.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F21",
+          "nombre": "Periodos de carencia cumplidos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Servicios sujetos a periodo de carencia solo se facturan una vez cumplido el periodo requerido.",
+          "evidencia_requerida": "BDUA, contrato, certificacion.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F22",
+          "nombre": "Preexistencias excluidas",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Preexistencias documentadas no se facturan al plan si el contrato las excluye o deriva a otro responsable.",
+          "evidencia_requerida": "Contrato, HC, declaracion del afiliado.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Copagos, cuotas y recaudos",
+      "reglas": [
+        {
+          "id": "F23",
+          "nombre": "Copago / cuota moderadora por IBC",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Copago o cuota moderadora se calcula segun el IBC del afiliado y los topes legales vigentes.",
+          "evidencia_requerida": "Normativa, BDUA, liquidador.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F24",
+          "nombre": "Recaudo registrado y descontado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Valor recaudado al usuario esta registrado y descontado correctamente del valor facturado al pagador.",
+          "evidencia_requerida": "Factura, recibo.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F25",
+          "nombre": "Exencion correctamente aplicada",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Exenciones por condicion (gestante, menor de edad, enfermedad de alto costo) aplicadas segun la norma.",
+          "evidencia_requerida": "BDUA, certificacion, HC.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "nombre": "Cierre financiero",
+      "reglas": [
+        {
+          "id": "F26",
+          "nombre": "Valor total conciliable",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El valor total facturado se concilia con la liquidacion contractual, sin diferencias injustificadas.",
+          "evidencia_requerida": "Factura, liquidador contractual.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F27",
+          "nombre": "Radicacion dentro de plazos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La factura se radica dentro del plazo contractual o legal, evitando castigo de pago por extemporaneidad.",
+          "evidencia_requerida": "Contrato, fecha de radicacion.",
+          "dimensiones": ["Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F28",
+          "nombre": "Historico del prestador en umbral",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "Comportamiento historico del prestador (tasa de glosa, desviacion tarifaria) esta dentro de umbrales aceptables para esta modalidad.",
+          "evidencia_requerida": "Analitico interno.",
+          "dimensiones": ["Calidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "nombre": "Controles antifraude y duplicidad",
+      "reglas": [
+        {
+          "id": "F29",
+          "nombre": "Fecha de emision anterior al vencimiento",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La fecha de emision de la factura es anterior a la fecha de vencimiento contractual o legal. No se emite una factura con fecha posterior a su vencimiento.",
+          "evidencia_requerida": "Factura, contrato, plazo legal.",
+          "dimensiones": ["Validez", "Oportunidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F30",
+          "nombre": "Fecha emision vs fecha de prestacion",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La fecha de emision de la factura es posterior a la fecha de prestacion del servicio y dentro de un rango razonable (no pre-emitida ni diferida atipicamente).",
+          "evidencia_requerida": "Factura, HC, RIPS.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F31",
+          "nombre": "Consecutivo DIAN valido y continuo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La factura tiene numero consecutivo asignado por DIAN dentro de la resolucion vigente, sin saltos ni repeticiones sospechosas.",
+          "evidencia_requerida": "Resolucion DIAN, historico de consecutivos.",
+          "dimensiones": ["Unicidad", "Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F32",
+          "nombre": "Unicidad: mismo paciente en multiples IPS",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El mismo paciente no esta facturado simultaneamente por dos o mas IPS por el mismo periodo, servicio o evento. Cruce antifraude del lado del pagador.",
+          "evidencia_requerida": "Historico del afiliado, BDUA, RIPS cruzados.",
+          "dimensiones": ["Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F33",
+          "nombre": "No solapamiento de hospitalizaciones",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "No existe solapamiento de fechas de hospitalizacion del mismo paciente en diferentes instituciones (imposibilidad fisica).",
+          "evidencia_requerida": "Historico de estancias, RIPS AH cruzados.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F34",
+          "nombre": "Servicios post-mortem",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Ningun servicio se factura con fecha posterior al fallecimiento del paciente.",
+          "evidencia_requerida": "RUAF, certificado de defuncion, BDUA.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F35",
+          "nombre": "Doble cobro SOAT / EPS / ARL / plan",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Mismo servicio no esta cobrado a dos pagadores simultaneamente (SOAT + EPS + ARL + plan voluntario) sin justificacion contractual de concurrencia.",
+          "evidencia_requerida": "Cruces BDUA - SOAT - ARL, historico.",
+          "dimensiones": ["Unicidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F36",
+          "nombre": "Servicios no realizados (phantom billing)",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada servicio facturado tiene evidencia de ejecucion en HC: nota, registro, firma del profesional responsable. No se facturan servicios sin evidencia de realizacion.",
+          "evidencia_requerida": "HC, notas, kardex, firma.",
+          "dimensiones": ["Integridad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F37",
+          "nombre": "Upcoding sospechoso",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El codigo facturado corresponde a la complejidad real del servicio. No hay elevacion injustificada a un CUPS de mayor valor que el realmente ejecutado.",
+          "evidencia_requerida": "HC, comparativo de CUPS relacionados.",
+          "dimensiones": ["Exactitud"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F38",
+          "nombre": "Unbundling detectado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Servicios que normalmente se facturan agrupados no estan fragmentados artificialmente para inflar el cobro (p.ej. kit quirurgico separado en componentes).",
+          "evidencia_requerida": "Manual tarifario, reglas de agrupacion.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F39",
+          "nombre": "Profesional sin concurrencia imposible",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El profesional no esta facturado ejecutando dos o mas servicios fisicamente incompatibles en el mismo horario (p.ej. dos cirugias simultaneas en sedes distintas).",
+          "evidencia_requerida": "Registro profesional, agenda, cruce de horarios.",
+          "dimensiones": ["Validez"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F40",
+          "nombre": "Cambio de diagnostico sospechoso",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "No hay cambios de diagnostico entre versiones de la misma cuenta que amplien la cobertura economica sin soporte clinico equivalente.",
+          "evidencia_requerida": "HC, historial de facturacion, versiones.",
+          "dimensiones": ["Trazabilidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F41",
+          "nombre": "Cantidades atipicas de insumos / medicamentos",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las cantidades de medicamentos, insumos y dispositivos son proporcionales al procedimiento y paciente, sin inflacion atipica vs el benchmark de la institucion.",
+          "evidencia_requerida": "Comparativo con estandares, analitica de consumo.",
+          "dimensiones": ["Consistencia"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        },
+        {
+          "id": "F42",
+          "nombre": "Patron recurrente del prestador",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "El prestador no presenta patron recurrente de desviaciones (glosas, upcoding, duplicidad) que sugieran riesgo sistemico o intencionalidad.",
+          "evidencia_requerida": "Analitica de patrones, score del prestador.",
+          "dimensiones": ["Calidad"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null,
+          "glosa_sugerida": null
+        }
+      ]
+    }
+  ],
+  "cierre": {
+    "score_total": null,
+    "concepto_final": null,
+    "clasificacion": null,
+    "accion_requerida": null,
+    "resumen_ejecutivo": null,
+    "valor_facturado": null,
+    "valor_aprobado": null,
+    "valor_glosado": null
+  }
+}
