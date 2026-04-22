@@ -26,7 +26,7 @@ Plan premium con red preferente, cobertura total del PBS y ampliada para no-PBS,
 - **Especializada primera vez:** 100 %
 - **Subespecializada:** 100 %
 - **Interconsulta hospitalaria:** 100 %
-- **Red:** preferente (ver `contratos_ips.json`). Red complementaria con autorización.
+- **Red:** preferente. Red complementaria con autorización.
 - **Autorización previa:** no requerida para primera vez; no requerida para control postquirúrgico.
 
 ### Ayudas diagnósticas

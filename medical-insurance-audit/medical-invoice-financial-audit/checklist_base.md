@@ -92,15 +92,32 @@ En financiero, la glosa debe incluir **monto**:
 
 Causales financieras más comunes: **1** (facturación), **2** (tarifas), **4** (autorización), **5** (cobertura), **6** (pertinencia cuando hay upcoding).
 
+#### Tabla resumen de valores válidos en reglas
+
+| Campo | Valores válidos |
+|---|---|
+| `resultado` | `"pass"` · `"fail"` · `"n/a"` · `null` (solo mientras no ha sido evaluado) |
+| `confianza` | Float 0.0–1.0. `0.95+`: diferencia numérica exacta. `0.80–0.95`: inferencia contra el plan. `<0.80` en antifraude → siempre escala. |
+| `glosa_sugerida` | `null` si `resultado != "fail"`. Objeto obligatorio si `resultado == "fail"`. |
+| `glosa_sugerida.causal_num` | `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones |
+| `glosa_sugerida.causal_nombre` | Nombre que corresponde al `causal_num`. |
+| `glosa_sugerida.valor_glosado` | Integer COP. **Obligatorio en financiero** — diferencia exacta entre valor facturado y valor reconocible. |
+| `glosa_sugerida.moneda` | Siempre `"COP"`. |
+
 ### 2.3 `cierre`
 
 Campos estándar + tres específicos del financiero:
 
-| Campo | Cómo llenarlo |
+| Campo | Valores válidos / cómo llenarlo |
 |---|---|
-| `valor_facturado` | Total facturado por el prestador (COP). |
-| `valor_aprobado` | Valor que el pagador reconoce tras glosas. |
-| `valor_glosado` | `valor_facturado - valor_aprobado`. Suma de todos los `valor_glosado` de las reglas en fail. |
+| `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. |
+| `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. |
+| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
+| `resumen_ejecutivo` | String. 1–2 frases. Debe indicar el total glosado en COP. |
+| `valor_facturado` | Integer COP. Total facturado por el prestador. `null` mientras se evalúa. |
+| `valor_aprobado` | Integer COP. Valor que el pagador reconoce tras glosas. `valor_facturado − valor_glosado`. `null` mientras se evalúa. |
+| `valor_glosado` | Integer COP. Suma de todos los `valor_glosado` de las reglas en `fail`. `null` mientras se evalúa. |
 
 ---
 

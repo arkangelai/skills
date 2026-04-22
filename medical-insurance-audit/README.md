@@ -8,49 +8,66 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 
 ## Pipeline
 
+The pipeline runs in three phases: an isolated intake that enqueues cases, a parallel audit core that produces `output.json`, and optional claim-denial skills triggered on user request.
+
+**Phase 1 — Intake (isolated, enqueues tasks)**
+
 ```
-                 ┌─────────────────────────────┐
-                 │ 1. gmail-intake             │  (Gmail → generates metadata_input.json)
-                 └─────────────┬───────────────┘
-                               │ case_id
-         ┌─────────────────────┼─────────────────────┐
-         ▼                     ▼                     ▼
- ┌──────────────┐      ┌──────────────┐     ┌──────────────┐
- │ 3. admin     │      │ 4. medical   │     │ 5. financial │  (run in parallel, independent)
- │    audit     │      │    audit     │     │    audit     │
- └──────┬───────┘      └──────┬───────┘     └──────┬───────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                               ▼
-                 ┌─────────────────────────────┐
-                 │ 6. consolidator-audit       │  (dedup + Anexo 6 causales + labels)
-                 └─────────────┬───────────────┘
-                               ▼
-                 ┌─────────────────────────────┐
-                 │ 7. claim-denial-generator   │  (PDF v1)
-                 └─────────────┬───────────────┘
-                               ▼
-                 ┌─────────────────────────────┐
-                 │ 8. fix-review               │  (reads human comments ⇄ loops with 7)
-                 └─────────────┬───────────────┘
-                               ▼
-                 ┌─────────────────────────────┐
-                 │ 9. claim-denial-gmail-sender│  (delivery to IPS via Gmail)
-                 └─────────────────────────────┘
+                 ┌─────────────────────────────────────────┐
+                 │ 1. gmail-intake                         │
+                 │    Gmail → metadata_input.json          │
+                 │    → enqueues case for audit            │
+                 └─────────────────────────────────────────┘
+```
+
+**Phase 2 — Audit (parallel → consolidated output)**
+
+```
+         ┌─────────────────────┬──────────────────────┐
+         ▼                     ▼                      ▼
+ ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+ │ 3. admin     │      │ 4. medical   │      │ 5. financial │
+ │    audit     │      │    audit     │      │    audit     │
+ └──────┬───────┘      └──────┬───────┘      └──────┬───────┘
+        │                     │                      │
+        └─────────────────────┼──────────────────────┘
+                              ▼
+              ┌───────────────────────────────┐
+              │ 6. consolidator-audit         │
+              │    dedup + Anexo 6 + labels   │
+              └───────────────┬───────────────┘
+                              ▼
+                         output.json
+```
+
+**Phase 3 — Claim denial (optional, each skill invoked independently)**
+
+```
+              ┌───────────────────────────────┐
+              │ 7. claim-denial-generator     │  (PDF v1)
+              └───────────────────────────────┘
+
+              ┌───────────────────────────────┐
+              │ 8. fix-review                 │  (human comments ⇄ revised output.json)
+              └───────────────────────────────┘
+
+              ┌───────────────────────────────┐
+              │ 9. claim-denial-gmail-sender  │  (delivery to IPS via Gmail)
+              └───────────────────────────────┘
 ```
 
 ## Skills
 
-| # | Name | Dependencies |
-|---|---|---|
-| 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | gogcli |
-| 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `metadata_input.json`, `bdua.json`, `contratos_ips.json` |
-| 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `metadata_input.json`, `guias-clinicas/` |
-| 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `metadata_input.json`, `tarifario_contractual.csv`, `contratos_ips.json`, `plan_afiliados.json`, `bdua.json` |
-| 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | outputs from skills 3-4-5 |
-| 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `metadata_input.json`, `output.json`, PDF rendering engine |
-| 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json`, `comments.json`, skill 7 |
-| 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | gogcli, `output.json`, `claim_denial.v*.pdf` |
+| Phase | # | Name | Key inputs / outputs |
+|---|---|---|---|
+| **Intake** | 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | → `metadata_input.json` |
+| **Audit** | 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `metadata_input.json` + `checklist_base.json` → audit output |
+| | 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `metadata_input.json` + `checklist_base.json` → audit output |
+| | 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `metadata_input.json` + `checklist_base.json` → audit output |
+| | 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | audit outputs → `output.json` |
+| **Claim denial** *(optional)* | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `output.json` → PDF |
+| | 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json` → revised `output.json` |
+| | 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | `output.json` + PDF → sent |
 
 ## Shared environment variables
 
@@ -59,7 +76,6 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 | `GOGCLI_CREDENTIALS_PATH` | 1, 9 | Path to `gogcli` OAuth credentials |
 | `GMAIL_WATCH_LABEL` | 1 | Label to watch (e.g. `INBOX`) |
 | `GMAIL_SENDER_ADDRESS` | 9 | Address the glosa is sent from |
-| `REF_DATA_PATH` | 3, 4, 5 | Folder with reference JSON/CSV files (`bdua.json`, `contratos_ips.json`, etc.) |
 
 ## Workflow states
 

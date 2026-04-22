@@ -19,20 +19,16 @@
       "descripcion": null,
       "valor_facturado": null,
       "hallazgo": null,
-      "reglas_aplicadas": null,
+      "capa": null,
+      "regla_aplicada": null,
       "severidad": null,
-      "valor_glosado": null,
+      "valor_objetado": null,
       "valor_a_reconocer": null,
       "glosa_sugerida": null,
       "confianza": null,
       "evidencia_requerida": null
     }
   ],
-  "resumen_por_capa": {
-    "administrativo": null,
-    "medico": null,
-    "financiero": null
-  },
   "resumen": {
     "total_facturado": null,
     "total_aprobado": null,
@@ -40,13 +36,13 @@
     "num_items": null,
     "num_conformes": null,
     "num_glosas": null,
+    "num_devoluciones": null,
     "tasa_objecion": null,
     "glosas_por_capa": {
       "administrativo": null,
       "medico": null,
       "financiero": null
     },
-    "zona": null,
     "concepto_final": null,
     "accion_requerida": null,
     "resumen_ejecutivo": null

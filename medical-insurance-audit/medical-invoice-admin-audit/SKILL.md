@@ -1,19 +1,14 @@
 ---
 name: medical-invoice-admin-audit
-description: Runs the administrative audit of a filed Colombian medical invoice (patient identity, BDUA affiliation, IPS contract, RIPS structure, DIAN invoice, prior authorization, signed clinical history, cross-document consistency, and filing timeliness). Emits findings with traceable evidence and generates admin_checklist_output.json. Use it when the user asks to audit the administrative side of a case, resume a failed audit, or run the admin sub-agent of the pipeline.
+description: Runs the administrative audit of a filed Colombian medical invoice (patient identity, IPS contract, RIPS structure, DIAN invoice, prior authorization, signed clinical history, cross-document consistency, and filing timeliness). Emits findings with traceable evidence and generates admin_checklist_output.json. Use it when the user asks to audit the administrative side of a case, resume a failed audit, or run the admin sub-agent of the pipeline.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
   hermes:
-    tags: [medical, audit, administrative, rips, bdua, colombia, eps]
+    tags: [medical, audit, administrative, rips, colombia, eps]
     category: medical-insurance-audit
     requires_toolsets: [terminal]
-required_environment_variables:
-  - name: REF_DATA_PATH
-    prompt: Folder with bdua.json, contratos_ips.json
-    help: Usually /ref_data/ synced from Drive (see issue #38)
-    required_for: full functionality
 ---
 
 # medical-invoice-admin-audit
@@ -35,7 +30,7 @@ The question it answers: **is the expediente formally complete and consistent en
 
 **Template:** `metadata_input.json` produced by `medical-invoice-gmail-intake` — 8 flat fields (`caso_id`, `fecha_radicacion`, `num_factura`, `prestador_nit`, `prestador_nombre`, `pagador_nit`, `pagador_nombre`, `documentos`). See `../medical-invoice-gmail-intake/metadata_input.json` for the canonical shape.
 
-Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contratos_ips.json` (IPS contracts). Loads each document listed in `metadata_input.json.documentos` from the local working directory.
+Loads each document listed in `metadata_input.json.documentos` from the local working directory.
 
 ## Output Contract
 
@@ -98,13 +93,9 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
    - Read `metadata_input.json` to get `ips_nit`, `invoice_number`, `service_date`, `patient_document`, `documentos[]`, `cups_principales[]`.
    - Load each attachment from the paths listed in `documentos[]` — `invoice_xml`, `rips`, `clinical_history`, `authorization`, `epicrisis`, `operative_note` (if applicable given the CUPS).
 
-2. **Load ref_data.**
-   - `$REF_DATA_PATH/bdua.json` — affiliation state.
-   - `$REF_DATA_PATH/contratos_ips.json` — active IPS contracts.
+2. **Run the DAMA-UK rule checklist.**
 
-3. **Run the DAMA-UK rule checklist.**
-
-   Load `checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a SOAT/ADRES payer in `contratos_ips.json`, load `checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
+   Load `checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a known SOAT/ADRES payer NIT, load `checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
 
    For each rule, follow `checklist_base.md` §2.3 and §3. Fill the four nullable fields:
 
@@ -112,10 +103,9 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
    - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. Examples:
      - Document quote: `HC p.3 "paciente egresa estable el 2026-04-13"`.
      - Reference with metadata: `autorizacion.pdf "Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30"`.
-     - System query: `BDUA "consultada 2026-04-21: afiliado activo, régimen contributivo, plan ORO"`.
      - Absence: `HC pp.1-40 "no se encontró firma en historia clínica"`.
      Never use vague statements like `"se verifica en HC"` without a specific citation.
-   - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual evidence found. `pass`: cite the document, field, or system query that confirms compliance (e.g. `"BDUA 2026-04-21: afiliado activo régimen contributivo, plan ORO, sin novedad de retiro"`). `fail`: cite the specific discrepancy and where it was found (e.g. `"RIPS AC campo numDocumento = '12345678'; HC p.1 cédula = '123456780' — dígito extra"`). `n/a`: explain why the rule structurally cannot apply to this case (e.g. `"Caso sin transporte de ambulancia — A14 no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
+   - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual evidence found. `pass`: cite the document, field, or system query that confirms compliance (e.g. `"autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30 — coincide con fechas de atención"`). `fail`: cite the specific discrepancy and where it was found (e.g. `"RIPS AC campo numDocumento = '12345678'; HC p.1 cédula = '123456780' — dígito extra"`). `n/a`: explain why the rule structurally cannot apply to this case (e.g. `"Caso sin transporte de ambulancia — A14 no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use the causal map in `checklist_base.md §7` to assign `causal_num` and `causal_nombre`. `valor_glosado` may be `null` if the financial auditor will determine it.
 
@@ -133,16 +123,14 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 
 6. **Emit detailed evidence.**
    Each `finding.evidencia` must be **citable**: file + section/line/page.
-   Valid example: `"US.txt line 1, field 3: document=CC12345678; BDUA: document=CC87654321"`.
+   Valid example: `"US.txt line 1, field 3: document=CC12345678; HC p.1: document=CC87654321"`.
    Invalid example: `"identity mismatch"` (no citation).
 
 ## Pitfalls
 
-- **Symptom:** ADMIN.01 fails because of accents (`JOSE` vs `JOSÉ`). **Cause:** RIPS handles accents inconsistently. **Fix:** normalize with `unicodedata.normalize('NFKD', s).encode('ascii','ignore')` before comparing.
-- **Symptom:** ADMIN.06 flags an expired contract that is actually active. **Cause:** `contratos_ips.json` has dates in DD/MM/YYYY while the service uses ISO. **Fix:** explicitly parse with `datetime.strptime` — never trust implicit parsing.
-- **Symptom:** ADMIN.10 fails because `numFactura` has leading zeros in `AF` but not in `AC`. **Cause:** inconsistent padding by the IPS. **Fix:** normalize (`lstrip('0')`) before comparing.
-- **Symptom:** false positives in ADMIN.17 (HC without signature). **Cause:** the PDF carries a digital signature in metadata, not visible in the OCR text. **Fix:** inspect the PDF's `/Sig` dictionary in addition to text OCR.
-- **Symptom:** BDUA says affiliate is inactive but they are actually active. **Cause:** local BDUA snapshot is stale (annual sync). **Fix:** if the critical BDUA rule fails, set `resultado=conditional` and let human-review query BDUA online.
+- **Symptom:** A04 fails because of accents (`JOSE` vs `JOSÉ`). **Cause:** RIPS handles accents inconsistently. **Fix:** normalize with `unicodedata.normalize('NFKD', s).encode('ascii','ignore')` before comparing.
+- **Symptom:** A10 fails because `numFactura` has leading zeros in `AF` but not in `AC`. **Cause:** inconsistent padding by the IPS. **Fix:** normalize (`lstrip('0')`) before comparing.
+- **Symptom:** false positives in A16 (HC without signature). **Cause:** the PDF carries a digital signature in metadata, not visible in the OCR text. **Fix:** inspect the PDF's `/Sig` dictionary in addition to text OCR.
 - **Symptom:** score fine, green zone, yet a critical rule failed. **Cause:** incorrect calculation — a failed critical forces the red zone. **Fix:** zone logic must first check if any Weight 3 rule has `resultado=fail`.
 
 ## Verification

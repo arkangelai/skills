@@ -87,16 +87,40 @@ Dos gatillos adicionales en médico:
   "moneda": "COP"
 }
 ```
-- `causal_num` — código Anexo 6 Res. 3047/2008 (`"1"`–`"7"`). Ver §7.
-- `causal_nombre` — nombre legible de la causal (ej. `"Pertinencia"`, `"Soportes"`, `"Autorización"`).
-- `valor_glosado` — valor en COP del ítem objetado (el valor total del ítem cuando la regla impide su reconocimiento). Puede ser `null` si el agente médico no puede determinarlo; el financiero lo consolida.
-- `moneda` — siempre `"COP"`.
+
+| Campo | Valores válidos |
+|---|---|
+| `causal_num` | `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones |
+| `causal_nombre` | Nombre que corresponde al `causal_num` (ej. `"Pertinencia"` para `"6"`) |
+| `texto` | String. Justificación breve y trazable. 1–2 oraciones. |
+| `valor_glosado` | Integer COP o `null` si el agente médico no puede determinarlo; el financiero lo consolida. |
+| `moneda` | Siempre `"COP"`. |
+
+- `glosa_sugerida` es **obligatoria** si `resultado == "fail"`. Debe ser `null` si `resultado == "pass"` o `"n/a"`.
 
 Causales frecuentes en médico: **3** (soporte faltante), **4** (autorización no-PBS), **5** (cobertura), **6** (pertinencia).
 
+#### Tabla resumen de valores válidos en reglas
+
+| Campo | Valores válidos |
+|---|---|
+| `resultado` | `"pass"` · `"fail"` · `"n/a"` · `null` (solo mientras no ha sido evaluado) |
+| `confianza` | Float 0.0–1.0. `0.90+`: evidencia unívoca alineada con GPC. `0.75–0.90`: requiere inferencia pero hay soporte en HC. `<0.75` en cualquier regla crítica → `concepto_final = "ESCALAR_HUMANO"`. |
+| `glosa_sugerida` | `null` si `resultado != "fail"`. Objeto con 5 campos si `resultado == "fail"`. |
+| `glosa_sugerida.causal_num` | `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones |
+| `glosa_sugerida.causal_nombre` | Nombre que corresponde al `causal_num` (ej. `"Pertinencia"` para `"6"`) |
+| `glosa_sugerida.valor_glosado` | Integer COP o `null` si el agente médico no puede determinarlo; el financiero lo consolida. |
+| `glosa_sugerida.moneda` | Siempre `"COP"`. |
+
 ### 2.4 `cierre`
 
-Misma semántica que admin: `concepto_final` (`APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO`), `clasificacion`, `accion_requerida`, `resumen_ejecutivo`. Sin `score_total` — decisión basada en reglas.
+| Campo | Valores válidos / cómo llenarlo |
+|---|---|
+| `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. |
+| `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. Dimensión dominante del hallazgo. |
+| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
+| `resumen_ejecutivo` | String. 1–2 frases. Debe nombrar cualquier regla crítica en `fail`. |
 
 ---
 
@@ -127,11 +151,11 @@ Misma semántica que admin: `concepto_final` (`APTA | NO_APTA | DEVOLUCION | ESC
 | M21 | Ayudas dx | Sin duplicidad injustificada | mayor | 2 |
 | M22 | Estancia | Criterio de ingreso documentado | crítica | 3 |
 | M23 | Estancia | Estancia justificada día a día | crítica | 3 |
-| M24 | Estancia | Egreso / traslado con criterio | mayor | 2 |
+| M24 | Estancia | Egreso o traslado con criterio | mayor | 2 |
 | M25 | Estancia | Interconsultas pertinentes y respondidas | mayor | 2 |
 | M26 | Alta | Epicrisis con plan de egreso | crítica | 3 |
 | M27 | Alta | Fórmula de egreso consistente | mayor | 2 |
-| M28 | Alta | Referencia / contrarreferencia trazable | mayor | 2 |
+| M28 | Alta | Referencia o contrarreferencia trazable | mayor | 2 |
 | M29 | Alta | Desenlace clínico documentado | baja | 1 |
 
 Peso total: **73**. Peso crítico: **48**. Peso mayor: **24**. Peso baja: **1**.
@@ -195,6 +219,7 @@ sino:                                                      concepto_final = "DEV
     }
   ],
   "cierre": {
+    "score_total": 100.0,
     "concepto_final": "APTA",
     "clasificacion": "Clinico",
     "accion_requerida": null,

@@ -100,12 +100,13 @@ Objeto o `null`. Estructura:
 
 ### 2.4 `cierre`
 
-| Campo | Cómo llenarlo |
+| Campo | Valores válidos / cómo llenarlo |
 |---|---|
-| `concepto_final` | Uno de: `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. Determinado por lógica de reglas, no por score. |
-| `clasificacion` | Dimensión dominante del hallazgo: `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. |
-| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"`. |
-| `resumen_ejecutivo` | 1–2 frases para la UI. Debe mencionar explícitamente cualquier hallazgo crítico (regla crítica en `fail`). |
+| `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. Determinado por lógica de reglas, no por score. |
+| `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. Dimensión dominante del hallazgo. |
+| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
+| `resumen_ejecutivo` | String. 1–2 frases para la UI. Debe mencionar explícitamente cualquier hallazgo crítico (regla crítica en `fail`). |
 
 ---
 
@@ -129,7 +130,7 @@ Objeto o `null`. Estructura:
 | A14 | Servicios facturados | Traslado en ambulancia soportado | mayor | 2 |
 | A15 | Servicios facturados | Ayudas diagnósticas soportadas | mayor | 2 |
 | A16 | Soportes | Historia clínica completa y firmada | crítica | 3 |
-| A17 | Soportes | Certificado / recibido del usuario | mayor | 2 |
+| A17 | Soportes | Certificado o recibido del usuario | mayor | 2 |
 | A18 | Soportes | Anexos técnicos y envíos | mayor | 2 |
 | A19 | Soportes | Récord de anestesia (si aplica) | mayor | 2 |
 | A20 | Soportes | Hoja administración de medicamentos | crítica | 3 |
@@ -212,6 +213,7 @@ El agente debe poblar `observaciones` a nivel de regla **y** `cierre.resumen_eje
     }
   ],
   "cierre": {
+    "score_total": 97.2,
     "concepto_final": "APTA",
     "clasificacion": "Administrativo",
     "accion_requerida": null,

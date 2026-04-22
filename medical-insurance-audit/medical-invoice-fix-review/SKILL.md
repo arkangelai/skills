@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-fix-review
-description: Reads human comments from comments.json in the working directory, interprets the auditor's intent (modify finding, add, remove, change causal, adjust amount, approve as-is), applies the changes to output.json, invokes claim-denial-generator to produce the next PDF version, and manages the workflow labels until the auditor explicitly approves with `claim-denial-ready`. Use it when a case has `needs-human-review` or `needs-fix-review` and a human left comments.
+description: Reads human comments from comments.json in the working directory, interprets the auditor's intent (modify finding, add, remove, change causal, adjust amount, approve as-is), applies the changes to output.json, and manages the workflow labels until the auditor explicitly approves with `claim-denial-ready`. Use it when a case has `needs-human-review` or `needs-fix-review` and a human left comments.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -14,7 +14,7 @@ required_environment_variables:
 
 # medical-invoice-fix-review
 
-Bridge between the human auditor and the automated pipeline. It watches the comments a human leaves on a case, turns them into concrete edits to the consolidated output, regenerates the PDF via skill 7, and ping-pongs until the human approves.
+Bridge between the human auditor and the automated pipeline. It watches the comments a human leaves on a case, turns them into concrete edits to the consolidated output, and manages workflow labels until the human approves. PDF regeneration is a separate step — invoke `medical-invoice-claim-denial-generator` after this skill signals changes.
 
 The question it answers: **what did the human ask for and how do I apply it to the consolidated output + PDF without breaking traceability?**
 
@@ -80,8 +80,7 @@ Comments must be processed in ascending chronological order. Only comments where
       "accion_requerida": "..."
     }
   },
-  "pdf_regenerated": true,
-  "new_pdf_version": "v2",
+  "pdf_regeneration_needed": true,
   "last_processed_at": "YYYY-MM-DDTHH:MM:SS-05:00"
 }
 ```
@@ -160,9 +159,9 @@ Comments must be processed in ascending chronological order. Only comments where
    }
    ```
 
-6. **Regenerate the PDF (invoke skill 7).**
-   If there were changes → run `medical-invoice-claim-denial-generator` to produce `v{n+1}`.
-   If only `ask_clarification` or `ambiguous` → do NOT regenerate.
+6. **Signal PDF regeneration.**
+   If there were changes → set `resumen.pdf_regeneration_needed = true` in `output.json`. The orchestrator or user invokes `medical-invoice-claim-denial-generator` separately to produce the next version.
+   If only `ask_clarification` or `ambiguous` → no status change.
 
 7. **Write bot reply.**
    Append the bot reply to `comments.json` in the working directory (with `author: "fix-review-bot"`):
@@ -203,7 +202,7 @@ Comments must be processed in ascending chronological order. Only comments where
 ## Verification
 
 - Every new comment produces an `audit-log` entry with a classified `intent`.
-- If changes occurred: a new PDF version (`v{n+1}`) exists more recent than any processed comment.
+- If changes occurred: `output.json resumen.pdf_regeneration_needed` is `true`.
 - If `intent=approve` and valid: `output.json resumen.label` is `claim-denial-ready` and `resumen.status` is `claim_denial_ready`.
 - `total_objetado ≥ 0` and `≤ invoice_total` after each change.
 - Every consolidated change has an `audit-log` entry with non-empty `triggered_by_comment`.
@@ -212,4 +211,4 @@ Comments must be processed in ascending chronological order. Only comments where
 ## References
 
 - Issue [arkangelai/audit-workflow#48](https://github.com/arkangelai/audit-workflow/issues/48).
-- Related skill: `medical-invoice-claim-denial-generator` (invoked by this skill).
+- Related skill: `medical-invoice-claim-denial-generator` (invoke separately after this skill signals `pdf_regeneration_needed`).

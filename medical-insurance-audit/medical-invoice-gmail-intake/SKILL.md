@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-gmail-intake
-description: Watches a Gmail inbox with `gogcli`, classifies emails as medical invoices, downloads attachments (DIAN invoice XML, RIPS, clinical history, epicrisis, authorization, supporting documents), extracts invoice metadata, and generates metadata_input.json with a RAD number. Use it when the user wants to automatically process medical invoices sent by IPS via email, configure the pipeline's initial watcher, or debug cases that landed on `medical-invoice/error`.
+description: Watches a Gmail inbox with `gogcli`, classifies emails as medical invoices, downloads attachments, extracts as much metadata as possible from available sources (DIAN XML, RIPS, PDFs, email envelope), and creates a case task with the metadata as context and attachments as input files. Use it when the user wants to automatically process medical invoices sent by IPS via email, configure the pipeline's initial watcher, or debug cases that landed on `medical-invoice/error`.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -22,9 +22,9 @@ required_environment_variables:
 
 # medical-invoice-gmail-intake
 
-First skill in the medical-invoice audit pipeline. It listens on Gmail, decides whether an email is a medical invoice, downloads the full document package, extracts metadata, and generates `metadata_input.json` with a RAD (filing) number assigned.
+First skill in the medical-invoice audit pipeline. It listens on Gmail, decides whether an email is a medical invoice, downloads all attachments, and extracts as much metadata as possible from whatever sources are present — DIAN XML, RIPS files, PDF text, and the email envelope — in that priority order. Fields that cannot be extracted from any source are left null and do not block intake.
 
-The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML invoice, RIPS, clinical history, epicrisis, authorization, and supporting files. The skill automates reception and case creation so the downstream auditors (admin, medical, financial) work on an already-structured case.
+Once metadata is assembled, the skill creates a case task via the task assignment tool, setting the extracted metadata as task context and uploading the downloaded attachment files as task input files. This enqueues the case for the parallel audit phase without requiring any specific document combination.
 
 ## When to Use
 
@@ -33,7 +33,7 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 - A case ended up with label `medical-invoice/error` and needs to be **reprocessed manually**.
 - The user asks "how does a message from IPS get filed?" or "is invoice X coming through?".
 
-**Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a `metadata_input.json` already exists in the working directory for the same `invoice_cuv`.
+**Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a task already exists in the task assignment tool for the same `invoice_cuv`.
 
 ## Input Contract
 
@@ -46,37 +46,41 @@ Trigger: Gmail message arrival on label $GMAIL_WATCH_LABEL
 
 ## Output Contract
 
-On success, the skill generates `metadata_input.json` for downstream audit skills. The `metadata_input.json` template in this skill's directory defines the schema — this skill always creates the file from scratch:
+On success, the skill creates a case task via the task assignment tool. The task carries:
 
-**Schema:** `metadata_input.json` in this skill's directory — 8 fields, all initially `null`, filled by this skill.
+- **Context** — the extracted metadata object (8-field schema below). Fields that could not be extracted from any source are `null`; this is acceptable and does not block intake.
+- **Input files** — every attachment downloaded from the Gmail thread, uploaded to the task so downstream audit skills can read them directly.
 
-| Field | Type | Description |
-|---|---|---|
-| `caso_id` | string | `RAD-YYYYMMDD-{num_factura_normalizado}` |
-| `fecha_radicacion` | ISO datetime | Filing timestamp in `America/Bogota` |
-| `num_factura` | string | Invoice number from DIAN XML |
-| `prestador_nit` | string | IPS tax ID |
-| `prestador_nombre` | string | IPS legal name |
-| `pagador_nit` | string | EPS tax ID |
-| `pagador_nombre` | string | EPS legal name |
-| `documentos` | string[] | Relative paths of received files (only files actually present) |
+**Metadata schema** — extracted from whatever sources are available:
 
-The skill also returns the envelope:
+| Field | Type | Source (in priority order) | Nullable? |
+|---|---|---|---|
+| `caso_id` | string | `RAD-YYYYMMDD-{num_factura_normalizado}` | no |
+| `fecha_radicacion` | ISO datetime | Filing timestamp in `America/Bogota` | no |
+| `num_factura` | string | DIAN XML → PDF extraction → email envelope | yes |
+| `prestador_nit` | string | DIAN XML → PDF extraction → sender domain | yes |
+| `prestador_nombre` | string | DIAN XML → PDF extraction → sender domain | yes |
+| `pagador_nit` | string | DIAN XML → PDF extraction → body text | yes |
+| `pagador_nombre` | string | DIAN XML → PDF extraction → body text | yes |
+| `documentos` | string[] | Names of all downloaded attachments | yes |
+
+The skill returns the envelope:
 
 ```json
 {
   "caso_id": "RAD-YYYYMMDD-{num_factura}",
   "rad": "YYYYMMDD-NNNN",
+  "task_id": "<returned by task assignment tool>",
   "message_id": "<gmail-message-id>",
   "label_aplicado": "medical-invoice/intake",
   "archivos_radicados": [
     { "name": "factura.pdf", "doc_type": "invoice_xml | rips | clinical_history | epicrisis | authorization | other", "sha256": "<hex>" }
   ],
-  "metadatos": { /* filled metadata_input.json */ }
+  "metadatos": { /* filled metadata object — null fields for unavailable sources */ }
 }
 ```
 
-`factura.pdf` is always required. `rips.csv` and `epicrisis.pdf` are required based on service type (see `input.md` in this directory for the full document requirements by service type). Optional files not present are simply omitted from `documentos`.
+No specific document combination is required. Files not present are simply absent from `documentos`.
 
 On non-invoice emails: returns `{ "label_aplicado": "medical-invoice/not-applicable" }` and stops.
 On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "motivo": "<string>" }` and stops.
@@ -109,11 +113,8 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 
    Positive signals (at least 2 must match):
    - Subject contains: `factura`, `cuenta médica`, `radicación`, `glosa respuesta`, `RIPS`, an invoice number, or a RAD.
-   - Sender domain matches a known IPS (cross-check with `$REF_DATA_PATH/contratos_ips.json`).
-   - At least 2 attachments, one of which is:
-     - a DIAN XML (namespace `urn:oasis:names:specification:ubl:...`),
-     - `rips.json` / `rips.zip` / flat files `US.txt`+`AF.txt`,
-     - a PDF whose text mentions "historia clínica" or "epicrisis".
+   - Sender domain matches a known IPS.
+   - At least 2 attachments, one of which is a PDF whose text mentions "historia clínica" or "epicrisis".
 
    If it **does not** match → apply label `medical-invoice/not-applicable` and **stop**.
    ```bash
@@ -130,41 +131,52 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
    ```
    Inventory the downloaded files and normalize names (no spaces, lowercase).
 
-5. **Extract invoice metadata from the DIAN XML.**
-   Required fields:
-   - `ips_nit` — from `<cbc:AccountingSupplierParty/cac:PartyTaxScheme/cbc:CompanyID>`
-   - `ips_razon_social` — from `<cbc:RegistrationName>`
-   - `invoice_number` — `<cbc:ID>`
-   - `invoice_cuv` — CUV/CUFE in `<ext:UBLExtension>` (validate against DIAN)
-   - `issue_date` — `<cbc:IssueDate>`
-   - `service_date` — from the RIPS (date of service)
-   - `total_amount` — `<cac:LegalMonetaryTotal/cbc:PayableAmount>`
-   - `patient_document` — from RIPS file `US.txt` (document type + number)
-   - `patient_name` — `US.txt`
-   - `cups_principales[]` — first CUPS codes from `AC.txt`/`AP.txt`
-   - `diagnostico_principal` — main CIE-10 from `AC.txt`
+5. **Extract metadata from all available sources (best-effort, in priority order).**
 
-   Pitfall: plain RIPS files use ISO-8859-1, **not UTF-8**. Convert before parsing:
-   ```bash
-   iconv -f ISO-8859-1 -t UTF-8 US.txt > US.utf8.txt
-   ```
+   **Priority 1 — DIAN XML** (if a `.xml` file is present):
+   - `ips_nit` — `<cbc:AccountingSupplierParty/cac:PartyTaxScheme/cbc:CompanyID>`
+   - `ips_razon_social` — `<cbc:RegistrationName>`
+   - `invoice_number` — `<cbc:ID>`
+   - `invoice_cuv` — CUV/CUFE in `<ext:UBLExtension>`
+   - `issue_date` — `<cbc:IssueDate>`
+   - `total_amount` — `<cac:LegalMonetaryTotal/cbc:PayableAmount>`
+
+   **Priority 2 — RIPS files** (if `US.txt` / `rips.json` present):
+   - `patient_document`, `patient_name` — from `US.txt`
+   - `service_date`, `cups_principales[]`, `diagnostico_principal` — from `AC.txt`/`AP.txt`
+   - Pitfall: RIPS files use ISO-8859-1, not UTF-8. Convert before parsing with `iconv -f ISO-8859-1 -t UTF-8`.
+
+   **Priority 3 — PDF text extraction** (for any PDF attachment):
+   - Use `pdftotext` or equivalent to extract raw text.
+   - Search for NIT patterns → `prestador_nit`, `num_factura`.
+   - Search for patient name / document → `patient_*`.
+   - Search for date patterns → `issue_date`, `service_date`.
+   - Search for CUPS codes → `cups_principales[]`.
+
+   **Priority 4 — Email envelope** (always available):
+   - Sender address/domain → hint for `prestador_nombre`.
+   - Subject line → keyword hints, possible invoice number.
+   - Body text → NIT, amounts, dates via regex.
+   - Attachment filenames → classify doc types for `documentos`.
+
+   Fields not found in any source remain `null` — this is not an error.
 
 6. **Validate minimums before filing.**
-   Block if any of these are missing:
-   - XML invoice with CUV.
-   - At least one RIPS file (`US.txt` + `AF.txt`, or `rips.json`).
-   - At least one PDF containing a clinical history or epicrisis.
+   Only block if:
+   - The email has zero attachments **and** the body has no medical-invoice signals → apply `medical-invoice/not-applicable` and stop.
+   - `caso_id` cannot be constructed because no invoice number was found from any source → apply `medical-invoice/error`, reply with explanation, and stop.
 
-   If invalid → apply label `medical-invoice/error`, reply on the thread listing the missing documents, **do not file**.
+   Do **not** block on the absence of DIAN XML, RIPS, or any specific document type. File with whatever metadata is available.
 
-7. **Generate metadata_input.json.**
+7. **Create a task via the task assignment tool.**
 
-   Using the `metadata_input.json` schema template in this skill's directory, generate the file from scratch:
-   - Fill all 8 fields from the extracted metadata.
-   - Set `documentos[]` to the relative paths of the downloaded attachments in the working directory.
+   Assemble the metadata object and submit it to the task assignment tool available in the agent's environment (e.g. `ark tasks`). The submission must:
+   - **Set the extracted metadata as task context** — the full metadata object is passed as structured context on the created task.
+   - **Upload the downloaded Gmail attachment files as task input files** — every file in the temp working directory is attached to the task so downstream audit skills can access them directly.
    - Assign `caso_id = "RAD-YYYYMMDD-{num_factura_normalizado}"`.
    - Assign `rad` in format `YYYYMMDD-NNNN` (sequential counter per day).
-   - Write to `metadata_input.json` in the working directory.
+   - Capture the `task_id` returned by the tool.
+   - Clean up the temp folder after upload (or retain for debugging).
 
 8. **Label the email and reply with an ACK.**
    ```bash
@@ -172,7 +184,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
      --add-label medical-invoice/intake \
      --add-label "medical-invoice/rad-$RAD"
 
-   gogcli messages reply "$MESSAGE_ID" --body "ACK — Case filed with RAD $RAD. case_id: $CASE_ID."
+   gogcli messages reply "$MESSAGE_ID" --body "ACK — Case filed with RAD $RAD. case_id: $CASE_ID. task_id: $TASK_ID."
    ```
 
 9. **Return the output payload.**
@@ -180,6 +192,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
    {
      "case_id": "...",
      "rad": "YYYYMMDD-NNNN",
+     "task_id": "<returned by task assignment tool>",
      "message_id": "...",
      "label_aplicado": "medical-invoice/intake",
      "archivos_radicados": [
@@ -193,7 +206,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 ## Pitfalls
 
 - **Symptom:** attachments arrive as password-protected `.zip`. **Cause:** the IPS protects the package with a password shared in the email body. **Fix:** extract the password from the body with regex (`contraseña:\s*(\S+)`) and unzip with `7z x -p"$PWD_FROM_BODY"`.
-- **Symptom:** the same email is processed twice. **Cause:** the watcher redelivers the event before the label is applied. **Fix:** before generating, check whether a `metadata_input.json` already exists in the working directory with the same `invoice_cuv` — if so, just apply the Gmail label and exit.
+- **Symptom:** the same email is processed twice. **Cause:** the watcher redelivers the event before the label is applied. **Fix:** before creating a task, query the task assignment tool for an existing task with the same `invoice_cuv` — if found, just apply the Gmail label and exit.
 - **Symptom:** XML parsing fails with "invalid encoding". **Cause:** the IPS generated the XML declaring `UTF-8` but with ISO-8859-1 bytes. **Fix:** detect with `file -i` and re-encode before parsing.
 - **Symptom:** `total_amount` differs between XML and the RIPS sum. **Cause:** the IPS included copays in the XML but not in RIPS (or vice versa). **Fix:** do NOT fix it here — pass both values to the case and let `financial-auditor` resolve it.
 - **Symptom:** `gogcli` fails with `invalid_grant`. **Cause:** the OAuth token expired. **Fix:** `gogcli auth refresh` or regenerate with `gogcli auth init`.
@@ -202,10 +215,11 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 ## Verification
 
 - After running the skill, the email has exactly **one** of the labels `medical-invoice/{intake|not-applicable|error}`.
-- `metadata_input.json` exists in the working directory with all 8 fields populated.
-- The Gmail thread has an ACK reply with the RAD.
-- No `metadata_input.json` exists already for the same `invoice_cuv` in the working directory (uniqueness).
-- Each attachment's `sha256` in the output matches the locally saved file.
+- A task exists in the task assignment tool with the `caso_id` as identifier, the extracted metadata set as task context, and all downloaded attachments uploaded as task input files.
+- Null metadata fields appear only for sources that were genuinely absent from the email.
+- The Gmail thread has an ACK reply containing the RAD and the `task_id`.
+- No duplicate task exists for the same `invoice_cuv` (uniqueness check via task tool).
+- Each attachment's `sha256` in the output matches the uploaded file.
 
 ## References
 

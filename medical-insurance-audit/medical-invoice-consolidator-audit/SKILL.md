@@ -88,13 +88,13 @@ The skill produces the canonical `output.json` — single source of truth for th
 
    | Causal | Name | Typical triggers |
    |---|---|---|
-   | **1** | No cobertura contractual | FIN.06 (plan excludes), FIN.22 (pre-existing), ADMIN.07 (wrong modality) |
-   | **2** | No pertinencia clínica | MED.04-06 (GPC), MED.10-13 (procedures), MED.14-15 (medications) |
-   | **3** | Documentación incompleta | ADMIN.08-11 (RIPS), ADMIN.17-19 (HC), MED.11 (operative note), MED.16 |
-   | **4** | Cobro duplicado | FIN.21 (repeated study), FIN.33 (overlap), FIN.38 (unbundling) |
-   | **5** | Tarifa incorrecta | FIN.07-09 (manual/UVB), FIN.13-16 (liquidation), FIN.23-25 (copays) |
-   | **6** | Agotamiento de cobertura | FIN.20 (caps), FIN.21 (grace period) |
-   | **7** | Genérica / devolución | ADMIN.12-14 (DIAN invoice), ADMIN.24 (timeliness), FIN.29-31 (dates/consecutive) |
+   | **1** | No cobertura contractual | F06 (plan excludes), F22 (pre-existing), A07 (wrong modality) |
+   | **2** | No pertinencia clínica | M04–M06 (GPC), M10–M13 (procedures), M14–M15 (medications) |
+   | **3** | Documentación incompleta | A08–A11 (authorization/coding), A17–A19 (HC annexes), M11 (operative note), M16 |
+   | **4** | Cobro duplicado | F32 (same patient unicidad), F33 (overlap), F38 (unbundling) |
+   | **5** | Tarifa incorrecta | F07–F09 (manual/UVB), F13–F16 (liquidation), F23–F25 (copays) |
+   | **6** | Agotamiento de cobertura | F20 (caps), F21 (carencia period) |
+   | **7** | Genérica / devolución | A12–A14 (support docs), A24 (timeliness), F29–F31 (dates/consecutive) |
 
    Rules:
    - Use the deterministic mapping table first.
@@ -122,7 +122,7 @@ The skill produces the canonical `output.json` — single source of truth for th
          "descripcion": "Consulta especializada",
          "valor_facturado": 1500000,
          "hallazgo": "glosa",
-         "reglas_aplicadas": ["ADMIN.15", "FIN.20"],
+         "reglas_aplicadas": ["A15", "F20"],
          "severidad": "critica",
          "valor_glosado": 1200000,
          "valor_a_reconocer": 300000,
