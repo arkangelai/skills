@@ -129,7 +129,7 @@ Objeto o `null`. Estructura:
 | A14 | Servicios facturados | Traslado en ambulancia soportado | mayor | 2 |
 | A15 | Servicios facturados | Ayudas diagnósticas soportadas | mayor | 2 |
 | A16 | Soportes | Historia clínica completa y firmada | crítica | 3 |
-| A17 | Soportes | Certificado / recibido del usuario | mayor | 2 |
+| A17 | Soportes | Certificado o recibido del usuario | mayor | 2 |
 | A18 | Soportes | Anexos técnicos y envíos | mayor | 2 |
 | A19 | Soportes | Récord de anestesia (si aplica) | mayor | 2 |
 | A20 | Soportes | Hoja administración de medicamentos | crítica | 3 |

@@ -128,9 +128,9 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 
 ## Pitfalls
 
-- **Symptom:** ADMIN.01 fails because of accents (`JOSE` vs `JOSÉ`). **Cause:** RIPS handles accents inconsistently. **Fix:** normalize with `unicodedata.normalize('NFKD', s).encode('ascii','ignore')` before comparing.
-- **Symptom:** ADMIN.10 fails because `numFactura` has leading zeros in `AF` but not in `AC`. **Cause:** inconsistent padding by the IPS. **Fix:** normalize (`lstrip('0')`) before comparing.
-- **Symptom:** false positives in ADMIN.17 (HC without signature). **Cause:** the PDF carries a digital signature in metadata, not visible in the OCR text. **Fix:** inspect the PDF's `/Sig` dictionary in addition to text OCR.
+- **Symptom:** A04 fails because of accents (`JOSE` vs `JOSÉ`). **Cause:** RIPS handles accents inconsistently. **Fix:** normalize with `unicodedata.normalize('NFKD', s).encode('ascii','ignore')` before comparing.
+- **Symptom:** A10 fails because `numFactura` has leading zeros in `AF` but not in `AC`. **Cause:** inconsistent padding by the IPS. **Fix:** normalize (`lstrip('0')`) before comparing.
+- **Symptom:** false positives in A16 (HC without signature). **Cause:** the PDF carries a digital signature in metadata, not visible in the OCR text. **Fix:** inspect the PDF's `/Sig` dictionary in addition to text OCR.
 - **Symptom:** score fine, green zone, yet a critical rule failed. **Cause:** incorrect calculation — a failed critical forces the red zone. **Fix:** zone logic must first check if any Weight 3 rule has `resultado=fail`.
 
 ## Verification

@@ -141,13 +141,13 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 ## Pitfalls
 
-- **Symptom:** FIN.13 false positives because of UVB factor. **Cause:** the contract uses UVB 2025 but the skill applied UVB 2026. **Fix:** read `uvb_factor` from `tarifario_contractual.csv` for the contract active on `service_date`, never from global variables.
-- **Symptom:** FIN.32 flags "simultaneous" billing that is actually on different dates. **Cause:** the comparison used date-only (00:00 times). **Fix:** compare by hospitalization intervals, not exact `DATE`.
-- **Symptom:** FIN.34 denies by post-mortem but the patient is alive. **Cause:** homonym in RUAF with a different document. **Fix:** cross by document + date of birth, never document alone.
-- **Symptom:** FIN.15 misapplied for same-access-route surgeries. **Cause:** manuals state 100% first + 75% second, skill applied 100% to both. **Fix:** explicitly implement the rule per manual (SOAT vs. ISS 2001 differ).
-- **Symptom:** FIN.37 upcoding misdetected. **Cause:** the HC describes a complex procedure but the simple one was billed (subcoding, not upcoding) — direction inverted. **Fix:** detect both directions; subcoding is a minor finding (the IPS loses money) but still report it for traceability.
-- **Symptom:** many FIN.31 findings (consecutive numbering) for a large batch. **Cause:** the IPS bills in batches and the consecutive jumps across clients. **Fix:** FIN.31 must evaluate consecutive numbering **from this issuer to this EPS**, not globally.
-- **Symptom:** score explodes by accumulation in anti-fraud when a single root cause triggers multiple findings (e.g. wrong date → fires FIN.30, FIN.31, FIN.32). **Cause:** no cascade suppression. **Fix:** do NOT suppress here — `consolidator-audit` will dedup. Report all.
+- **Symptom:** F13 false positives because of UVB factor. **Cause:** the contract uses UVB 2025 but the skill applied UVB 2026. **Fix:** read `uvb_factor` from `tarifario_contractual.csv` for the contract active on `service_date`, never from global variables.
+- **Symptom:** F32 flags "simultaneous" billing that is actually on different dates. **Cause:** the comparison used date-only (00:00 times). **Fix:** compare by hospitalization intervals, not exact `DATE`.
+- **Symptom:** F34 denies by post-mortem but the patient is alive. **Cause:** homonym in RUAF with a different document. **Fix:** cross by document + date of birth, never document alone.
+- **Symptom:** F15 misapplied for same-access-route surgeries. **Cause:** manuals state 100% first + 75% second, skill applied 100% to both. **Fix:** explicitly implement the rule per manual (SOAT vs. ISS 2001 differ).
+- **Symptom:** F37 upcoding misdetected. **Cause:** the HC describes a complex procedure but the simple one was billed (subcoding, not upcoding) — direction inverted. **Fix:** detect both directions; subcoding is a minor finding (the IPS loses money) but still report it for traceability.
+- **Symptom:** many F31 findings (consecutive numbering) for a large batch. **Cause:** the IPS bills in batches and the consecutive jumps across clients. **Fix:** F31 must evaluate consecutive numbering **from this issuer to this EPS**, not globally.
+- **Symptom:** score explodes by accumulation in anti-fraud when a single root cause triggers multiple findings (e.g. wrong date → fires F30, F31, F32). **Cause:** no cascade suppression. **Fix:** do NOT suppress here — `consolidator-audit` will dedup. Report all.
 
 ## Verification
 
@@ -156,7 +156,7 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 - Total `valor_glosado` ≤ `invoice_total`.
 - Any failing critical rule → `concepto_final ≠ APTA`.
 - The skill did NOT read `admin_audit` nor `medical_audit` (independence).
-- If any anti-fraud rule (FIN.29-FIN.42) fails, there is at least one finding with `critica` or `mayor` severity.
+- If any anti-fraud rule (F29–F42) fails, there is at least one finding with `critica` or `mayor` severity.
 
 ## References
 

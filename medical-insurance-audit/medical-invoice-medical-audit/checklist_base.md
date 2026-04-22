@@ -127,11 +127,11 @@ Misma semántica que admin: `concepto_final` (`APTA | NO_APTA | DEVOLUCION | ESC
 | M21 | Ayudas dx | Sin duplicidad injustificada | mayor | 2 |
 | M22 | Estancia | Criterio de ingreso documentado | crítica | 3 |
 | M23 | Estancia | Estancia justificada día a día | crítica | 3 |
-| M24 | Estancia | Egreso / traslado con criterio | mayor | 2 |
+| M24 | Estancia | Egreso o traslado con criterio | mayor | 2 |
 | M25 | Estancia | Interconsultas pertinentes y respondidas | mayor | 2 |
 | M26 | Alta | Epicrisis con plan de egreso | crítica | 3 |
 | M27 | Alta | Fórmula de egreso consistente | mayor | 2 |
-| M28 | Alta | Referencia / contrarreferencia trazable | mayor | 2 |
+| M28 | Alta | Referencia o contrarreferencia trazable | mayor | 2 |
 | M29 | Alta | Desenlace clínico documentado | baja | 1 |
 
 Peso total: **73**. Peso crítico: **48**. Peso mayor: **24**. Peso baja: **1**.
