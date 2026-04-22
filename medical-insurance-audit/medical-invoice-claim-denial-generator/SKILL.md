@@ -21,7 +21,7 @@ The question it answers: **how do I turn the consolidated output into a legal, t
 ## When to Use
 
 - The case is labeled `auto-denial` and the initial glosa must be produced.
-- `fix-review` applied changes and asks to regenerate the PDF (`v2`, `v3`, ...).
+- Changes were applied to `output.json` (e.g. after `fix-review`) and a new PDF version is needed (`v2`, `v3`, ...).
 - The user asks "draft the glosa for case {RAD}" or "regenerate the glosa with the auditor's edits".
 
 **Do not use:** if the case has no `consolidated_findings` published; if the current label is `auto-approve` (no glosa needed).

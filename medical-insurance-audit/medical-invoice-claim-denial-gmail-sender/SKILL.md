@@ -21,7 +21,7 @@ required_environment_variables:
 
 # medical-invoice-claim-denial-gmail-sender
 
-Last skill of the pipeline. Takes the human-approved glosa (label `claim-denial-ready`) and sends it to the IPS via Gmail, preserving the original filing thread when possible, attaching the PDF, and recording delivery in `delivery-log.json`.
+Optional skill for delivering the glosa. Takes the human-approved glosa (label `claim-denial-ready`) and sends it to the IPS via Gmail, preserving the original filing thread when possible, attaching the PDF, and recording delivery in `delivery-log.json`.
 
 The question it answers: **how do I formally deliver the glosa to the IPS with traceability and thread continuity?**
 

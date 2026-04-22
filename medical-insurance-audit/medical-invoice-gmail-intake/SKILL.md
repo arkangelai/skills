@@ -24,7 +24,7 @@ required_environment_variables:
 
 First skill in the medical-invoice audit pipeline. It listens on Gmail, decides whether an email is a medical invoice, downloads the full document package, extracts metadata, and generates `metadata_input.json` with a RAD (filing) number assigned.
 
-The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML invoice, RIPS, clinical history, epicrisis, authorization, and supporting files. The skill automates reception and case creation so the downstream auditors (admin, medical, financial) work on an already-structured case.
+The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML invoice, RIPS, clinical history, epicrisis, authorization, and supporting files. The skill automates reception and case creation, producing a structured `metadata_input.json` that enqueues the case for the parallel audit phase.
 
 ## When to Use
 
