@@ -110,10 +110,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
    Positive signals (at least 2 must match):
    - Subject contains: `factura`, `cuenta médica`, `radicación`, `glosa respuesta`, `RIPS`, an invoice number, or a RAD.
    - Sender domain matches a known IPS.
-   - At least 2 attachments, one of which is:
-     - a DIAN XML (namespace `urn:oasis:names:specification:ubl:...`),
-     - `rips.json` / `rips.zip` / flat files `US.txt`+`AF.txt`,
-     - a PDF whose text mentions "historia clínica" or "epicrisis".
+   - At least 2 attachments, one of which is a PDF whose text mentions "historia clínica" or "epicrisis".
 
    If it **does not** match → apply label `medical-invoice/not-applicable` and **stop**.
    ```bash
