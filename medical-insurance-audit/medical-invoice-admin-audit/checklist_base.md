@@ -45,7 +45,7 @@ Cada regla tiene **campos rúbrica** (fijos, no se tocan) y **campos llenables**
 | `id` | Código único (`A01`–`A27` para DAMA-UK, `S01`–`S21` para SOAT). |
 | `nombre` | Nombre corto de la regla. |
 | `severidad` | `"critica"` (peso 3) · `"mayor"` (peso 2) · `"menor"` (peso 1). |
-| `peso` | 1, 2 ó 3. Determina el impacto de la regla en `score_total`. |
+| `peso` | 1, 2 ó 3. Severidad del impacto: `critica`=3, `mayor`=2, `menor`=1. |
 | `descripcion` | Qué valida la regla. |
 | `evidencia_requerida` | Qué documentos/datos se necesitan para decidir. |
 | `dimensiones` | Dimensiones DAMA-UK que la regla toca (p.ej. `["Validez","Unicidad"]`). |
@@ -102,8 +102,7 @@ Objeto o `null`. Estructura:
 
 | Campo | Cómo llenarlo |
 |---|---|
-| `score_total` | `round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)`. Rango 0–100. Se calcula al final sobre todas las reglas con `resultado != "n/a"`. |
-| `concepto_final` | Uno de: `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. |
+| `concepto_final` | Uno de: `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. Determinado por lógica de reglas, no por score. |
 | `clasificacion` | Dimensión dominante del hallazgo: `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. |
 | `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"`. |
 | `resumen_ejecutivo` | 1–2 frases para la UI. Debe mencionar explícitamente cualquier hallazgo crítico (regla crítica en `fail`). |
@@ -150,7 +149,7 @@ Las 21 reglas SOAT (S01–S21) están listadas en `checklist_soat_base.json` con
 
 ## 4. Umbrales y lógica de decisión
 
-El `concepto_final` se deriva del estado de las reglas críticas y del `score_total`:
+El `concepto_final` se deriva del estado de las reglas — no de un score numérico:
 
 ```
 si (existe alguna regla crítica con resultado "fail"):
@@ -159,9 +158,7 @@ si (existe alguna regla crítica con resultado "fail"):
 
 sino si (alguna regla con confianza < 0.75):                               concepto_final = "ESCALAR_HUMANO", accion_requerida = "Escalar"
 
-sino si (score_total >= 85):                                               concepto_final = "APTA",     accion_requerida = "Correccion" si hay mayores en fail, sino null
-
-sino:                                                                      concepto_final = "DEVOLUCION", accion_requerida = "Complemento"
+sino si (no hay criticas en fail):                                         concepto_final = "APTA", accion_requerida = "Correccion" si hay mayores en fail, sino null
 ```
 
 - **DEVOLUCION** ≠ glosa. Es pedir al prestador que adjunte documentación faltante *antes* de reabrir auditoría.
@@ -215,7 +212,6 @@ El agente debe poblar `observaciones` a nivel de regla **y** `cierre.resumen_eje
     }
   ],
   "cierre": {
-    "score_total": 96.5,
     "concepto_final": "APTA",
     "clasificacion": "Administrativo",
     "accion_requerida": null,

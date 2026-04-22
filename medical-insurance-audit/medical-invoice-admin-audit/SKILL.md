@@ -60,7 +60,6 @@ Then fill `meta` and append `cierre`:
 {
   "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-admin-v1" },
   "cierre": {
-    "score_total": 100.0,
     "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
     "clasificacion": "Administrativo",
     "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
@@ -130,10 +129,11 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    For each rule, follow `checklist_base.md` §2.3 and §3. Fill the four nullable fields:
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` only when the rule structurally does not apply to this service type (e.g. A14 ambulance transport for a case with no transport).
-   - **`evidencia`**: citable and specific. Three valid formats (in order of preference):
-     1. Literal quote: `"Epicrisis p.3: 'paciente egresa estable el 2026-04-13...'"`.
-     2. Document reference: `"Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30, archivo autorizacion.pdf"`.
-     3. External query result: `"BDUA consultada 2026-04-21 14:28; afiliado activo, régimen contributivo, plan ORO"`.
+   - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. Examples:
+     - Document quote: `HC p.3 "paciente egresa estable el 2026-04-13"`.
+     - Reference with metadata: `autorizacion.pdf "Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30"`.
+     - System query: `BDUA "consultada 2026-04-21: afiliado activo, régimen contributivo, plan ORO"`.
+     - Absence: `HC pp.1-40 "no se encontró firma en historia clínica"`.
      Never use vague statements like `"se verifica en HC"` without a specific citation.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual evidence found. `pass`: cite the document, field, or system query that confirms compliance (e.g. `"BDUA 2026-04-21: afiliado activo régimen contributivo, plan ORO, sin novedad de retiro"`). `fail`: cite the specific discrepancy and where it was found (e.g. `"RIPS AC campo numDocumento = '12345678'; HC p.1 cédula = '123456780' — dígito extra"`). `n/a`: explain why the rule structurally cannot apply to this case (e.g. `"Caso sin transporte de ambulancia — A14 no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
@@ -144,8 +144,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 5. **Compute `cierre` and complete the checklist.**
 
    Once all rules are filled, compute and append the `cierre` block per `checklist_base.md §2.4`:
-   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over all rules with `resultado ≠ "n/a"`.
-   - `concepto_final` — follow decision logic in `checklist_base.md §4`.
+   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`:
    - `clasificacion`: `"Administrativo"`.
    - `resumen_ejecutivo`: 1–2 sentences mentioning any critical finding explicitly.
 
@@ -179,8 +178,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 - `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits?type=admin` returns exactly one record with all 27 rules evaluated (each with a `resultado`).
 - Every finding has a non-empty, citable `evidencia`.
-- The sum `Σ peso × (1 if fail else 0)` matches `score`.
-- No critical rule with `resultado=fail` coexists with `zona=verde|amarilla` (invariant).
+- No critical rule with `resultado=fail` coexists with `concepto_final=APTA` (invariant).
 - The skill did NOT read `medical_audit` nor `financial_audit` (independence is verifiable in logs).
 
 ## References

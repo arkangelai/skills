@@ -72,7 +72,7 @@ Comments must be processed in ascending chronological order. Only comments where
       "intent": "modify_finding | add_finding | remove_finding | change_causal | adjust_value | add_evidence | approve | ask_clarification | ambiguous",
       "target_item": 1,
       "changes_applied": [
-        { "op": "replace", "path": "/hallazgos/2/valor_objetado", "value": 1500000 }
+        { "op": "replace", "path": "/hallazgos/2/valor_glosado", "value": 1500000 }
       ]
     }
   ],
@@ -97,9 +97,9 @@ Comments must be processed in ascending chronological order. Only comments where
 **When no changes (only clarifications or ambiguous):** `pdf_regenerated: false`, `new_pdf_version: null`.
 
 **Money invariants after every patch:**
-- `resumen.total_glosado = sum(hallazgos[].valor_objetado)` — always recomputed.
+- `resumen.total_glosado = sum(hallazgos[].valor_glosado)` — always recomputed.
 - `resumen.total_aprobado = factura.total_facturado − resumen.total_glosado`.
-- `hallazgos[].valor_objetado ≥ 0` always — if a patch would make it negative, reject and reply asking for clarification.
+- `hallazgos[].valor_glosado ≥ 0` always — if a patch would make it negative, reject and reply asking for clarification.
 - `resumen.total_glosado ≤ factura.total_facturado` always.
 
 ## Procedure
@@ -122,9 +122,10 @@ Comments must be processed in ascending chronological order. Only comments where
    | `add_finding` | "add", "missing", "there is also", "additional" | Insert new finding |
    | `remove_finding` | "remove", "delete", "does not apply", "not deniable" | Mark finding as `resultado=pass` |
    | `change_causal` | "the right causal is", "it is not X but Y" | Reassign `causal`/`subcausal` |
-   | `adjust_value` | "the disputed amount is $X" | Change `valor_objetado` |
+   | `adjust_value` | "the disputed amount is $X" | Change `valor_glosado` |
    | `add_evidence` | "the evidence is at", "see page Y" | Append text to `evidencia` |
    | `approve` | "approved", "ready", "send it", "OK as is" | Label change to `claim-denial-ready` |
+   | `escalate` | "escalate", "need a senior", "cannot decide", "unsure" | Set `concepto_final = ESCALAR_HUMANO`, exit loop |
    | `ask_clarification` | "why", "do not understand", "explain" | Reply on the case, do NOT modify |
    | `ambiguous` | unclassifiable | Reply asking for clarification, do NOT modify |
 
@@ -143,7 +144,7 @@ Comments must be processed in ascending chronological order. Only comments where
    PATCH {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/consolidated
    {
      "changes": [
-       { "op": "replace", "path": "/consolidated_findings/2/valor_objetado", "value": 1500000 },
+       { "op": "replace", "path": "/consolidated_findings/2/valor_glosado", "value": 1500000 },
        { "op": "replace", "path": "/consolidated_findings/2/causal", "value": 5 },
        { "op": "add", "path": "/consolidated_findings/-", "value": { ...new finding } },
        { "op": "replace", "path": "/consolidated_findings/0/resultado", "value": "pass" }
@@ -155,7 +156,7 @@ Comments must be processed in ascending chronological order. Only comments where
 
    **Always recompute** after the patch:
    - `case_summary.score` = Σ weights of active findings.
-   - `case_summary.total_objetado` = Σ `valor_objetado`.
+   - `case_summary.total_objetado` = Σ `valor_glosado`.
    - `case_summary.total_a_pagar` = `invoice_total - total_objetado`.
    - `case_summary.zona` based on new values.
 
@@ -193,7 +194,8 @@ Comments must be processed in ascending chronological order. Only comments where
    body: "I could not interpret your comment on finding #3. Could you clarify whether you want to change the amount, the causal, or add evidence?"
    ```
 
-8. **Handle final approval.**
+8. **Handle final approval or escalation.**
+
    If intent = `approve`:
    ```
    DELETE /cases/{id}/labels/needs-human-review
@@ -201,10 +203,16 @@ Comments must be processed in ascending chronological order. Only comments where
    POST   /cases/{id}/labels   { "name": "claim-denial-ready" }
    PATCH  /cases/{id}          { "status": "claim_denial_ready" }
    ```
+   **Requirement**: `approve` is only honored if the comment author has the auditor role and at least one PDF version exists (`v1` or later).
 
-   **Requirement**: `approve` is only honored if:
-   - The comment author has the auditor role (not another bot).
-   - At least one PDF version exists (`v1` or later).
+   If intent = `escalate`:
+   ```
+   DELETE /cases/{id}/labels/needs-human-review
+   DELETE /cases/{id}/labels/needs-fix-review
+   POST   /cases/{id}/labels   { "name": "needs-human-review" }
+   PATCH  /cases/{id}          { "status": "escalated", "resumen.concepto_final": "ESCALAR_HUMANO" }
+   ```
+   Loop exits. No PDF regeneration.
 
 9. **Update `last_processed_at`.** Save the timestamp of the latest comment processed into case metadata so the next run does not reprocess.
 
@@ -213,7 +221,7 @@ Comments must be processed in ascending chronological order. Only comments where
 - **Symptom:** the bot interprets "this is not right" as `approve`. **Cause:** LLM miscalibrated on negations. **Fix:** use a strict enum JSON schema plus few-shot negative examples in the prompt.
 - **Symptom:** `approve` applied but the human had asked for edits earlier. **Cause:** the approval comment is newer, but another later comment asked for changes → processed out of order. **Fix:** process comments in ascending chronological order; `approve` only if it is the last one.
 - **Symptom:** regenerated a PDF without real changes. **Cause:** intent was `add_evidence` applied to a null field. **Fix:** validate the patch produced a non-empty diff before invoking skill 7.
-- **Symptom:** `valor_objetado` ends up negative. **Cause:** human asked "reduce by $500k" and the bot subtracted without validation. **Fix:** enforce `≥ 0`; if negative, reply asking for clarification.
+- **Symptom:** `valor_glosado` ends up negative. **Cause:** human asked "reduce by $500k" and the bot subtracted without validation. **Fix:** enforce `≥ 0`; if negative, reply asking for clarification.
 - **Symptom:** bot loops with another bot. **Cause:** both reply to comments. **Fix:** skip if `author` ends in `-bot`; only process human comments.
 - **Symptom:** applied changes do not appear in `v2`. **Cause:** PDF regenerated before the PATCH confirmed. **Fix:** PATCH → `GET /consolidated` to verify → only then invoke skill 7.
 - **Symptom:** human asks to change the causal but the finding has multiple `rule_ids` mapping to different causales. **Cause:** dedup merged findings with potentially different causales. **Fix:** allow manual causal override; leave a note in `justificacion` that it was a human override.

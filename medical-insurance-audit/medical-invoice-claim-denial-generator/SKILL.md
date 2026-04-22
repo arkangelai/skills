@@ -51,7 +51,7 @@ The skill reads the canonical `output.json` produced by `medical-invoice-consoli
     "plan_afiliado": "ORO | PLATA | BASICO",
     "total_facturado": 0
   },
-  "hallazgos": [ /* items with hallazgo = glosa | devolucion */ ],
+  "hallazgos": [ /* items with hallazgo = "glosa"; devolucion is case-level via concepto_final */ ],
   "resumen": {
     "total_facturado": 0,
     "total_aprobado": 0,
@@ -63,7 +63,7 @@ The skill reads the canonical `output.json` produced by `medical-invoice-consoli
 }
 ```
 
-Pre-flight check: abort with clear error if `resumen.concepto_final = APTA` (no glosa to generate) or if `hallazgos` contains zero items with `hallazgo = glosa | devolucion`.
+Pre-flight check: abort with clear error if `resumen.concepto_final = APTA` (no glosa to generate) or if `hallazgos` contains zero items with `hallazgo = glosa`. Also abort if any `glosa` item has `glosa_sugerida.causal_num = null` — that finding must be resolved in fix-review before the PDF can be generated.
 
 ## Output Contract
 
@@ -86,7 +86,7 @@ The skill uploads the PDF to the destination software and returns:
 2. **Parties** — IPS (legal name + NIT + email) and EPS identification.
 3. **Disputed invoice** — `num_factura`, CUV, `fecha_atencion`, `fecha_factura`, patient, `total_facturado`.
 4. **Executive summary** — table with `total_facturado`, `total_objetado`, `total_aprobado`; causales applied with item counts.
-5. **Detailed findings** — one block per `hallazgo` item where `hallazgo ∈ {glosa, devolucion}`, including: `causal_num`, `causal_nombre`, `valor_objetado`, legal justification (Res. 3047 Anexo 6 reference), clinical/technical justification, and `evidencia` verbatim.
+5. **Detailed findings** — one block per `hallazgo` item where `hallazgo = "glosa"`, including: `causal_num`, `causal_nombre`, `valor_glosado`, legal justification (Res. 3047 Anexo 6 reference), clinical/technical justification, and `evidencia` verbatim. For cases where `concepto_final = "DEVOLUCION"`, include a case-level devolución section instead of per-item findings.
 6. **Right of response + signature** — "15 días hábiles (Art. 6 Res. 3047/2008)" deadline.
 
 **Versioning invariant:** each call creates a new version (`v{n+1}`). Never overwrite. The destination software must keep all versions in `documents[]`.
@@ -234,7 +234,7 @@ The skill uploads the PDF to the destination software and returns:
 
 - `GET /cases/{case_id}/documents?tipo=claim_denial` lists the new version without deleting previous ones.
 - The PDF opens and contains the 6 mandatory sections (header, parties, invoice, summary, findings, right of response + signature).
-- Every finding in the PDF shows `causal`, `valor_objetado`, `evidencia`, `rule_ids`, `confianza`.
+- Every finding in the PDF shows `causal_num`, `valor_glosado`, `evidencia`, `reglas_aplicadas`, `confianza`.
 - PDF totals match `case_summary` exactly (to the cent).
 - The PDF contains "Res. 3047/2008 Art. 6" and the "15 business days" deadline.
 - Case status is `claim_denial_draft` (not `claim_denial_sent` — that is skill 9).

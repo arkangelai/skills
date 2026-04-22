@@ -76,7 +76,6 @@ Then fill `meta` and append `cierre`:
     "tarifario_aplicado": "<nombre completo del tarifario resuelto>"
   },
   "cierre": {
-    "score_total": 100.0,
     "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
     "clasificacion": "Financiero",
     "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
@@ -132,7 +131,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    Load `checklist_base.json` (42 rules F01–F42) and follow `checklist_base.md` for each rule, using the resolved `plan_afiliado` and `tarifario_aplicado` from the Input Contract step. Fill the four nullable fields per `checklist_base.md §2.2`:
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` when the rule doesn't apply to the billing modality (e.g. F19 PGP/cápita for an event-based contract).
-   - **`evidencia`**: mandatory explicit calculation for tariff rules. Format: `"{CUPS}: esperado={X} ({fuente, línea CSV}); cobrado={Y}; delta={Y-X} ({pct}%)"`. For anti-fraud rules (F32–F42), follow the evidence templates in `checklist_base.md §5` exactly — each pattern has a required format.
+   - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. For tariff rules the calc is mandatory: `tarifario_contrato_eps_2026.csv p.47 [calc: CUPS 890201: esperado=85000; cobrado=120000; delta=35000 (41.2%)]`. For anti-fraud rules follow templates in `checklist_base.md §5`.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual financial evidence found. `pass`: cite the tariff source and the matching calculation (e.g. `"CUPS 890201: tarifario_contrato_eps_2026.csv línea 47, precio_base=$85.000; cobrado=$85.000 — coincide exactamente"`). `fail`: cite the discrepancy with the full calculation (e.g. `"CUPS 893150: esperado=$42.000 (ISS 2001 ×1.4 UVB 2026); cobrado=$65.000; delta=+$23.000 (54.8%) — F13 supera umbral"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"Contrato por eventos — F19 cápita no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: `0.95+` for exact numeric comparisons, `0.80–0.95` for plan coverage interpretation, `<0.80` for any anti-fraud rule forces escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `checklist_base.md §8`.
@@ -140,15 +139,14 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    Anti-fraud thresholds (F29–F42) per `checklist_base.md §4` and §6:
    - F32–F36 `fail` with `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
    - Any F29–F42 `fail` with `confianza < 0.9` → `concepto_final = "ESCALAR_HUMANO"`.
-   - Anti-fraud finding with `valor_objetado > $10.000.000 COP` → always escalate regardless of confidence.
+   - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → always escalate regardless of confidence.
 
    See `checklist_base.md §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
 
 5. **Compute `cierre` y publicar el checklist.**
 
    Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.3` and §4:
-   - `score_total = round(Σ(peso × 1 si pass) / Σ(peso) × 100, 1)` over rules with `resultado ≠ "n/a"`.
-   - `concepto_final` — follow decision logic in `checklist_base.md §4`. Key thresholds: tariff deviation >10% → `NO_APTA`; 2–10% → `APTA` with partial glosa; <2% → `APTA`.
+   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key thresholds: tariff deviation >10% → `NO_APTA`; 2–10% → `APTA` with partial glosa; <2% → `APTA`.
    - `clasificacion`: `"Financiero"`.
    - `valor_facturado`, `valor_aprobado`, `valor_glosado`: compute from the invoice items and all failing rule `valor_glosado` values. `valor_glosado ≤ valor_facturado` always; if not, there is a calculation error — escalate.
    - `resumen_ejecutivo`: 1–2 sentences mentioning the tariff applied, the plan, and total disputed amount.
@@ -172,8 +170,8 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 - `GET /cases/{case_id}/audits?type=financial` returns exactly 1 record with 42 evaluated rules.
 - Every finding with `resultado=fail` has an explicit calculation in `evidencia` (expected, charged, delta).
-- Total `valor_objetado` ≤ `invoice_total`.
-- Any failing critical rule → `zona=roja`.
+- Total `valor_glosado` ≤ `invoice_total`.
+- Any failing critical rule → `concepto_final ≠ APTA`.
 - The skill did NOT read `admin_audit` nor `medical_audit` (independence).
 - If any anti-fraud rule (FIN.29-FIN.42) fails, there is at least one finding with `critica` or `mayor` severity.
 

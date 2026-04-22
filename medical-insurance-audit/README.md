@@ -45,7 +45,7 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 |---|---|---|
 | 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | gogcli, destination software |
 | 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | destination software, `bdua.json`, `contratos_ips.json` |
-| 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | destination software, `gpc_resumidas.json` |
+| 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | destination software, `guias-clinicas/` |
 | 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | destination software, `tarifario_contractual.csv`, `contratos_ips.json`, `plan_afiliados.json`, `bdua.json` |
 | 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | destination software, outputs from 3-4-5 |
 | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | destination software, PDF rendering engine |

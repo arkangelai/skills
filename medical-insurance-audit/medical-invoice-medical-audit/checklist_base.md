@@ -96,7 +96,7 @@ Causales frecuentes en médico: **3** (soporte faltante), **4** (autorización n
 
 ### 2.4 `cierre`
 
-Igual semántica que admin: `score_total` (0–100), `concepto_final` (`APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO`), `clasificacion`, `accion_requerida`, `resumen_ejecutivo`.
+Misma semántica que admin: `concepto_final` (`APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO`), `clasificacion`, `accion_requerida`, `resumen_ejecutivo`. Sin `score_total` — decisión basada en reglas.
 
 ---
 
@@ -146,7 +146,7 @@ si (cualquier regla crítica "fail" y no subsanable):       concepto_final = "NO
 si (crítica "fail" subsanable con info adicional HC):      concepto_final = "DEVOLUCION"
 si (confianza < 0.75 en alguna crítica):                   concepto_final = "ESCALAR_HUMANO"
 si (caso atípico o dx raro sin GPC):                       concepto_final = "ESCALAR_HUMANO"
-si (score_total >= 85 y sin críticas en fail):             concepto_final = "APTA"
+si (sin críticas en fail):                                 concepto_final = "APTA"
 sino:                                                      concepto_final = "DEVOLUCION"
 ```
 
@@ -195,7 +195,6 @@ sino:                                                      concepto_final = "DEV
     }
   ],
   "cierre": {
-    "score_total": 92.1,
     "concepto_final": "APTA",
     "clasificacion": "Clinico",
     "accion_requerida": null,
