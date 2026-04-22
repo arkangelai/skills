@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-fix-review
-description: Reads human comments left on a medical-invoice glosa in the destination software, interprets the auditor's intent (modify finding, add, remove, change causal, adjust amount, approve as-is), applies the changes to the consolidated output, invokes claim-denial-generator to produce the next PDF version, and manages the workflow labels until the auditor explicitly approves with `claim-denial-ready`. Use it when a case has `needs-human-review` or `needs-fix-review` and a human left comments.
+description: Reads human comments from comments.json in the working directory, interprets the auditor's intent (modify finding, add, remove, change causal, adjust amount, approve as-is), applies the changes to output.json, invokes claim-denial-generator to produce the next PDF version, and manages the workflow labels until the auditor explicitly approves with `claim-denial-ready`. Use it when a case has `needs-human-review` or `needs-fix-review` and a human left comments.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -10,12 +10,6 @@ metadata:
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 required_environment_variables:
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
 ---
 
 # medical-invoice-fix-review
@@ -72,7 +66,7 @@ Comments must be processed in ascending chronological order. Only comments where
       "intent": "modify_finding | add_finding | remove_finding | change_causal | adjust_value | add_evidence | approve | ask_clarification | ambiguous",
       "target_item": 1,
       "changes_applied": [
-        { "op": "replace", "path": "/hallazgos/2/valor_objetado", "value": 1500000 }
+        { "op": "replace", "path": "/hallazgos/2/valor_glosado", "value": 1500000 }
       ]
     }
   ],
@@ -97,18 +91,15 @@ Comments must be processed in ascending chronological order. Only comments where
 **When no changes (only clarifications or ambiguous):** `pdf_regenerated: false`, `new_pdf_version: null`.
 
 **Money invariants after every patch:**
-- `resumen.total_glosado = sum(hallazgos[].valor_objetado)` — always recomputed.
+- `resumen.total_glosado = sum(hallazgos[].valor_glosado)` — always recomputed.
 - `resumen.total_aprobado = factura.total_facturado − resumen.total_glosado`.
-- `hallazgos[].valor_objetado ≥ 0` always — if a patch would make it negative, reject and reply asking for clarification.
+- `hallazgos[].valor_glosado ≥ 0` always — if a patch would make it negative, reject and reply asking for clarification.
 - `resumen.total_glosado ≤ factura.total_facturado` always.
 
 ## Procedure
 
-1. **Detect new comments.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/comments?since={last_processed_at}
-   ```
-   If 0 results → exit with no changes.
+1. **Load comments.**
+   Read `comments.json` from the working directory, filtered to entries with `created_at > last_processed_at`. If none → exit with no changes.
 
    For every comment capture: `comment_id`, `author`, `text`, `target` (specific finding or whole case), `created_at`.
 
@@ -122,9 +113,10 @@ Comments must be processed in ascending chronological order. Only comments where
    | `add_finding` | "add", "missing", "there is also", "additional" | Insert new finding |
    | `remove_finding` | "remove", "delete", "does not apply", "not deniable" | Mark finding as `resultado=pass` |
    | `change_causal` | "the right causal is", "it is not X but Y" | Reassign `causal`/`subcausal` |
-   | `adjust_value` | "the disputed amount is $X" | Change `valor_objetado` |
+   | `adjust_value` | "the disputed amount is $X" | Change `valor_glosado` |
    | `add_evidence` | "the evidence is at", "see page Y" | Append text to `evidencia` |
    | `approve` | "approved", "ready", "send it", "OK as is" | Label change to `claim-denial-ready` |
+   | `escalate` | "escalate", "need a senior", "cannot decide", "unsure" | Set `concepto_final = ESCALAR_HUMANO`, exit loop |
    | `ask_clarification` | "why", "do not understand", "explain" | Reply on the case, do NOT modify |
    | `ambiguous` | unclassifiable | Reply asking for clarification, do NOT modify |
 
@@ -136,75 +128,64 @@ Comments must be processed in ascending chronological order. Only comments where
    - If it mentions a CUPS or description → match by content.
    - If it cannot be resolved → classify as `ambiguous`.
 
-4. **Apply changes to the consolidated output.**
+4. **Apply changes to output.json.**
 
-   For each actionable intent:
+   For each actionable intent, apply the JSON Patch operations directly to `output.json` on disk. Example operations:
+   ```json
+   [
+     { "op": "replace", "path": "/hallazgos/2/valor_glosado", "value": 1500000 },
+     { "op": "replace", "path": "/hallazgos/2/glosa_sugerida/causal_num", "value": "5" },
+     { "op": "add", "path": "/hallazgos/-", "value": { "...": "new finding" } },
+     { "op": "replace", "path": "/hallazgos/0/hallazgo", "value": "conforme" }
+   ]
    ```
-   PATCH {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/consolidated
-   {
-     "changes": [
-       { "op": "replace", "path": "/consolidated_findings/2/valor_objetado", "value": 1500000 },
-       { "op": "replace", "path": "/consolidated_findings/2/causal", "value": 5 },
-       { "op": "add", "path": "/consolidated_findings/-", "value": { ...new finding } },
-       { "op": "replace", "path": "/consolidated_findings/0/resultado", "value": "pass" }
-     ]
-   }
-   ```
-
-   If the destination software does not support JSON Patch, use `PATCH` with the full updated object.
 
    **Always recompute** after the patch:
    - `case_summary.score` = Σ weights of active findings.
-   - `case_summary.total_objetado` = Σ `valor_objetado`.
+   - `case_summary.total_objetado` = Σ `valor_glosado`.
    - `case_summary.total_a_pagar` = `invoice_total - total_objetado`.
    - `case_summary.zona` based on new values.
 
-5. **Record in the audit-log** for traceability.
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audit-log
+5. **Append to audit-log.json** for traceability.
+   Append the entry to `audit-log.json` in the working directory. Never overwrite — always append:
+   ```json
    {
      "actor": "fix-review",
      "triggered_by_comment": "comment_id",
      "intent": "modify_finding",
-     "changes_applied": [...],
+     "changes_applied": [],
      "finding_id": "fx-003",
      "author_original": "auditor@eps.com",
      "timestamp": "..."
    }
    ```
-   Never overwrite history — always append.
 
 6. **Regenerate the PDF (invoke skill 7).**
    If there were changes → run `medical-invoice-claim-denial-generator` to produce `v{n+1}`.
    If only `ask_clarification` or `ambiguous` → do NOT regenerate.
 
-7. **Reply to the auditor.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/comments
+7. **Write bot reply.**
+   Append the bot reply to `comments.json` in the working directory (with `author: "fix-review-bot"`):
+   ```json
    {
      "reply_to": "comment_id",
      "author": "fix-review-bot",
-     "body": "Applied: changed finding #3 amount from $1,200,000 to $1,500,000. Version v2 generated. Please review."
+     "body": "Applied: changed finding #3 amount from $1,200,000 to $1,500,000. Version v2 generated. Please review.",
+     "created_at": "..."
    }
    ```
 
-   If the intent was `ambiguous`:
-   ```
-   body: "I could not interpret your comment on finding #3. Could you clarify whether you want to change the amount, the causal, or add evidence?"
-   ```
+   If the intent was `ambiguous`, set body to: `"I could not interpret your comment on finding #3. Could you clarify whether you want to change the amount, the causal, or add evidence?"`
 
-8. **Handle final approval.**
+8. **Handle final approval or escalation.**
+
    If intent = `approve`:
-   ```
-   DELETE /cases/{id}/labels/needs-human-review
-   DELETE /cases/{id}/labels/needs-fix-review
-   POST   /cases/{id}/labels   { "name": "claim-denial-ready" }
-   PATCH  /cases/{id}          { "status": "claim_denial_ready" }
-   ```
+   Set `output.json resumen.label = "claim-denial-ready"` and `resumen.status = "claim_denial_ready"`.
+   **Requirement**: `approve` is only honored if the comment author has the auditor role and at least one PDF version exists (`v1` or later).
 
-   **Requirement**: `approve` is only honored if:
-   - The comment author has the auditor role (not another bot).
-   - At least one PDF version exists (`v1` or later).
+   If intent = `escalate`:
+   Set `output.json resumen.label = "needs-human-review"`, `resumen.status = "escalated"`, and `resumen.concepto_final = "ESCALAR_HUMANO"`.
+   Loop exits. No PDF regeneration.
 
 9. **Update `last_processed_at`.** Save the timestamp of the latest comment processed into case metadata so the next run does not reprocess.
 
@@ -213,7 +194,7 @@ Comments must be processed in ascending chronological order. Only comments where
 - **Symptom:** the bot interprets "this is not right" as `approve`. **Cause:** LLM miscalibrated on negations. **Fix:** use a strict enum JSON schema plus few-shot negative examples in the prompt.
 - **Symptom:** `approve` applied but the human had asked for edits earlier. **Cause:** the approval comment is newer, but another later comment asked for changes → processed out of order. **Fix:** process comments in ascending chronological order; `approve` only if it is the last one.
 - **Symptom:** regenerated a PDF without real changes. **Cause:** intent was `add_evidence` applied to a null field. **Fix:** validate the patch produced a non-empty diff before invoking skill 7.
-- **Symptom:** `valor_objetado` ends up negative. **Cause:** human asked "reduce by $500k" and the bot subtracted without validation. **Fix:** enforce `≥ 0`; if negative, reply asking for clarification.
+- **Symptom:** `valor_glosado` ends up negative. **Cause:** human asked "reduce by $500k" and the bot subtracted without validation. **Fix:** enforce `≥ 0`; if negative, reply asking for clarification.
 - **Symptom:** bot loops with another bot. **Cause:** both reply to comments. **Fix:** skip if `author` ends in `-bot`; only process human comments.
 - **Symptom:** applied changes do not appear in `v2`. **Cause:** PDF regenerated before the PATCH confirmed. **Fix:** PATCH → `GET /consolidated` to verify → only then invoke skill 7.
 - **Symptom:** human asks to change the causal but the finding has multiple `rule_ids` mapping to different causales. **Cause:** dedup merged findings with potentially different causales. **Fix:** allow manual causal override; leave a note in `justificacion` that it was a human override.
@@ -223,7 +204,7 @@ Comments must be processed in ascending chronological order. Only comments where
 
 - Every new comment produces an `audit-log` entry with a classified `intent`.
 - If changes occurred: a new PDF version (`v{n+1}`) exists more recent than any processed comment.
-- If `intent=approve` and valid: the case's current labels include `claim-denial-ready` and exclude `needs-human-review` / `needs-fix-review`.
+- If `intent=approve` and valid: `output.json resumen.label` is `claim-denial-ready` and `resumen.status` is `claim_denial_ready`.
 - `total_objetado ≥ 0` and `≤ invoice_total` after each change.
 - Every consolidated change has an `audit-log` entry with non-empty `triggered_by_comment`.
 - The same `comment_id` was not processed twice (idempotent via `last_processed_at`).

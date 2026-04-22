@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-gmail-intake
-description: Watches a Gmail inbox with `gogcli`, classifies emails as medical invoices, downloads attachments (DIAN invoice XML, RIPS, clinical history, epicrisis, authorization, supporting documents), extracts invoice metadata, and files the case in the destination software with a RAD number. Use it when the user wants to automatically process medical invoices sent by IPS via email, configure the pipeline's initial watcher, or debug cases that landed on `medical-invoice/error`.
+description: Watches a Gmail inbox with `gogcli`, classifies emails as medical invoices, downloads attachments (DIAN invoice XML, RIPS, clinical history, epicrisis, authorization, supporting documents), extracts invoice metadata, and generates metadata_input.json with a RAD number. Use it when the user wants to automatically process medical invoices sent by IPS via email, configure the pipeline's initial watcher, or debug cases that landed on `medical-invoice/error`.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -18,19 +18,11 @@ required_environment_variables:
     prompt: Gmail label to watch (e.g. INBOX or a specific one like "radicacion")
     help: For shared inboxes, prefer a dedicated label over INBOX
     required_for: full functionality
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software where cases are filed
-    help: Placeholder until the final software is chosen
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key or bearer token for the destination software
-    help: Ask infrastructure
-    required_for: full functionality
 ---
 
 # medical-invoice-gmail-intake
 
-First skill in the medical-invoice audit pipeline. It listens on Gmail, decides whether an email is a medical invoice, downloads the full document package, extracts metadata, and opens a case in the destination software with a RAD (filing) number assigned.
+First skill in the medical-invoice audit pipeline. It listens on Gmail, decides whether an email is a medical invoice, downloads the full document package, extracts metadata, and generates `metadata_input.json` with a RAD (filing) number assigned.
 
 The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML invoice, RIPS, clinical history, epicrisis, authorization, and supporting files. The skill automates reception and case creation so the downstream auditors (admin, medical, financial) work on an already-structured case.
 
@@ -41,7 +33,7 @@ The assumption: each IPS sends its invoice as a Gmail thread with a DIAN XML inv
 - A case ended up with label `medical-invoice/error` and needs to be **reprocessed manually**.
 - The user asks "how does a message from IPS get filed?" or "is invoice X coming through?".
 
-**Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a case with the same invoice number already exists in the destination software.
+**Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a `metadata_input.json` already exists in the working directory for the same `invoice_cuv`.
 
 ## Input Contract
 
@@ -54,9 +46,9 @@ Trigger: Gmail message arrival on label $GMAIL_WATCH_LABEL
 
 ## Output Contract
 
-On success, the skill files the case in the destination software and writes `metadata_input.json` for downstream audit skills:
+On success, the skill generates `metadata_input.json` for downstream audit skills. The `metadata_input.json` template in this skill's directory defines the schema — this skill always creates the file from scratch:
 
-**Template:** `metadata_input.json` in this skill's directory — 8 fields, all initially `null`, filled by this skill.
+**Schema:** `metadata_input.json` in this skill's directory — 8 fields, all initially `null`, filled by this skill.
 
 | Field | Type | Description |
 |---|---|---|
@@ -95,7 +87,6 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
    ```bash
    gogcli --version
    test -f "$GOGCLI_CREDENTIALS_PATH" || { echo "Missing gogcli creds"; exit 1; }
-   test -n "$DEST_SOFTWARE_API_KEY" || { echo "Missing API key"; exit 1; }
    ```
 
 2. **Start the watcher (or process a specific message).**
@@ -166,37 +157,14 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 
    If invalid → apply label `medical-invoice/error`, reply on the thread listing the missing documents, **do not file**.
 
-7. **File the case in the destination software.**
+7. **Generate metadata_input.json.**
 
-   Expected endpoint (document exact contract once the software is chosen):
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases
-   Authorization: Bearer {DEST_SOFTWARE_API_KEY}
-   Content-Type: application/json
-
-   {
-     "ips_nit": "...",
-     "ips_razon_social": "...",
-     "invoice_number": "...",
-     "invoice_cuv": "...",
-     "issue_date": "YYYY-MM-DD",
-     "service_date": "YYYY-MM-DD",
-     "total_amount": 0,
-     "patient_document": "...",
-     "patient_name": "...",
-     "cups_principales": [...],
-     "diagnostico_principal": "...",
-     "source": { "channel": "gmail", "message_id": "..." }
-   }
-   ```
-
-   The software returns `case_id` and `rad` (suggested format: `YYYYMMDD-NNNN`).
-
-   Then upload each attachment:
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/attachments
-   (multipart/form-data: file, doc_type=invoice_xml|rips|clinical_history|epicrisis|authorization|other)
-   ```
+   Using the `metadata_input.json` schema template in this skill's directory, generate the file from scratch:
+   - Fill all 8 fields from the extracted metadata.
+   - Set `documentos[]` to the relative paths of the downloaded attachments in the working directory.
+   - Assign `caso_id = "RAD-YYYYMMDD-{num_factura_normalizado}"`.
+   - Assign `rad` in format `YYYYMMDD-NNNN` (sequential counter per day).
+   - Write to `metadata_input.json` in the working directory.
 
 8. **Label the email and reply with an ACK.**
    ```bash
@@ -225,7 +193,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 ## Pitfalls
 
 - **Symptom:** attachments arrive as password-protected `.zip`. **Cause:** the IPS protects the package with a password shared in the email body. **Fix:** extract the password from the body with regex (`contraseña:\s*(\S+)`) and unzip with `7z x -p"$PWD_FROM_BODY"`.
-- **Symptom:** the same email is processed twice (duplicate case in destination software). **Cause:** the watcher redelivers the event before the label is applied. **Fix:** before filing, query `GET /cases?invoice_cuv={cuv}` — if it exists, just apply the label and exit.
+- **Symptom:** the same email is processed twice. **Cause:** the watcher redelivers the event before the label is applied. **Fix:** before generating, check whether a `metadata_input.json` already exists in the working directory with the same `invoice_cuv` — if so, just apply the Gmail label and exit.
 - **Symptom:** XML parsing fails with "invalid encoding". **Cause:** the IPS generated the XML declaring `UTF-8` but with ISO-8859-1 bytes. **Fix:** detect with `file -i` and re-encode before parsing.
 - **Symptom:** `total_amount` differs between XML and the RIPS sum. **Cause:** the IPS included copays in the XML but not in RIPS (or vice versa). **Fix:** do NOT fix it here — pass both values to the case and let `financial-auditor` resolve it.
 - **Symptom:** `gogcli` fails with `invalid_grant`. **Cause:** the OAuth token expired. **Fix:** `gogcli auth refresh` or regenerate with `gogcli auth init`.
@@ -234,10 +202,10 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
 ## Verification
 
 - After running the skill, the email has exactly **one** of the labels `medical-invoice/{intake|not-applicable|error}`.
-- If filed: `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}` returns the case with all mandatory fields populated and every attachment in `attachments[]`.
+- `metadata_input.json` exists in the working directory with all 8 fields populated.
 - The Gmail thread has an ACK reply with the RAD.
-- No other case exists in the software with the same `invoice_cuv` (uniqueness).
-- Each attachment's `sha256` in the output matches the file uploaded to the software.
+- No `metadata_input.json` exists already for the same `invoice_cuv` in the working directory (uniqueness).
+- Each attachment's `sha256` in the output matches the locally saved file.
 
 ## References
 
