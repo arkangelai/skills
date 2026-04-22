@@ -6,5 +6,6 @@
   "prestador_nombre": null,
   "pagador_nit": null,
   "pagador_nombre": null,
-  "documentos": []
+  "documentos": [],
+  "reply_sent": null
 }
