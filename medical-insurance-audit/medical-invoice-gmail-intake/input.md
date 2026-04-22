@@ -39,7 +39,8 @@ Sobre logístico del radicado. No contiene datos clínicos ni del paciente — e
     "epicrisis.pdf",
     "soportes/autorizacion.pdf",
     "soportes/nota_quirurgica.pdf"
-  ]
+  ],
+  "reply_sent": false
 }
 ```
 
@@ -55,6 +56,7 @@ Sobre logístico del radicado. No contiene datos clínicos ni del paciente — e
 | `pagador_nit` | string | NIT del pagador (EPS / aseguradora) con dígito de verificación. |
 | `pagador_nombre` | string | Nombre del pagador. |
 | `documentos` | array de strings | Rutas relativas de todos los archivos adjuntos, en el orden en que se recibieron. |
+| `reply_sent` | boolean · opcional | `true` una vez que la EPS ha enviado respuesta al prestador para este caso. Por defecto: `false`. |
 
 ---
 

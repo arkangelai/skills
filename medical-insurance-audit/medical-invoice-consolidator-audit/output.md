@@ -1,8 +1,8 @@
 # Output del pipeline de auditoría
 
-El archivo `output_base.json` es el resultado final del pipeline. Lo produce el agente orquestador una vez que los tres sub-agentes (administrativo, médico, financiero) completan su trabajo. Es la única entrega que sale del pipeline hacia el dashboard, el Excel de glosas y la notificación al prestador.
+El archivo `output.json` es el resultado final del pipeline. Lo produce el agente orquestador una vez que los tres sub-agentes (administrativo, médico, financiero) completan su trabajo. Es la única entrega que sale del pipeline hacia el dashboard, el Excel de glosas y la notificación al prestador.
 
-El template vacío está en `output_base.json`. Todos los campos con `null` deben ser llenados por el agente.
+El template vacío está en `output.json`. Todos los campos con `null` deben ser llenados por el agente.
 
 ---
 
@@ -34,30 +34,21 @@ Extraída por el agente de `factura.pdf`. No se copia de `metadata_input_base.js
 ### `hallazgos`
 Array con un objeto por cada ítem facturado. Los ítems conformes y los glosados aparecen todos — ninguno se omite.
 
-| Campo | Valores válidos | Descripción |
-|---|---|---|
-| `item` | int | Número de ítem tal como aparece en la factura. |
-| `codigo_cups` | string | Código CUPS del servicio. |
-| `descripcion` | string | Descripción del servicio con tildes. |
-| `valor_facturado` | int COP | Valor total del ítem en la factura. |
-| `hallazgo` | `"conforme"` · `"glosa"` | Resultado del ítem. `"conforme"` si pasa todas las capas. `"glosa"` si hay objeción fundamentada. `"devolucion"` es **exclusivo del nivel de caso** (`resumen.concepto_final`), nunca por ítem. |
-| `reglas_aplicadas` | array de string · `null` | IDs de todas las reglas que fallaron para este ítem en cualquier capa (ej. `["A08", "F06"]`). `null` si conforme. Para ver la evidencia detallada de cada regla, consultar el checklist JSON de la capa correspondiente. |
-| `severidad` | `"critica"` · `"mayor"` · `"menor"` · `null` | Severidad máxima entre las reglas en `reglas_aplicadas`. `null` si conforme. |
-| `valor_glosado` | int COP | Monto objetado del ítem. `0` si conforme. Corresponde al `valor_glosado` de la regla más severa (no se suman reglas del mismo ítem). |
-| `valor_a_reconocer` | int COP | Valor que el pagador reconoce. Igual a `valor_facturado` si conforme; puede ser menor si la glosa es parcial (ej. diferencia tarifaria). |
-| `confianza` | float 0.0–1.0 · `null` | Confianza en el hallazgo. `null` si conforme. Valores `< 0.75` en regla crítica escalan a humano. |
-| `evidencia_requerida` | string · `null` | Qué debe presentar el prestador para subsanar. `null` si conforme o si no aplica. |
-
----
-
-### `resumen_por_capa`
-Tres párrafos cortos (1–2 oraciones cada uno) que resumen lo encontrado en cada capa de auditoría. Permiten al auditor humano tener un panorama rápido sin necesidad de leer todos los hallazgos.
-
-| Campo | Descripción |
+| Campo | Valores válidos / cómo llenarlo |
 |---|---|
-| `administrativo` | Resumen de la auditoría administrativa. Ej: `"2 reglas críticas fallidas (A01, A08): CUV inválido y autorización ausente."` |
-| `medico` | Resumen de la auditoría médica. Ej: `"Sin hallazgos clínicos relevantes."` |
-| `financiero` | Resumen de la auditoría financiera. Ej: `"3 reglas fallidas (F13, F33, F37): sobretarifa, duplicación y upcoding."` |
+| `item` | Integer. Número de ítem tal como aparece en la factura. |
+| `codigo_cups` | String. Código CUPS del servicio. |
+| `descripcion` | String. Descripción del servicio con tildes. |
+| `valor_facturado` | Integer COP. Valor total del ítem en la factura. |
+| `hallazgo` | `"conforme"` — pasa todas las capas. `"glosa"` — objeción fundamentada con evidencia. `"devolucion"` — defecto formal subsanable por el prestador. |
+| `capa` | `"administrativo"` · `"medico"` · `"financiero"` · `null`. Sub-agente que generó el hallazgo. `null` si `hallazgo == "conforme"`. |
+| `regla_aplicada` | String o `null`. ID de la única regla que disparó el hallazgo (ej. `"A08"`, `"F13"`). Si múltiples reglas fallan para el mismo ítem, usar la más severa. `null` si `hallazgo == "conforme"`. |
+| `severidad` | `"critica"` · `"mayor"` · `"menor"` · `null`. Severidad de `regla_aplicada`. `null` si conforme. |
+| `valor_objetado` | Integer COP. Monto objetado del ítem. `0` si conforme. |
+| `valor_a_reconocer` | Integer COP. `valor_facturado − valor_objetado`. Igual a `valor_facturado` si conforme. |
+| `confianza` | Float 0.0–1.0 o `null`. Confianza en el hallazgo. `null` si conforme. `< 0.75` en regla crítica → `concepto_final = "ESCALAR_HUMANO"`. |
+| `evidencia_requerida` | String o `null`. Qué debe presentar el prestador para subsanar. `null` si conforme. |
+| `glosa_sugerida` | `null` si conforme. Objeto con `causal_num`, `causal_nombre`, `texto`, `valor_glosado`, `moneda` si hay hallazgo. |
 
 ---
 
@@ -77,19 +68,20 @@ Tres párrafos cortos (1–2 oraciones cada uno) que resumen lo encontrado en ca
 ### `resumen`
 Calculado por el orquestador al consolidar los tres sub-agentes.
 
-| Campo | Descripción |
+| Campo | Valores válidos / cómo llenarlo |
 |---|---|
-| `total_facturado` | Suma de `valor_facturado` de todos los ítems. |
-| `total_aprobado` | Suma de `valor_a_reconocer` de todos los ítems. |
-| `total_glosado` | `total_facturado − total_aprobado`. Es el **dinero recuperado**. |
-| `num_items` | Total de ítems en la factura. |
-| `num_conformes` | Ítems con `hallazgo == "conforme"`. |
-| `num_glosas` | Ítems con `hallazgo == "glosa"`. |
-| `tasa_objecion` | `total_glosado / total_facturado × 100`. Float con un decimal. |
-| `glosas_por_capa` | Conteo de glosas por sub-agente: `administrativo`, `medico`, `financiero`. |
+| `total_facturado` | Integer COP. Suma de `valor_facturado` de todos los ítems. |
+| `total_aprobado` | Integer COP. Suma de `valor_a_reconocer` de todos los ítems. |
+| `total_glosado` | Integer COP. `total_facturado − total_aprobado`. Dinero recuperado. |
+| `num_items` | Integer. Total de ítems en la factura. |
+| `num_conformes` | Integer. Ítems con `hallazgo == "conforme"`. |
+| `num_glosas` | Integer. Ítems con `hallazgo == "glosa"`. |
+| `num_devoluciones` | Integer. Ítems con `hallazgo == "devolucion"`. |
+| `tasa_objecion` | Float. `total_glosado / total_facturado × 100`. Un decimal. |
+| `glosas_por_capa` | Objeto con `administrativo`, `medico`, `financiero` (enteros). Conteo de glosas por sub-agente. |
 | `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver lógica abajo. |
 | `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
-| `resumen_ejecutivo` | 1–2 frases para el dashboard. Debe mencionar el concepto final y los hallazgos críticos. |
+| `resumen_ejecutivo` | String. 1–2 frases para el dashboard. Debe mencionar `concepto_final` y hallazgos críticos. |
 
 #### Lógica de `concepto_final`
 
@@ -130,9 +122,10 @@ si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → 
       "descripcion": "Colecistectomia laparoscopica",
       "valor_facturado": 4350000,
       "hallazgo": "glosa",
-      "reglas_aplicadas": ["F13"],
+      "capa": "financiero",
+      "regla_aplicada": "F13",
       "severidad": "critica",
-      "valor_glosado": 600000,
+      "valor_objetado": 600000,
       "valor_a_reconocer": 3750000,
       "glosa_sugerida": {
         "causal_num": "2",
@@ -150,20 +143,16 @@ si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → 
       "descripcion": "Estancia hospitalaria general - dia",
       "valor_facturado": 855000,
       "hallazgo": "conforme",
-      "reglas_aplicadas": null,
+      "capa": null,
+      "regla_aplicada": null,
       "severidad": null,
-      "valor_glosado": 0,
+      "valor_objetado": 0,
       "valor_a_reconocer": 855000,
       "glosa_sugerida": null,
       "confianza": null,
       "evidencia_requerida": null
     }
   ],
-  "resumen_por_capa": {
-    "administrativo": "Sin hallazgos administrativos.",
-    "medico": "Sin hallazgos clínicos.",
-    "financiero": "1 regla crítica fallida (F13): tarifa H30103 excede contrato en $600.000."
-  },
   "resumen": {
     "total_facturado": 7285000,
     "total_aprobado": 6685000,
@@ -171,6 +160,7 @@ si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → 
     "num_items": 8,
     "num_conformes": 7,
     "num_glosas": 1,
+    "num_devoluciones": 0,
     "tasa_objecion": 8.2,
     "glosas_por_capa": {
       "administrativo": 0,
