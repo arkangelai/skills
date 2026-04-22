@@ -24,13 +24,7 @@
       "severidad": null,
       "valor_objetado": null,
       "valor_a_reconocer": null,
-      "glosa_sugerida": {
-        "causal_num": null,
-        "causal_nombre": null,
-        "texto": null,
-        "valor_glosado": null,
-        "moneda": "COP"
-      },
+      "glosa_sugerida": null,
       "confianza": null,
       "evidencia_requerida": null
     }
