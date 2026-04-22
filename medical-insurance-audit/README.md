@@ -44,9 +44,9 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 | # | Name | Dependencies |
 |---|---|---|
 | 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | gogcli |
-| 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `metadata_input.json`, `bdua.json`, `contratos_ips.json` |
+| 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `metadata_input.json` |
 | 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `metadata_input.json`, `guias-clinicas/` |
-| 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `metadata_input.json`, `tarifario_contractual.csv`, `contratos_ips.json`, `plan_afiliados.json`, `bdua.json` |
+| 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `metadata_input.json`, `tarifario_contractual.csv`, `plan_afiliados.json` |
 | 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | outputs from skills 3-4-5 |
 | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `metadata_input.json`, `output.json`, PDF rendering engine |
 | 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json`, `comments.json`, skill 7 |
@@ -59,7 +59,6 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 | `GOGCLI_CREDENTIALS_PATH` | 1, 9 | Path to `gogcli` OAuth credentials |
 | `GMAIL_WATCH_LABEL` | 1 | Label to watch (e.g. `INBOX`) |
 | `GMAIL_SENDER_ADDRESS` | 9 | Address the glosa is sent from |
-| `REF_DATA_PATH` | 3, 4, 5 | Folder with reference JSON/CSV files (`bdua.json`, `contratos_ips.json`, etc.) |
 
 ## Workflow states
 

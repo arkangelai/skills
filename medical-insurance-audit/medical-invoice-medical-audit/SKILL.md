@@ -9,10 +9,6 @@ metadata:
     tags: [medical, audit, clinical, gpc, cie10, rethus, colombia, eps]
     category: medical-insurance-audit
     requires_toolsets: [terminal]
-required_environment_variables:
-  - name: REF_DATA_PATH
-    prompt: Folder with rethus_snapshot.json, mipres_catalog.json
-    required_for: full functionality
 ---
 
 # medical-invoice-medical-audit
@@ -93,8 +89,6 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 2. **Load clinical ref_data.**
    - `guias-clinicas/INDEX.md` + `guias-clinicas/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
-   - `$REF_DATA_PATH/rethus_snapshot.json` — registered professionals.
-   - `$REF_DATA_PATH/mipres_catalog.json` — authorizable non-PBS medications.
 
 3. **Extract structured clinical data.**
    - `diagnostico_principal` (CIE-10 + description) and secondaries.
@@ -142,7 +136,7 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 - **Symptom:** MED.01 flags a valid CIE-10 as invalid. **Cause:** outdated CIE-10 catalog (latest 2026 vs. local 2024). **Fix:** update catalog and retry; meanwhile use `resultado=conditional`.
 - **Symptom:** MED.04 false positives — reports "non GPC-adherent" for a legitimate edge case. **Cause:** the loaded GPC does not capture all accepted exceptions. **Fix:** if the HC explicitly mentions an accepted exception criterion, mark `resultado=pass` with note; otherwise `conditional` and escalate.
 - **Symptom:** MED.11 reports missing operative note when it is present. **Cause:** the note is embedded inside the main HC PDF, not a separate attachment. **Fix:** search by content ("NOTA OPERATORIA", "DESCRIPCIÓN QUIRÚRGICA") across the full HC PDF, not by filename.
-- **Symptom:** MED.08 flags a valid RETHUS professional. **Cause:** RETHUS snapshot stale (weekly). **Fix:** same pattern — `conditional` + note requesting online validation.
+- **Symptom:** MED.08 flags a valid RETHUS professional. **Cause:** professional is registered but not found in available documents. **Fix:** set `resultado=conditional` and request online RETHUS validation.
 - **Symptom:** MED.18 denies a non-PBS with a valid MIPRES. **Cause:** MIPRES is in the authorization attachment but not in the structured field. **Fix:** also parse authorization PDFs looking for a MIPRES number.
 - **Symptom:** MED.23 flags an unjustified inpatient day that actually had a criterion (waiting for intervention). **Cause:** justification is in nursing notes, not the medical record. **Fix:** consider nursing notes when evaluating stay.
 - **Symptom:** many simultaneous critical findings, exploded `score`. **Cause:** HC PDF parsing (OCR) failed. **Fix:** before publishing, check that the extracted HC text has >N words; otherwise emit a single `conditional` finding asking for re-OCR.

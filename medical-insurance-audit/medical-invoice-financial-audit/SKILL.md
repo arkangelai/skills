@@ -9,10 +9,6 @@ metadata:
     tags: [medical, audit, financial, tariff, fraud, cups, colombia, eps]
     category: medical-insurance-audit
     requires_toolsets: [terminal]
-required_environment_variables:
-  - name: REF_DATA_PATH
-    prompt: Folder with tarifario_contractual.csv, contratos_ips.json, plan_afiliados.json, bdua.json, ruaf_snapshot.json
-    required_for: full functionality
 ---
 
 # medical-invoice-financial-audit
@@ -37,7 +33,7 @@ The question it answers: **does the billed amount match the contract and the app
 Additionally the skill resolves two reference hierarchies from this skill's directory before running any rules:
 
 **Plan resolution** (determines coverage rules, exclusions, caps, and carency):
-1. Extract `plan_afiliado` (ORO / PLATA / BASICO) from BDUA using `paciente_documento`.
+1. Extract `plan_afiliado` (ORO / PLATA / BASICO) from `plan_afiliados.json` using `paciente_documento`.
 2. Load `planes/INDEX.md` → identify plan file.
 3. Load `planes/plan_{id}.md` for the applicable coverage rules.
 
@@ -109,11 +105,8 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    Read `metadata_input.json` from the working directory. Load `invoice_xml`, `rips`, `clinical_history` (to validate services actually delivered), and `authorization` from the paths in `documentos[]`.
 
 2. **Load financial ref_data.**
-   - `$REF_DATA_PATH/tarifario_contractual.csv` — columns: `ips_nit,cups,manual,version,uvb_factor,precio_base,precio_noche,precio_festivo,vigente_desde,vigente_hasta,plan`.
-   - `$REF_DATA_PATH/contratos_ips.json` — contracts with modality, validity, amendments.
-   - `$REF_DATA_PATH/plan_afiliados.json` — coverages, limits, grace periods, exclusions per plan.
-   - `$REF_DATA_PATH/bdua.json` — affiliate plan, IBC (for copays).
-   - `$REF_DATA_PATH/ruaf_snapshot.json` — mortality (for post-mortem checks).
+   - `tarifario_contractual.csv` — columns: `ips_nit,cups,manual,version,uvb_factor,precio_base,precio_noche,precio_festivo,vigente_desde,vigente_hasta,plan`.
+   - `plan_afiliados.json` — coverages, limits, grace periods, exclusions per plan.
 
 3. **Extract invoice transactions.** Internal shape: `items[] = {cups, description, quantity, unit_price, total_price, access_route?, specialty?}`.
 
@@ -148,11 +141,10 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 ## Pitfalls
 
-- **Symptom:** FIN.13 false positives because of UVB factor. **Cause:** the contract uses UVB 2025 but the skill applied UVB 2026. **Fix:** read `uvb_factor` from `contratos_ips.json` for the contract active on `service_date`, never from global variables.
+- **Symptom:** FIN.13 false positives because of UVB factor. **Cause:** the contract uses UVB 2025 but the skill applied UVB 2026. **Fix:** read `uvb_factor` from `tarifario_contractual.csv` for the contract active on `service_date`, never from global variables.
 - **Symptom:** FIN.32 flags "simultaneous" billing that is actually on different dates. **Cause:** the comparison used date-only (00:00 times). **Fix:** compare by hospitalization intervals, not exact `DATE`.
 - **Symptom:** FIN.34 denies by post-mortem but the patient is alive. **Cause:** homonym in RUAF with a different document. **Fix:** cross by document + date of birth, never document alone.
 - **Symptom:** FIN.15 misapplied for same-access-route surgeries. **Cause:** manuals state 100% first + 75% second, skill applied 100% to both. **Fix:** explicitly implement the rule per manual (SOAT vs. ISS 2001 differ).
-- **Symptom:** FIN.17 denies package-included services but the package was contractually excluded via an amendment. **Cause:** `contratos_ips.json` did not load the latest amendment. **Fix:** always use the contract version with the largest `vigente_desde` ≤ `service_date`.
 - **Symptom:** FIN.37 upcoding misdetected. **Cause:** the HC describes a complex procedure but the simple one was billed (subcoding, not upcoding) — direction inverted. **Fix:** detect both directions; subcoding is a minor finding (the IPS loses money) but still report it for traceability.
 - **Symptom:** many FIN.31 findings (consecutive numbering) for a large batch. **Cause:** the IPS bills in batches and the consecutive jumps across clients. **Fix:** FIN.31 must evaluate consecutive numbering **from this issuer to this EPS**, not globally.
 - **Symptom:** score explodes by accumulation in anti-fraud when a single root cause triggers multiple findings (e.g. wrong date → fires FIN.30, FIN.31, FIN.32). **Cause:** no cascade suppression. **Fix:** do NOT suppress here — `consolidator-audit` will dedup. Report all.

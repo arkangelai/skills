@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-claim-denial-gmail-sender
-description: Sends the final glosa (claim denial) of a medical invoice to the IPS via Gmail using `gogcli`, with the formal PDF attached, an executive summary in the body, a reference to the 15 business-day response deadline (Res. 3047/2008 Art. 6), recipient resolved from the original filing email or from `contratos_ips.json`, and delivery confirmation recorded in delivery-log.json. Sets the case status to `claim-denial-sent` in output.json. Use it once the case is `claim-denial-ready` and the final PDF is approved.
+description: Sends the final glosa (claim denial) of a medical invoice to the IPS via Gmail using `gogcli`, with the formal PDF attached, an executive summary in the body, a reference to the 15 business-day response deadline (Res. 3047/2008 Art. 6), recipient resolved from the original filing email, and delivery confirmation recorded in delivery-log.json. Sets the case status to `claim-denial-sent` in output.json. Use it once the case is `claim-denial-ready` and the final PDF is approved.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -16,9 +16,6 @@ required_environment_variables:
     required_for: full functionality
   - name: GMAIL_SENDER_ADDRESS
     prompt: Address the glosa is sent from (e.g. glosas@eps.com)
-    required_for: full functionality
-  - name: REF_DATA_PATH
-    prompt: Folder with contratos_ips.json (fallback recipient resolution)
     required_for: full functionality
 ---
 
@@ -125,14 +122,9 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
       gogcli messages get "$SOURCE_MESSAGE_ID" --fields from,reply-to
       ```
       Prefer `Reply-To` if present; otherwise `From`.
-   2. **Glosa notification contact** in `contratos_ips.json`:
-      ```json
-      { "nit": "900123456", "email_glosas": "glosas@ipsabc.com", ... }
-      ```
-   3. Abort if neither is available → label `medical-invoice/send-failed`, note requesting manual contact.
+   2. Abort if not available → label `medical-invoice/send-failed`, note requesting manual contact.
 
    Add in **CC** (if configured):
-   - IPS legal representative (from `contratos_ips.json`).
    - EPS internal archive mailbox.
 
 4. **Compose the email.**
@@ -230,7 +222,7 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
 
 - **Symptom:** the same glosa sent twice. **Cause:** retry without checking the `claim-denial-sent` label. **Fix:** first step is to verify that label and abort if present.
 - **Symptom:** the IPS receives the glosa but does not tie it to the original filing. **Cause:** `In-Reply-To` / `thread-id` from the original thread not used. **Fix:** always read `source.message_id` from the case and pass it to `gogcli`.
-- **Symptom:** bounce when sending. **Cause:** the original sender was accounting, not glosas. **Fix:** prefer `email_glosas` from `contratos_ips.json` over the original `From` when both exist.
+- **Symptom:** bounce when sending. **Cause:** the original sender was accounting, not glosas. **Fix:** check `Reply-To` before using `From`; if bounce persists, escalate to human for manual contact resolution.
 - **Symptom:** PDF attachment arrives corrupted at the IPS. **Cause:** `gogcli` applied the wrong content-type. **Fix:** specify `--attach-mime application/pdf`.
 - **Symptom:** subject with special characters renders as `=?UTF-8?Q?...`. **Cause:** missing RFC 2047 encoding. **Fix:** `gogcli` handles it; if not, escape before passing the argument.
 - **Symptom:** older PDF version sent (`v2` when `v3` existed). **Cause:** step 2 ordered by `created_at` instead of numeric version. **Fix:** sort by `CAST(version LIKE 'v%' → INT(substr))` descending, not by timestamp.
