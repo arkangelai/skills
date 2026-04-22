@@ -16,15 +16,6 @@ required_environment_variables:
   - name: DEST_SOFTWARE_API_KEY
     prompt: API key / bearer token
     required_for: full functionality
-  - name: CONFIDENCE_THRESHOLD
-    prompt: Minimum confidence for automatic decisions (default 0.7)
-    required_for: optional
-  - name: ZONA_GREEN_MAX
-    prompt: Maximum lost points for green zone (default 5)
-    required_for: optional
-  - name: ZONA_YELLOW_MAX
-    prompt: Maximum lost points for yellow zone (default 15)
-    required_for: optional
 ---
 
 # medical-invoice-consolidator-audit
@@ -137,9 +128,9 @@ The skill produces the canonical `output.json` — single source of truth for th
 7. **Compute zone and amounts.**
    - `score` = Σ `peso` of deduplicated findings with `resultado=fail`.
    - `zona`:
-     - Green: `score ≤ ZONA_GREEN_MAX` (default 5) **and** no critical rule fails.
-     - Yellow: `score ≤ ZONA_YELLOW_MAX` (default 15) without criticals, or criticals with low confidence.
-     - Red: `score > ZONA_YELLOW_MAX` **or** at least one critical with confidence ≥ `CONFIDENCE_THRESHOLD`.
+     - Green: `score ≤ 5` **and** no critical rule fails.
+     - Yellow: `score ≤ 15` without criticals, or criticals with low confidence.
+     - Red: `score > 15` **or** at least one critical with high confidence.
    - `total_objetado` = Σ `valor_objetado` of failing findings.
    - `total_a_pagar` = `invoice_total - total_objetado`.
    - `confianza_global` = weighted average by `peso`.
@@ -202,7 +193,6 @@ The skill produces the canonical `output.json` — single source of truth for th
 
 - **Symptom:** dedup merges findings that are NOT the same. **Cause:** semantic similarity too loose. **Fix:** require an exact match on at least one of the three criteria (doc evidence, invoice_item, description); do not rely on LLM similarity alone.
 - **Symptom:** consolidated `valor_objetado` exceeds `invoice_total`. **Cause:** summing overlapping findings (same item across multiple rules). **Fix:** when totalling, group by `invoice_item` and take the maximum disputed amount per item, not the sum.
-- **Symptom:** every case ends up in `needs-human-review`. **Cause:** threshold too high or evidence clarity miscomputed. **Fix:** temporarily lower `CONFIDENCE_THRESHOLD` to 0.6 and review the actual distribution; adjust weights.
 - **Symptom:** causal assignment inconsistent across findings with the same root cause. **Cause:** the mapping ran per individual `rule_id`, ignoring the merge. **Fix:** run mapping **after** dedup on the merged `rule_ids` set.
 - **Symptom:** yellow zone but a critical rule fails. **Cause:** zone logic evaluated before the critical-rule gate. **Fix:** a critical with high confidence ALWAYS forces red.
 - **Symptom:** two labels applied simultaneously (`auto-denial` and `needs-human-review`). **Cause:** previous label not removed. **Fix:** before applying, `DELETE /cases/{id}/labels/*` for mutually exclusive labels.

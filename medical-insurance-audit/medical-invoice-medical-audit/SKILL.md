@@ -53,6 +53,7 @@ Additionally the skill resolves the applicable GPC before running rules:
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
 - `evidencia`: `"{file} p.{N}[, section X][, line Y]: <literal quote>"` — use absence format when not found
+- `observaciones`: mandatory per-rule explanation stating explicitly why the rule passed, failed, or does not apply — must cite the specific evidence found (or its absence). Generic phrases such as "se verificó", "cumple", or "no aplica" without justification are invalid.
 - `confianza`: float 0.0–1.0
 - `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
 
@@ -122,6 +123,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
      - `"HC evolución 2026-04-10 08:30: 'BNP 380 pg/mL en descenso. Se continúa furosemida IV.' — criterio de estancia GPC_falla_cardiaca §3.2"`.
      - `"Ecocardiograma 2026-04-09, FEVI 32% — consistente con GPC_falla_cardiaca §2 criterios Framingham"`.
      - Absence: `"HC pp.1-40: no se encontró nota operatoria (búsqueda: 'NOTA OPERATORIA', 'DESCRIPCIÓN QUIRÚRGICA') para CUPS {X}"`.
+   - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual clinical evidence found. `pass`: cite the document and section that confirms the criterion is met (e.g. `"HC evolución 2026-04-10: BNP 380 pg/mL — criterio de estancia GPC_falla_cardiaca §3.2 cumplido"`). `fail`: cite the specific deficiency and its location (e.g. `"HC pp.1-40: no se encontró nota de evolución diaria para los días 2026-04-11 y 2026-04-12 — M09 incumplido"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"No hay CUPS quirúrgicos en la factura — M11 nota operatoria no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` forces human escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 

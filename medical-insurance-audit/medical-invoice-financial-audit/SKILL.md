@@ -19,9 +19,6 @@ required_environment_variables:
   - name: REF_DATA_PATH
     prompt: Folder with tarifario_contractual.csv, contratos_ips.json, plan_afiliados.json, bdua.json, ruaf_snapshot.json
     required_for: full functionality
-  - name: TARIFF_DEVIATION_THRESHOLD_PCT
-    prompt: Tariff deviation threshold to trigger critical finding (default 5)
-    required_for: optional
 ---
 
 # medical-invoice-financial-audit
@@ -65,6 +62,7 @@ The resolved `plan_afiliado` and `tarifario_aplicado` are written to `meta` befo
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
 - `evidencia`: explicit calculation — `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"` — never generic descriptions
+- `observaciones`: mandatory per-rule explanation stating explicitly why the rule passed, failed, or does not apply — must cite the specific evidence found (or its absence). Generic phrases such as "se verificó", "cumple", or "no aplica" without justification are invalid.
 - `confianza`: float 0.0–1.0
 - `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
 
@@ -135,6 +133,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` when the rule doesn't apply to the billing modality (e.g. F19 PGP/cápita for an event-based contract).
    - **`evidencia`**: mandatory explicit calculation for tariff rules. Format: `"{CUPS}: esperado={X} ({fuente, línea CSV}); cobrado={Y}; delta={Y-X} ({pct}%)"`. For anti-fraud rules (F32–F42), follow the evidence templates in `checklist_base.md §5` exactly — each pattern has a required format.
+   - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual financial evidence found. `pass`: cite the tariff source and the matching calculation (e.g. `"CUPS 890201: tarifario_contrato_eps_2026.csv línea 47, precio_base=$85.000; cobrado=$85.000 — coincide exactamente"`). `fail`: cite the discrepancy with the full calculation (e.g. `"CUPS 893150: esperado=$42.000 (ISS 2001 ×1.4 UVB 2026); cobrado=$65.000; delta=+$23.000 (54.8%) — F13 supera umbral"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"Contrato por eventos — F19 cápita no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: `0.95+` for exact numeric comparisons, `0.80–0.95` for plan coverage interpretation, `<0.80` for any anti-fraud rule forces escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `checklist_base.md §8`.
 

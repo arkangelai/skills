@@ -181,8 +181,7 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
    y/o aceptaciones por cada hallazgo.
 
    Atentamente,
-   {EPS_LEGAL_REPRESENTATIVE}
-   {Title}
+   Equipo Auditoría Médica
    ```
 
    > The user-facing email body stays in Spanish because the IPS is a Colombian provider — legal language and habit require it. Internal prose and comments stay in English.

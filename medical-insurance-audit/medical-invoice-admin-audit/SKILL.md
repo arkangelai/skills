@@ -50,6 +50,7 @@ Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contrat
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
 - `evidencia`: citable string — file + page/section + literal quote
+- `observaciones`: mandatory per-rule explanation stating explicitly why the rule passed, failed, or does not apply — must cite the specific evidence found (or its absence). Generic phrases such as "se verificó", "cumple", or "no aplica" without justification are invalid.
 - `confianza`: float 0.0–1.0
 - `glosa_sugerida`: object (only when `resultado = "fail"`), else `null`
 
@@ -134,6 +135,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
      2. Document reference: `"Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30, archivo autorizacion.pdf"`.
      3. External query result: `"BDUA consultada 2026-04-21 14:28; afiliado activo, régimen contributivo, plan ORO"`.
      Never use vague statements like `"se verifica en HC"` without a specific citation.
+   - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual evidence found. `pass`: cite the document, field, or system query that confirms compliance (e.g. `"BDUA 2026-04-21: afiliado activo régimen contributivo, plan ORO, sin novedad de retiro"`). `fail`: cite the specific discrepancy and where it was found (e.g. `"RIPS AC campo numDocumento = '12345678'; HC p.1 cédula = '123456780' — dígito extra"`). `n/a`: explain why the rule structurally cannot apply to this case (e.g. `"Caso sin transporte de ambulancia — A14 no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use the causal map in `checklist_base.md §7` to assign `causal_num` and `causal_nombre`. `valor_glosado` may be `null` if the financial auditor will determine it.
 

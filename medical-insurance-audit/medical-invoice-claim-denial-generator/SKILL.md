@@ -16,13 +16,6 @@ required_environment_variables:
   - name: DEST_SOFTWARE_API_KEY
     prompt: API key / bearer token
     required_for: full functionality
-  - name: EPS_INSTITUTIONAL_TEMPLATE_PATH
-    prompt: Path to the EPS-branded HTML/Typst/LaTeX glosa template
-    help: If missing, the skill uses the generic Res. 3047-compliant template
-    required_for: optional
-  - name: EPS_LEGAL_REPRESENTATIVE
-    prompt: Name and title of the signer (lead medical auditor / legal representative)
-    required_for: full functionality
 ---
 
 # medical-invoice-claim-denial-generator
@@ -94,7 +87,7 @@ The skill uploads the PDF to the destination software and returns:
 3. **Disputed invoice** — `num_factura`, CUV, `fecha_atencion`, `fecha_factura`, patient, `total_facturado`.
 4. **Executive summary** — table with `total_facturado`, `total_objetado`, `total_aprobado`; causales applied with item counts.
 5. **Detailed findings** — one block per `hallazgo` item where `hallazgo ∈ {glosa, devolucion}`, including: `causal_num`, `causal_nombre`, `valor_objetado`, legal justification (Res. 3047 Anexo 6 reference), clinical/technical justification, and `evidencia` verbatim.
-6. **Right of response + signature** — "15 días hábiles (Art. 6 Res. 3047/2008)" deadline; `EPS_LEGAL_REPRESENTATIVE` name and title.
+6. **Right of response + signature** — "15 días hábiles (Art. 6 Res. 3047/2008)" deadline.
 
 **Versioning invariant:** each call creates a new version (`v{n+1}`). Never overwrite. The destination software must keep all versions in `documents[]`.
 
@@ -113,7 +106,7 @@ The skill uploads the PDF to the destination software and returns:
    ```
    List existing versions. New version = `max(version) + 1`, default `v1`.
 
-3. **Load the template.** If `EPS_INSTITUTIONAL_TEMPLATE_PATH` exists, use it. Otherwise use a generic template with the required structure:
+3. **Load the generic template.** Use the generic Res. 3047-compliant template with the required structure:
 
    ### PDF structure
 
@@ -234,7 +227,6 @@ The skill uploads the PDF to the destination software and returns:
 - **Symptom:** evidence truncated in the table. **Cause:** cells with long text and no wrap. **Fix:** set `word-break: break-word` / `break-anywhere: true` for evidence cells.
 - **Symptom:** totals mismatch (`total_objetado > invoice_total`). **Cause:** findings with the same invoice_item summed multiple times. **Fix:** this skill does NOT sum — use `case_summary.total_objetado` directly from the consolidator.
 - **Symptom:** a glosa was generated even though the zone is green. **Cause:** the skill ran without checking labels. **Fix:** first step: `GET /cases/{id}/labels` — abort if `auto-approve` is present.
-- **Symptom:** signer is blank in the PDF. **Cause:** `EPS_LEGAL_REPRESENTATIVE` unset. **Fix:** required variable; fail loudly if empty (do not publish unsigned PDFs).
 - **Symptom:** the IPS claims the PDF is legally invalid. **Cause:** missing explicit citation to Res. 3047 in the footer and per causal. **Fix:** template must hardcode legal references, not leave them optional.
 - **Symptom:** `v2` regeneration does not reflect fix-review changes. **Cause:** skill read a stale consolidated (cached). **Fix:** always re-fetch `GET /cases/{id}/consolidated` at start; never trust in-memory state.
 
