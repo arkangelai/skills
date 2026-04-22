@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-medical-audit
-description: Runs the clinical-pertinence audit of a Colombian medical invoice (valid CIE-10 diagnosis, adherence to MinSalud Guías de Práctica Clínica, signed medical order with RETHUS-registered professional, procedures with indication and operative note, medications with correct dose/duration, justified diagnostic aids, inpatient stay with admission criteria and daily progress, and epicrisis with discharge plan). Publishes findings with citations to the clinical history in the destination software. Use it when the user asks to audit the clinical side of a case, review procedure pertinence, or run the medical sub-agent of the pipeline.
+description: Runs the clinical-pertinence audit of a Colombian medical invoice (valid CIE-10 diagnosis, adherence to MinSalud Guías de Práctica Clínica, signed medical order with RETHUS-registered professional, procedures with indication and operative note, medications with correct dose/duration, justified diagnostic aids, inpatient stay with admission criteria and daily progress, and epicrisis with discharge plan). Generates medical_checklist_output.json with findings cited to the clinical history. Use it when the user asks to audit the clinical side of a case, review procedure pertinence, or run the medical sub-agent of the pipeline.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -10,12 +10,6 @@ metadata:
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 required_environment_variables:
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
   - name: REF_DATA_PATH
     prompt: Folder with rethus_snapshot.json, mipres_catalog.json
     required_for: full functionality
@@ -71,7 +65,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+Generate `medical_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **`resultado`, `confianza`, and `glosa_sugerida`** follow the same rules as admin-audit. Evidence must cite the clinical document: `"HC ingreso p.3: motivo consulta dolor hipocondrio derecho..."`.
 
@@ -94,11 +88,8 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 ## Procedure
 
-1. **Read the case and clinical attachments.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-   ```
-   Download: `clinical_history`, `epicrisis`, `operative_note` (if there is a surgical CUPS), `orden_medica`, `consentimiento_informado`, `administracion_medicamentos`, `interconsultas`.
+1. **Load inputs.**
+   Read `metadata_input.json` from the working directory. Load the listed clinical attachments from the paths in `documentos[]`: `clinical_history`, `epicrisis`, `operative_note` (if there is a surgical CUPS), `orden_medica`, `consentimiento_informado`, `administracion_medicamentos`, `interconsultas`.
 
 2. **Load clinical ref_data.**
    - `guias-clinicas/INDEX.md` + `guias-clinicas/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
@@ -139,7 +130,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    - `clasificacion`: `"Clinico"`.
    - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding.
 
-   Publish via `POST /cases/{case_id}/audits` plus each finding individually.
+   Generate `medical_checklist_output.json` from scratch and write to the working directory.
 
 6. **Mandatory evidence citation.**
    - Format: `{file} p.{N}[, section "X"][, line "Y"]`.
@@ -158,7 +149,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 ## Verification
 
-- `GET /cases/{case_id}/audits?type=medical` returns exactly 1 record with 29 evaluated rules.
+- `medical_checklist_output.json` exists in the working directory and contains exactly 1 record with 29 evaluated rules.
 - Every finding with `resultado=fail` has `evidencia` referencing a specific file and location.
 - If `concepto_final ≠ APTA`, at least one critical rule has `resultado=fail` OR `confianza < 0.75` on a critical rule.
 - The skill did NOT read `admin_audit` nor `financial_audit` (independence).

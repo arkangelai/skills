@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-claim-denial-gmail-sender
-description: Sends the final glosa (claim denial) of a medical invoice to the IPS via Gmail using `gogcli`, with the formal PDF attached, an executive summary in the body, a reference to the 15 business-day response deadline (Res. 3047/2008 Art. 6), recipient resolved from the original filing email or from `contratos_ips.json`, and delivery confirmation (message_id) recorded in the destination software. Labels the case as `claim-denial-sent`. Use it once the case is `claim-denial-ready` and the final PDF is approved.
+description: Sends the final glosa (claim denial) of a medical invoice to the IPS via Gmail using `gogcli`, with the formal PDF attached, an executive summary in the body, a reference to the 15 business-day response deadline (Res. 3047/2008 Art. 6), recipient resolved from the original filing email or from `contratos_ips.json`, and delivery confirmation recorded in delivery-log.json. Sets the case status to `claim-denial-sent` in output.json. Use it once the case is `claim-denial-ready` and the final PDF is approved.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -17,12 +17,6 @@ required_environment_variables:
   - name: GMAIL_SENDER_ADDRESS
     prompt: Address the glosa is sent from (e.g. glosas@eps.com)
     required_for: full functionality
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
   - name: REF_DATA_PATH
     prompt: Folder with contratos_ips.json (fallback recipient resolution)
     required_for: full functionality
@@ -30,7 +24,7 @@ required_environment_variables:
 
 # medical-invoice-claim-denial-gmail-sender
 
-Last skill of the pipeline. Takes the human-approved glosa (label `claim-denial-ready`) and sends it to the IPS via Gmail, preserving the original filing thread when possible, attaching the PDF, and recording delivery in the destination software.
+Last skill of the pipeline. Takes the human-approved glosa (label `claim-denial-ready`) and sends it to the IPS via Gmail, preserving the original filing thread when possible, attaching the PDF, and recording delivery in `delivery-log.json`.
 
 The question it answers: **how do I formally deliver the glosa to the IPS with traceability and thread continuity?**
 
@@ -100,7 +94,7 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
 }
 ```
 
-**`notification_date`** (set on the case as `PATCH /cases/{caso_id}`) is the legal base date for the 15 business-day IPS response deadline per Res. 3047/2008 Art. 6. It must match `sent_at` date exactly.
+**`notification_date`** (written to `output.json resumen.notification_date`) is the legal base date for the 15 business-day IPS response deadline per Res. 3047/2008 Art. 6. It must match `sent_at` date exactly.
 
 **Email body invariants:**
 - Subject format: `[GLOSA] RAD {rad} — Factura {num_factura} — IPS {prestador}`
@@ -113,26 +107,15 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
 1. **Pre-flight checks.**
    ```bash
    gogcli --version
-   test -n "$DEST_SOFTWARE_API_KEY" && test -n "$GMAIL_SENDER_ADDRESS" || exit 1
+   test -n "$GMAIL_SENDER_ADDRESS" || exit 1
    ```
 
-   Validate the case state:
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/labels
-   ```
-   - Must contain `claim-denial-ready`.
-   - Must NOT contain `claim-denial-sent` (abort with a clear message if already sent).
+   Validate the case state by reading `output.json` from the working directory:
+   - `resumen.label` must be `claim-denial-ready`.
+   - `resumen.status` must NOT be `claim_denial_sent` (abort with a clear message if already sent).
 
-2. **Fetch the latest PDF.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/documents?tipo=claim_denial
-   ```
-   Pick the highest version (e.g. `v3`).
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/documents/{doc_id}/content
-   ```
-   Save as `/tmp/glosa/{rad}-{version}.pdf`.
+2. **Locate the latest PDF.**
+   List `claim_denial.v*.pdf` files in the working directory. Pick the highest version (sort by numeric version suffix descending). Copy to `/tmp/glosa/{rad}-{version}.pdf` for sending.
 
 3. **Resolve the IPS recipient.**
 
@@ -213,27 +196,21 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
    - The Gmail API confirms `labelIds: ["SENT"]` on the message.
    - If the IPS provider returns a bounce (DSN), `gogcli` will detect it within minutes → apply error label + alert.
 
-7. **Record in the destination software.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/claim-denial-delivery
+7. **Record delivery.**
+   Append the delivery record to `delivery-log.json` in the working directory:
+   ```json
    {
      "sent_at": "2026-04-15T17:45:00Z",
      "sent_message_id": "...",
      "thread_id": "...",
      "recipient_to": "glosas@ipsabc.com",
-     "recipient_cc": [...],
+     "recipient_cc": [],
      "claim_denial_version": "v3",
-     "pdf_document_id": "...",
      "channel": "gmail"
    }
    ```
 
-   Apply label and update status:
-   ```
-   POST /cases/{id}/labels   { "name": "claim-denial-sent" }
-   DELETE /cases/{id}/labels/claim-denial-ready
-   PATCH /cases/{id}         { "status": "claim_denial_sent", "notification_date": "2026-04-15" }
-   ```
+   Then update `output.json`: set `resumen.label = "claim-denial-sent"`, `resumen.status = "claim_denial_sent"`, and `resumen.notification_date = "{sent_at date}"` (this is the legal base for the 15 business-day IPS response deadline).
 
 8. **Return the summary.**
    ```json
@@ -263,11 +240,11 @@ Pre-flight: abort if case label `claim-denial-sent` is already present. Verify `
 ## Verification
 
 - The case has label `claim-denial-sent` and not `claim-denial-ready`.
-- `GET /cases/{id}/claim-denial-delivery` returns the delivery with a non-empty `sent_message_id`.
+- `delivery-log.json` contains the entry with a non-empty `sent_message_id`.
 - In Gmail, the message exists in `SENT` with correct `X-Case-Id` and `X-RAD` headers.
 - The `thread_id` of the sent message matches the original filing email's (when applicable).
-- The attachment in the sent message has the same `sha256` as the PDF in the destination software.
-- `notification_date` is set on the case — this is the legal base for the 15 business-day deadline.
+- The attachment in the sent message has the same `sha256` as the local `claim_denial.{version}.pdf`.
+- `output.json resumen.notification_date` is set — this is the legal base for the 15 business-day deadline.
 
 ## References
 

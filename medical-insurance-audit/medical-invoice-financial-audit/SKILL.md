@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-financial-audit
-description: Runs the financial and anti-fraud audit of a Colombian medical invoice (active IPS contract with modality, affiliate plan and applicable tariff sheet, SOAT/ISS/proprietary manual with correct UVB/UVR, CUPS/CUM/INVIMA homologation, liquidation with surcharges and surgical access rules, packages vs. events, coverage limits and grace periods, copays, and 14 anti-fraud rules covering DIAN consecutive numbering, double-billing SOAT+EPS+ARL, overlapping stays, post-mortem services, upcoding, and unbundling). Publishes findings to the destination software. Use it when the user asks to audit tariffs/contracts/fraud or run the financial sub-agent of the pipeline.
+description: Runs the financial and anti-fraud audit of a Colombian medical invoice (active IPS contract with modality, affiliate plan and applicable tariff sheet, SOAT/ISS/proprietary manual with correct UVB/UVR, CUPS/CUM/INVIMA homologation, liquidation with surcharges and surgical access rules, packages vs. events, coverage limits and grace periods, copays, and 14 anti-fraud rules covering DIAN consecutive numbering, double-billing SOAT+EPS+ARL, overlapping stays, post-mortem services, upcoding, and unbundling). Generates financial_checklist_output.json. Use it when the user asks to audit tariffs/contracts/fraud or run the financial sub-agent of the pipeline.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -10,12 +10,6 @@ metadata:
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 required_environment_variables:
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
   - name: REF_DATA_PATH
     prompt: Folder with tarifario_contractual.csv, contratos_ips.json, plan_afiliados.json, bdua.json, ruaf_snapshot.json
     required_for: full functionality
@@ -87,7 +81,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+Generate `financial_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **Evidence format for tariff rules (mandatory):** `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"`. Never use generic descriptions like "tariff mismatch".
 
@@ -111,11 +105,8 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 ## Procedure
 
-1. **Read the case and attachments.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-   ```
-   Download: `invoice_xml`, `rips`, `clinical_history` (to validate services actually delivered), `authorization`.
+1. **Load inputs.**
+   Read `metadata_input.json` from the working directory. Load `invoice_xml`, `rips`, `clinical_history` (to validate services actually delivered), and `authorization` from the paths in `documentos[]`.
 
 2. **Load financial ref_data.**
    - `$REF_DATA_PATH/tarifario_contractual.csv` — columns: `ips_nit,cups,manual,version,uvb_factor,precio_base,precio_noche,precio_festivo,vigente_desde,vigente_hasta,plan`.
@@ -151,9 +142,9 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
    - `valor_facturado`, `valor_aprobado`, `valor_glosado`: compute from the invoice items and all failing rule `valor_glosado` values. `valor_glosado ≤ valor_facturado` always; if not, there is a calculation error — escalate.
    - `resumen_ejecutivo`: 1–2 sentences mentioning the tariff applied, the plan, and total disputed amount.
 
-6. **Publish the checklist.**
+6. **Generate the output.**
 
-   `POST /cases/{case_id}/audits` with the full filled checklist, plus each individual finding. Mandatory financial evidence shows the explicit calculation — `checklist_base.md §2.2` details the required format per rule type.
+   Generate `financial_checklist_output.json` from scratch and write to the working directory. Mandatory financial evidence shows the explicit calculation — `checklist_base.md §2.2` details the required format per rule type.
 
 ## Pitfalls
 
@@ -168,7 +159,7 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 ## Verification
 
-- `GET /cases/{case_id}/audits?type=financial` returns exactly 1 record with 42 evaluated rules.
+- `financial_checklist_output.json` exists in the working directory and contains exactly 1 record with 42 evaluated rules.
 - Every finding with `resultado=fail` has an explicit calculation in `evidencia` (expected, charged, delta).
 - Total `valor_glosado` ≤ `invoice_total`.
 - Any failing critical rule → `concepto_final ≠ APTA`.

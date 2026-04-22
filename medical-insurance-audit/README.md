@@ -10,7 +10,7 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 
 ```
                  ┌─────────────────────────────┐
-                 │ 1. gmail-intake             │  (Gmail → destination software)
+                 │ 1. gmail-intake             │  (Gmail → generates metadata_input.json)
                  └─────────────┬───────────────┘
                                │ case_id
          ┌─────────────────────┼─────────────────────┐
@@ -43,35 +43,33 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 
 | # | Name | Dependencies |
 |---|---|---|
-| 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | gogcli, destination software |
-| 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | destination software, `bdua.json`, `contratos_ips.json` |
-| 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | destination software, `guias-clinicas/` |
-| 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | destination software, `tarifario_contractual.csv`, `contratos_ips.json`, `plan_afiliados.json`, `bdua.json` |
-| 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | destination software, outputs from 3-4-5 |
-| 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | destination software, PDF rendering engine |
-| 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | destination software, skill 7 |
-| 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | gogcli, destination software |
+| 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | gogcli |
+| 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `metadata_input.json`, `bdua.json`, `contratos_ips.json` |
+| 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `metadata_input.json`, `guias-clinicas/` |
+| 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `metadata_input.json`, `tarifario_contractual.csv`, `contratos_ips.json`, `plan_afiliados.json`, `bdua.json` |
+| 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | outputs from skills 3-4-5 |
+| 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `metadata_input.json`, `output.json`, PDF rendering engine |
+| 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json`, `comments.json`, skill 7 |
+| 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | gogcli, `output.json`, `claim_denial.v*.pdf` |
 
 ## Shared environment variables
 
-Every skill except the Gmail ones assumes the **destination software** exposes a REST API or CLI. Until the final software is chosen, each skill documents the expected endpoints and uses placeholders.
-
 | Variable | Used by | Purpose |
 |---|---|---|
-| `DEST_SOFTWARE_BASE_URL` | 1, 3-9 | Base URL of the destination software API |
-| `DEST_SOFTWARE_API_KEY` | 1, 3-9 | API key or bearer token |
 | `GOGCLI_CREDENTIALS_PATH` | 1, 9 | Path to `gogcli` OAuth credentials |
 | `GMAIL_WATCH_LABEL` | 1 | Label to watch (e.g. `INBOX`) |
 | `GMAIL_SENDER_ADDRESS` | 9 | Address the glosa is sent from |
-| `REF_DATA_PATH` | 3, 4, 5 | Folder with reference JSON/CSV mocks |
+| `REF_DATA_PATH` | 3, 4, 5 | Folder with reference JSON/CSV files (`bdua.json`, `contratos_ips.json`, etc.) |
 
-## Standard labels (destination software)
+## Workflow states
 
-| Label | Meaning | Applied by |
+Each skill reads and writes status from `output.json resumen.label` and `resumen.status`. The table below documents the vocabulary:
+
+| Label / status | Meaning | Set by |
 |---|---|---|
-| `medical-invoice/intake` | Email classified as a medical invoice | skill 1 |
-| `medical-invoice/not-applicable` | Not a medical invoice | skill 1 |
-| `medical-invoice/error` | Intake error | skill 1 |
+| `medical-invoice/intake` | Email classified as a medical invoice (Gmail label) | skill 1 |
+| `medical-invoice/not-applicable` | Not a medical invoice (Gmail label) | skill 1 |
+| `medical-invoice/error` | Intake error (Gmail label) | skill 1 |
 | `auto-approve` | Green zone, automatic approval | skill 6 |
 | `needs-human-review` | Yellow zone or low confidence | skill 6 |
 | `auto-denial` | Red zone, automatic glosa | skill 6 |

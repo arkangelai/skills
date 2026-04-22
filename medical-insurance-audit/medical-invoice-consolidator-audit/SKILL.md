@@ -10,12 +10,6 @@ metadata:
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 required_environment_variables:
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
 ---
 
 # medical-invoice-consolidator-audit
@@ -42,7 +36,7 @@ Reads the three filled checklists published by the parallel audit skills:
 | `PERT-CLIN` (médico) | `medical-invoice-medical-audit` | `../medical-invoice-medical-audit/checklist_base.json` — 29 rules (M01–M29) |
 | `FIN-CTR` (financiero) | `medical-invoice-financial-audit` | `../medical-invoice-financial-audit/checklist_base.json` — 42 rules (F01–F42) |
 
-Fetch via `GET /cases/{case_id}/audits` — validate that all three `instrumento` values are present; abort if any is missing.
+Read `admin_checklist_output.json`, `medical_checklist_output.json`, and `financial_checklist_output.json` from the working directory. Validate all three `instrumento` values are present; abort if any file is missing or its `instrumento` field is wrong.
 
 Also reads `factura.pdf` directly to populate the `factura` block in the output. The `factura` block is **never copied from `metadata_input.json`** — fields like `paciente_nombre`, `paciente_documento`, `diagnostico_principal`, and `total_facturado` come from the invoice document, not from the filing envelope.
 
@@ -50,7 +44,7 @@ Also reads `factura.pdf` directly to populate the `factura` block in the output.
 
 **Template:** `output.json` in this directory — canonical structure for `hallazgos[]` (per CUPS item) and `resumen`. See `output.md` for detailed field-by-field specifications.
 
-The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Publish to `POST /cases/{caso_id}/consolidated` and persist as `output.json`.
+The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Generate from scratch using the `output.json` template as the schema reference. Write to the working directory.
 
 **`hallazgo` values (item level):**
 - `conforme`: all layers passed for this item. `capa`, `reglas_aplicadas`, `severidad`, `glosa_sugerida` are all `null`; `valor_glosado = 0`.
@@ -69,11 +63,8 @@ The skill produces the canonical `output.json` — single source of truth for th
 
 ## Procedure
 
-1. **Read the three audits for the case.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits
-   ```
-   Validate that all three `audit_type` values exist: `admin`, `medical`, `financial`. If any is missing, abort and leave a note on the case.
+1. **Load the three audit outputs.**
+   Read `admin_checklist_output.json`, `medical_checklist_output.json`, and `financial_checklist_output.json` from the working directory. Validate all three `instrumento` values are present; abort if any file is missing or its `instrumento` field is wrong.
 
 2. **Collect every finding with `resultado=fail` or `conditional`.**
    Ignore `pass` — they do not produce findings for a glosa.
@@ -120,9 +111,9 @@ The skill produces the canonical `output.json` — single source of truth for th
    - `total_a_pagar` = `invoice_total - total_glosado`.
    - `confianza_global` = weighted average by `peso`.
 
-8. **Publish the consolidated object.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/consolidated
+8. **Generate output.json.**
+   Using the `output.json` template as the schema reference, build the consolidated object from scratch. Example shape:
+   ```json
    {
      "hallazgos": [
        {
@@ -151,15 +142,16 @@ The skill produces the canonical `output.json` — single source of truth for th
        "total_glosado": 1200000,
        "total_a_pagar": 7300000,
        "concepto_final": "NO_APTA",
-       "accion_requerida": "Rechazo"
+       "accion_requerida": "Rechazo",
+       "label": "auto-denial",
+       "tags": ["consolidated"],
+       "status": "consolidated"
      }
    }
    ```
+   Write to `output.json` in the working directory.
 
-9. **Apply workflow labels.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/labels
-   ```
+9. **Set the workflow label.**
 
    Decision matrix:
 
@@ -172,31 +164,25 @@ The skill produces the canonical `output.json` — single source of truth for th
    | Red | ≥ 0.7 | Yes (e.g. admin says OK, financial says fraud) | `needs-fix-review` |
    | Red | < 0.7 | - | `needs-human-review` |
 
-   Always add: `consolidated`.
-
-10. **Update the case status.**
-    ```
-    PATCH {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-    { "status": "consolidated", "zona": "...", "total_glosado": ... }
-    ```
+   Set `output.json resumen.label` to the determined label. Set `resumen.tags = ["consolidated"]`. Set `resumen.status = "consolidated"`, `resumen.zona`, and `resumen.total_glosado`. Ensure only one mutually exclusive label is set before writing.
 
 ## Pitfalls
 
 - **Symptom:** consolidated `total_glosado` exceeds `invoice_total`. **Cause:** summing `valor_glosado` per rule rather than per item. **Fix:** when totalling, group by invoice item and take one `valor_glosado` per item (from the most severe rule), not the sum across all rules.
 - **Symptom:** causal assignment picks wrong causal when multiple rules apply. **Cause:** ranking not applied. **Fix:** always apply severity ranking 4 > 2 > 5 > 1 > 3 > 6 > 7; ties broken by `valor_glosado`.
 - **Symptom:** yellow zone but a critical rule fails. **Cause:** zone logic evaluated before the critical-rule gate. **Fix:** any critical `fail` ALWAYS forces red zone regardless of other findings.
-- **Symptom:** two labels applied simultaneously (`auto-denial` and `needs-human-review`). **Cause:** previous label not removed. **Fix:** before applying, `DELETE /cases/{id}/labels/*` for mutually exclusive labels.
+- **Symptom:** two mutually exclusive labels in `output.json`. **Cause:** previous label not cleared before writing. **Fix:** ensure only one mutually exclusive label is set in `output.json resumen.label` before writing the file.
 - **Symptom:** contradictions between auditors go undetected (`needs-fix-review` never fires). **Cause:** contradiction check compares only `fail` findings, missing when one says `pass` and another `fail` on the same item. **Fix:** cross by invoice_item as well; if admin passes and financial fails on the same item → contradiction.
 
 ## Verification
 
-- `GET /cases/{case_id}/consolidated` returns an object with `consolidated_findings[]` and `case_summary`.
+- `output.json` exists in the working directory and contains the consolidated object.
 - Every finding has `causal_num` ∈ `{1,2,3,4,5,6,7}` OR `causal_num = null` with `concepto_final = ESCALAR_HUMANO`.
 - `total_glosado ≤ invoice_total`.
-- Exactly one decision label applied (`auto-approve`, `needs-human-review`, `auto-denial`, `needs-fix-review`).
+- Exactly one decision label set in `output.json resumen.label` (`auto-approve`, `needs-human-review`, `auto-denial`, `needs-fix-review`).
 - If `zona=roja`, label is `auto-denial` or `needs-fix-review`, never `auto-approve`.
 - `resumen_por_capa` contains a non-empty string for each of the three layers.
-- Case status is `consolidated`.
+- `output.json resumen.status` is `consolidated`.
 
 ## References
 

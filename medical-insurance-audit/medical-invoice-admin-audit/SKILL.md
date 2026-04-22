@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-admin-audit
-description: Runs the administrative audit of a filed Colombian medical invoice (patient identity, BDUA affiliation, IPS contract, RIPS structure, DIAN invoice, prior authorization, signed clinical history, cross-document consistency, and filing timeliness). Emits findings with traceable evidence and publishes them to the destination software. Use it when the user asks to audit the administrative side of a case, resume a failed audit, or run the admin sub-agent of the pipeline.
+description: Runs the administrative audit of a filed Colombian medical invoice (patient identity, BDUA affiliation, IPS contract, RIPS structure, DIAN invoice, prior authorization, signed clinical history, cross-document consistency, and filing timeliness). Emits findings with traceable evidence and generates admin_checklist_output.json. Use it when the user asks to audit the administrative side of a case, resume a failed audit, or run the admin sub-agent of the pipeline.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -10,12 +10,6 @@ metadata:
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 required_environment_variables:
-  - name: DEST_SOFTWARE_BASE_URL
-    prompt: Base URL of the destination software
-    required_for: full functionality
-  - name: DEST_SOFTWARE_API_KEY
-    prompt: API key / bearer token
-    required_for: full functionality
   - name: REF_DATA_PATH
     prompt: Folder with bdua.json, contratos_ips.json
     help: Usually /ref_data/ synced from Drive (see issue #38)
@@ -41,7 +35,7 @@ The question it answers: **is the expediente formally complete and consistent en
 
 **Template:** `metadata_input.json` produced by `medical-invoice-gmail-intake` — 8 flat fields (`caso_id`, `fecha_radicacion`, `num_factura`, `prestador_nit`, `prestador_nombre`, `pagador_nit`, `pagador_nombre`, `documentos`). See `../medical-invoice-gmail-intake/metadata_input.json` for the canonical shape.
 
-Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contratos_ips.json` (IPS contracts). Fetches each document listed in `documentos` from the destination software.
+Additionally loads from `$REF_DATA_PATH`: `bdua.json` (affiliation) and `contratos_ips.json` (IPS contracts). Loads each document listed in `metadata_input.json.documentos` from the local working directory.
 
 ## Output Contract
 
@@ -68,7 +62,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Publish to `POST /cases/{caso_id}/audits` and return the complete filled checklist.
+Generate `admin_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **Rules for `resultado`:**
 - `pass` — rule satisfied with evidence.
@@ -100,29 +94,15 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
 ## Procedure
 
-1. **Read the case from the destination software.**
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}
-   Authorization: Bearer {DEST_SOFTWARE_API_KEY}
-   ```
-   Retrieve: `ips_nit`, `invoice_number`, `service_date`, `patient_document`, `attachments[]`, `cups_principales[]`.
+1. **Load inputs from the working directory.**
+   - Read `metadata_input.json` to get `ips_nit`, `invoice_number`, `service_date`, `patient_document`, `documentos[]`, `cups_principales[]`.
+   - Load each attachment from the paths listed in `documentos[]` — `invoice_xml`, `rips`, `clinical_history`, `authorization`, `epicrisis`, `operative_note` (if applicable given the CUPS).
 
-2. **Download the necessary attachments.**
-   - `invoice_xml` (DIAN invoice)
-   - `rips` (flat file or JSON)
-   - `clinical_history` (PDF)
-   - `authorization` (if any)
-   - `epicrisis`, `operative_note` (if applicable given the CUPS)
-
-   ```
-   GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/attachments/{name}
-   ```
-
-3. **Load ref_data.**
+2. **Load ref_data.**
    - `$REF_DATA_PATH/bdua.json` — affiliation state.
    - `$REF_DATA_PATH/contratos_ips.json` — active IPS contracts.
 
-4. **Run the DAMA-UK rule checklist.**
+3. **Run the DAMA-UK rule checklist.**
 
    Load `checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a SOAT/ADRES payer in `contratos_ips.json`, load `checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
 
@@ -141,25 +121,17 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 
    See `checklist_base.md §6` for filled pass/fail examples.
 
-5. **Compute `cierre` and complete the checklist.**
+4. **Compute `cierre` and complete the checklist.**
 
    Once all rules are filled, compute and append the `cierre` block per `checklist_base.md §2.4`:
    - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`:
    - `clasificacion`: `"Administrativo"`.
    - `resumen_ejecutivo`: 1–2 sentences mentioning any critical finding explicitly.
 
-6. **Publish the result to the destination software.**
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits
-   { ...admin_audit }
-   ```
+5. **Generate the output.**
+   Using `checklist_base.json` as the schema template, generate `admin_checklist_output.json` from scratch with all filled rules, `meta`, and `cierre`. Write to the working directory.
 
-   Publish each finding individually as well, so humans can comment on each:
-   ```
-   POST {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits/{audit_id}/findings
-   ```
-
-7. **Emit detailed evidence.**
+6. **Emit detailed evidence.**
    Each `finding.evidencia` must be **citable**: file + section/line/page.
    Valid example: `"US.txt line 1, field 3: document=CC12345678; BDUA: document=CC87654321"`.
    Invalid example: `"identity mismatch"` (no citation).
@@ -170,13 +142,12 @@ Publish to `POST /cases/{caso_id}/audits` and return the complete filled checkli
 - **Symptom:** ADMIN.06 flags an expired contract that is actually active. **Cause:** `contratos_ips.json` has dates in DD/MM/YYYY while the service uses ISO. **Fix:** explicitly parse with `datetime.strptime` — never trust implicit parsing.
 - **Symptom:** ADMIN.10 fails because `numFactura` has leading zeros in `AF` but not in `AC`. **Cause:** inconsistent padding by the IPS. **Fix:** normalize (`lstrip('0')`) before comparing.
 - **Symptom:** false positives in ADMIN.17 (HC without signature). **Cause:** the PDF carries a digital signature in metadata, not visible in the OCR text. **Fix:** inspect the PDF's `/Sig` dictionary in addition to text OCR.
-- **Symptom:** the admin audit was published but the consolidator does not see it. **Cause:** the aggregate object was published but not the individual findings (only one of the two endpoints). **Fix:** always publish both (step 6).
 - **Symptom:** BDUA says affiliate is inactive but they are actually active. **Cause:** local BDUA snapshot is stale (annual sync). **Fix:** if the critical BDUA rule fails, set `resultado=conditional` and let human-review query BDUA online.
 - **Symptom:** score fine, green zone, yet a critical rule failed. **Cause:** incorrect calculation — a failed critical forces the red zone. **Fix:** zone logic must first check if any Weight 3 rule has `resultado=fail`.
 
 ## Verification
 
-- `GET {DEST_SOFTWARE_BASE_URL}/cases/{case_id}/audits?type=admin` returns exactly one record with all 27 rules evaluated (each with a `resultado`).
+- `admin_checklist_output.json` exists in the working directory and contains exactly one record with all 27 rules evaluated (each with a `resultado`).
 - Every finding has a non-empty, citable `evidencia`.
 - No critical rule with `resultado=fail` coexists with `concepto_final=APTA` (invariant).
 - The skill did NOT read `medical_audit` nor `financial_audit` (independence is verifiable in logs).
