@@ -36,7 +36,6 @@
     "num_items": null,
     "num_conformes": null,
     "num_glosas": null,
-    "num_devoluciones": null,
     "tasa_objecion": null,
     "glosas_por_capa": {
       "administrativo": null,
@@ -44,6 +43,7 @@
       "financiero": null
     },
     "concepto_final": null,
+    "en_devolucion": null,
     "accion_requerida": null,
     "resumen_ejecutivo": null
   }

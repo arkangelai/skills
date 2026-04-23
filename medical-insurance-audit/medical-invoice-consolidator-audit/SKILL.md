@@ -1,6 +1,6 @@
 ---
 name: medical-invoice-consolidator-audit
-description: Consolidates the findings of the three audits (admin, medical, financial) for a Colombian medical invoice, groups failing rules by invoice item, builds per-layer narrative summaries (resumen_por_capa), assigns Anexo 6 causales (Res. 3047/2008 codes 1-7) to each finding using severity ranking, determines the case zone (red/yellow/green) by rule-based logic, and applies workflow labels (auto-approve, needs-human-review, auto-denial, needs-fix-review). Use it once the three audits have run and the case must advance to glosa generation or human review.
+description: Consolidates the findings of the three audits (admin, medical, financial) for a Colombian medical invoice, groups failing rules by invoice item, assigns Anexo 6 causales (Res. 3047/2008 codes 1-7) to each finding using severity ranking, and determines concepto_final and en_devolucion by rule-based logic. Use it once the three audits have run and the case must advance to glosa generation or human review.
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -14,9 +14,9 @@ required_environment_variables:
 
 # medical-invoice-consolidator-audit
 
-Unifies the outputs of the three sub-auditors (admin + medical + financial), groups failing rules by invoice item without deduplication, builds per-layer narrative summaries, assigns Anexo 6 causales (Res. 3047/2008), and labels the case for the next step.
+Unifies the outputs of the three sub-auditors (admin + medical + financial), groups failing rules by invoice item without deduplication, assigns Anexo 6 causales (Res. 3047/2008), and determines `concepto_final` and `en_devolucion` for the case.
 
-The question it answers: **given what the three audits found, which findings are real, which causal do they belong to, and what is the next step (auto-approve, human review, or auto-denial)?**
+The question it answers: **given what the three audits found, which findings are real, which causal do they belong to, and is the case APTA, glosada, or in devolucion?**
 
 ## When to Use
 
@@ -47,19 +47,28 @@ Also reads `factura.pdf` directly to populate the `factura` block in the output.
 The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Generate from scratch using the `output.json` template as the schema reference. Write to the working directory.
 
 **`hallazgo` values (item level):**
-- `conforme`: all layers passed for this item. `capa`, `reglas_aplicadas`, `severidad`, `glosa_sugerida` are all `null`; `valor_glosado = 0`.
-- `glosa`: formal objection with evidence; `valor_glosado > 0`, `glosa_sugerida` populated.
+- `conforme`: all layers passed for this item. `capa`, `regla_aplicada`, `severidad`, `glosa_sugerida` are all `null`; `valor_objetado = 0`.
+- `glosa`: formal objection with evidence; `valor_objetado > 0`, `glosa_sugerida` populated.
 
-`"devolucion"` is **case-level only** — expressed via `resumen.concepto_final = "DEVOLUCION"` when a global invalidity condition (e.g. expired contract, patient not affiliated) makes the whole invoice invalid.
+`devolucion` does not exist as an item-level hallazgo value — it is expressed via `resumen.en_devolucion = true` at the case level.
 
-**Money invariant:** `total_glosado = sum(hallazgos[].valor_glosado)`. Per item, `valor_a_reconocer = valor_facturado − valor_glosado`.
+**`regla_aplicada`**: single string ID of the most severe rule that triggered the hallazgo (not an array).
 
-**`concepto_final` decision logic (evaluated in order; first match wins):**
-1. `NO_APTA` + `accion_requerida: "Rechazo"` — any `critica` rule with `resultado = fail` that is not subsanable by document submission (e.g. missing HC entirely, expired contract, patient not covered on service date).
-2. `DEVOLUCION` + `accion_requerida: "Complemento"` — any `critica` rule with `resultado = fail` that is subsanable by the IPS submitting additional documents (e.g. missing authorization, missing operative note).
-3. `ESCALAR_HUMANO` + `accion_requerida: "Escalar"` — any `critica` rule with `confianza < 0.75`, OR anti-fraud rules F32–F36 with `confianza < 0.9`.
-4. `APTA` + `accion_requerida: null` — all rules pass, `tasa_objecion = 0.0`, no devoluciones.
-5. `APTA` + `accion_requerida: "Correccion"` — some glosas exist but all are partial and subsanable (`tasa_objecion > 0` but no critical fails).
+**`valor_objetado`**: the per-item objected amount (replaces any reference to `valor_glosado` per item).
+
+**`resumen` fields:**
+- `en_devolucion`: boolean — always present, never null.
+- `total_aprobado` (replaces `total_a_pagar`).
+- `resumen_ejecutivo`: 1–2 sentences for the dashboard.
+- Removed: `num_devoluciones`, `zona`, `label`, `tags`, `status`, `confianza_global`.
+
+**Money invariant:** `total_aprobado + total_glosado = total_facturado` always. Per item, `valor_a_reconocer = valor_facturado − valor_objetado`.
+
+**`concepto_final` and `en_devolucion` decision logic (evaluated in order; first match wins):**
+1. `APTA + en_devolucion=false + accion_requerida=null` — all items conforme across all three layers.
+2. `NO_APTA + en_devolucion=false + accion_requerida="Correccion"` — items glosados, no missing critical docs.
+3. `NO_APTA + en_devolucion=true + accion_requerida="Rechazo"` — any critica fail subsanable by document resubmission (missing authorization, missing HC, missing operative note). Takes priority even when glosas also exist. Still fill ALL item-level glosas and valor_objetado for expected recovery amount.
+4. When any critica rule has `confianza < 0.75`: emit best-guess verdict per rules 1–3, state uncertainty in `resumen_ejecutivo`. The task system handles escalation to human review.
 
 ## Procedure
 
@@ -72,19 +81,12 @@ The skill produces the canonical `output.json` — single source of truth for th
 3. **Group findings by invoice item (CUPS + date).**
    No deduplication — all failing rules are preserved. For each invoice item, collect every `rule_id` from every layer that flagged it into `reglas_aplicadas[]`. The detail evidence per rule stays in the individual checklist JSONs; callers read those directly if they need per-rule evidence.
 
-4. **Build per-layer narrative summaries (`resumen_por_capa`).**
-   For each of the three layers, write a 1–2 sentence Spanish paragraph summarizing what was found:
-   - `administrativo`: e.g. `"2 reglas críticas fallidas (A01, A08): CUV inválido y autorización ausente."`.
-   - `medico`: e.g. `"1 regla crítica fallida (M06): desviación de GPC sin justificación clínica."`.
-   - `financiero`: e.g. `"3 reglas fallidas (F13, F33, F37): sobretarifa H30103, duplicación y upcoding."`.
-   These are the at-a-glance summaries; full evidence is in each checklist JSON.
-
-5. **Prioritize findings** in this order:
+4. **Prioritize findings** in this order:
    - Severity descending: `critica > mayor > menor`.
    - Within the same severity: `valor_glosado` descending.
    - Within the same amount: `confianza` descending.
 
-6. **Assign an Anexo 6 causal to each finding** (Res. 3047 Art. 5):
+5. **Assign an Anexo 6 causal to each finding** (Res. 3047 Art. 5):
 
    | Causal | Name | Typical triggers |
    |---|---|---|
@@ -99,22 +101,35 @@ The skill produces the canonical `output.json` — single source of truth for th
    Rules:
    - Use the deterministic mapping table first.
    - If a finding's `reglas_aplicadas[]` maps to multiple causales, pick the most severe by ranking: 4 > 2 > 5 > 1 > 3 > 6 > 7. Ties broken by highest `valor_glosado`.
-   - If no mapping applies → set `causal_num = null` AND `concepto_final = ESCALAR_HUMANO`. A human reviewer assigns the causal during fix-review.
+   - If no mapping applies → set `causal_num = null` and document the unresolved causal in `resumen_ejecutivo`. The task system handles escalation to human review.
    - Assign the **subcausal** if Anexo 6 defines one (e.g. `3.1` clinical documentation, `3.2` administrative documentation).
 
-7. **Compute zone and amounts (rule-based, no score).**
-   - `zona`:
-     - Red: any `critica` rule with `resultado=fail` (regardless of confidence).
-     - Yellow: no critical fails, but ≥1 `mayor` rule with `resultado=fail`.
-     - Green: all applicable rules `pass` or only `menor` fails.
-   - `total_glosado` = Σ `valor_glosado` of failing findings (per item, not per rule — avoid double-counting the same item).
-   - `total_a_pagar` = `invoice_total - total_glosado`.
-   - `confianza_global` = weighted average by `peso`.
+6. **Compute amounts and flags.**
+   - `total_glosado` = Σ `valor_objetado` of glosa items (per item, not per rule — avoid double-counting).
+   - `total_aprobado` = `total_facturado − total_glosado`.
+   - `tasa_objecion` = `total_glosado / total_facturado × 100` (one decimal).
+   - `glosas_por_capa` = sum of `valor_objetado` for glosa items per layer.
+   - `en_devolucion` = `true` if any critica fail is subsanable by document resubmission; `false` otherwise.
+   - `concepto_final` = per decision logic above.
+   - `resumen_ejecutivo` = 1–2 sentences for the dashboard mentioning `concepto_final`, `en_devolucion`, and key findings.
 
-8. **Generate output.json.**
+7. **Generate output.json.**
    Using the `output.json` template as the schema reference, build the consolidated object from scratch. Example shape:
    ```json
    {
+     "caso_id": "RAD-20260402-FV08142",
+     "factura": {
+       "num_factura": "FE-2026-04871",
+       "prestador": "Clínica San Rafael",
+       "prestador_nit": "800.123.456-7",
+       "paciente_nombre": "Juan Pérez",
+       "paciente_documento": "CC 52489731",
+       "fecha_atencion": "2026-04-01",
+       "fecha_factura": "2026-04-10",
+       "diagnostico_principal": "K80.1 - Cálculo de la vesícula biliar",
+       "plan_afiliado": "PLATA",
+       "total_facturado": 8500000
+     },
      "hallazgos": [
        {
          "item": 1,
@@ -122,67 +137,57 @@ The skill produces the canonical `output.json` — single source of truth for th
          "descripcion": "Consulta especializada",
          "valor_facturado": 1500000,
          "hallazgo": "glosa",
-         "reglas_aplicadas": ["A15", "F20"],
-         "severidad": "critica",
-         "valor_glosado": 1200000,
-         "valor_a_reconocer": 300000,
-         "glosa_sugerida": { "causal_num": "6", "causal_nombre": "Agotamiento de cobertura", "texto": "Cupo anual $5M agotado; excedente $1.2M", "valor_glosado": 1200000, "moneda": "COP" },
-         "confianza": 0.92
+         "capa": "financiero",
+         "regla_aplicada": "F13",
+         "severidad": "mayor",
+         "valor_objetado": 300000,
+         "valor_a_reconocer": 1200000,
+         "confianza": 0.95,
+         "evidencia_requerida": null,
+         "glosa_sugerida": {
+           "causal_num": "5",
+           "causal_nombre": "Tarifa incorrecta",
+           "texto": "CUPS 890201: esperado=$1.200.000 (tarifario_contrato_eps_2026.csv); cobrado=$1.500.000; delta=+$300.000 (25%)",
+           "valor_glosado": 300000,
+           "moneda": "COP"
+         }
        }
      ],
-     "resumen_por_capa": {
-       "administrativo": "1 regla crítica fallida (A15): agotamiento de cupo anual.",
-       "medico": "Sin hallazgos.",
-       "financiero": "1 regla crítica fallida (F20): excede límite de cobertura contractual."
-     },
      "resumen": {
-       "zona": "roja",
-       "confianza_global": 0.92,
        "total_facturado": 8500000,
-       "total_glosado": 1200000,
-       "total_a_pagar": 7300000,
+       "total_aprobado": 8200000,
+       "total_glosado": 300000,
+       "num_items": 4,
+       "num_conformes": 3,
+       "num_glosas": 1,
+       "tasa_objecion": 3.5,
+       "glosas_por_capa": { "administrativo": 0, "medico": 0, "financiero": 300000 },
        "concepto_final": "NO_APTA",
-       "accion_requerida": "Rechazo",
-       "label": "auto-denial",
-       "tags": ["consolidated"],
-       "status": "consolidated"
+       "en_devolucion": false,
+       "accion_requerida": "Correccion",
+       "resumen_ejecutivo": "Factura con 1 glosa financiera (F13 sobretarifa CUPS 890201, $300.000). Concepto NO_APTA con corrección requerida."
      }
    }
    ```
    Write to `output.json` in the working directory.
 
-9. **Set the workflow label.**
-
-   Decision matrix:
-
-   | Zone | Global confidence | Contradictions between auditors | Label |
-   |---|---|---|---|
-   | Green | ≥ 0.7 | No | `auto-approve` |
-   | Green | < 0.7 | - | `needs-human-review` |
-   | Yellow | any | - | `needs-human-review` |
-   | Red | ≥ 0.7 | No | `auto-denial` |
-   | Red | ≥ 0.7 | Yes (e.g. admin says OK, financial says fraud) | `needs-fix-review` |
-   | Red | < 0.7 | - | `needs-human-review` |
-
-   Set `output.json resumen.label` to the determined label. Set `resumen.tags = ["consolidated"]`. Set `resumen.status = "consolidated"`, `resumen.zona`, and `resumen.total_glosado`. Ensure only one mutually exclusive label is set before writing.
+The `concepto_final` and `en_devolucion` fields drive the app-level workflow. The agent does not set `label`, `status`, or `zona` — those are derived by the task system from the output JSON.
 
 ## Pitfalls
 
 - **Symptom:** consolidated `total_glosado` exceeds `invoice_total`. **Cause:** summing `valor_glosado` per rule rather than per item. **Fix:** when totalling, group by invoice item and take one `valor_glosado` per item (from the most severe rule), not the sum across all rules.
 - **Symptom:** causal assignment picks wrong causal when multiple rules apply. **Cause:** ranking not applied. **Fix:** always apply severity ranking 4 > 2 > 5 > 1 > 3 > 6 > 7; ties broken by `valor_glosado`.
-- **Symptom:** yellow zone but a critical rule fails. **Cause:** zone logic evaluated before the critical-rule gate. **Fix:** any critical `fail` ALWAYS forces red zone regardless of other findings.
-- **Symptom:** two mutually exclusive labels in `output.json`. **Cause:** previous label not cleared before writing. **Fix:** ensure only one mutually exclusive label is set in `output.json resumen.label` before writing the file.
-- **Symptom:** contradictions between auditors go undetected (`needs-fix-review` never fires). **Cause:** contradiction check compares only `fail` findings, missing when one says `pass` and another `fail` on the same item. **Fix:** cross by invoice_item as well; if admin passes and financial fails on the same item → contradiction.
+- **Symptom:** contradictions between auditors go undetected. **Cause:** contradiction check compares only `fail` findings, missing when one says `pass` and another `fail` on the same item. **Fix:** cross by invoice_item as well; if admin passes and financial fails on the same item → document the contradiction in `resumen_ejecutivo`.
 
 ## Verification
 
 - `output.json` exists in the working directory and contains the consolidated object.
-- Every finding has `causal_num` ∈ `{1,2,3,4,5,6,7}` OR `causal_num = null` with `concepto_final = ESCALAR_HUMANO`.
-- `total_glosado ≤ invoice_total`.
-- Exactly one decision label set in `output.json resumen.label` (`auto-approve`, `needs-human-review`, `auto-denial`, `needs-fix-review`).
-- If `zona=roja`, label is `auto-denial` or `needs-fix-review`, never `auto-approve`.
-- `resumen_por_capa` contains a non-empty string for each of the three layers.
-- `output.json resumen.status` is `consolidated`.
+- Every finding has `causal_num` ∈ `{1,2,3,4,5,6,7}` OR `causal_num = null` (uncertainty documented in `resumen_ejecutivo`).
+- `total_glosado ≤ total_facturado`.
+- `total_aprobado + total_glosado = total_facturado`.
+- `en_devolucion` is a boolean (never null) in the final output.
+- `concepto_final` is `APTA` or `NO_APTA` — never `DEVOLUCION` or `ESCALAR_HUMANO`.
+- When `en_devolucion = true`, `resumen_ejecutivo` identifies the missing document(s).
 
 ## References
 

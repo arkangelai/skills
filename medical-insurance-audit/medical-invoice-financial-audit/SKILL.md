@@ -66,10 +66,12 @@ Then fill `meta` and append `cierre`:
     "tarifario_aplicado": "<nombre completo del tarifario resuelto>"
   },
   "cierre": {
-    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "score_total": null,
+    "concepto_final": "APTA | NO_APTA",
+    "en_devolucion": false,
     "clasificacion": "Financiero",
-    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
-    "resumen_ejecutivo": "<2-3 oraciones con tarifario y plan referenciados>",
+    "accion_requerida": "Correccion | Rechazo | null",
+    "resumen_ejecutivo": "<1-2 oraciones con tarifario y plan referenciados>",
     "valor_facturado": 0,
     "valor_aprobado": 0,
     "valor_glosado": 0
@@ -81,7 +83,16 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 **Evidence format for tariff rules (mandatory):** `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"`. Never use generic descriptions like "tariff mismatch".
 
-**`resultado`, `confianza`** follow the same rules as admin-audit. `confianza < 0.75` on any `critica` rule → `ESCALAR_HUMANO`.
+**`resultado`, `confianza`** follow the same rules as admin-audit.
+
+**`concepto_final` and `en_devolucion` decision logic:**
+- `concepto_final = APTA`: all applicable rules pass.
+- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
+- `en_devolucion = true`: any `critica` fail subsanable by document resubmission — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for expected recovery amount.
+- `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
+- `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
+- `accion_requerida = null`: when `concepto_final = APTA`.
+- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo`.
 
 **`glosa_sugerida` shape (only when `resultado = fail`):**
 ```json
@@ -105,8 +116,9 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    Read `metadata_input.json` from the working directory. Load `invoice_xml`, `rips`, `clinical_history` (to validate services actually delivered), and `authorization` from the paths in `documentos[]`.
 
 2. **Load financial ref_data.**
-   - `tarifario_contractual.csv` — columns: `ips_nit,cups,manual,version,uvb_factor,precio_base,precio_noche,precio_festivo,vigente_desde,vigente_hasta,plan`.
-   - `plan_afiliados.json` — coverages, limits, grace periods, exclusions per plan.
+   - Load `tarifarios/INDEX.md` to resolve the applicable tariff file per the precedence order defined there. Load the resolved CSV file(s) (`tarifarios/tarifario_contrato_eps_2026.csv` → `tarifarios/tarifario_iss_2001.csv` → `tarifarios/tarifario_soat_2026.csv`). BOTH `tarifarios/INDEX.md` AND the resolved CSV MUST be loaded before any tariff rule runs.
+   - Load `planes/INDEX.md` to identify the plan file for `plan_afiliado`. Load `planes/plan_{ORO|PLATA|BASICO}.md` for coverage rules, exclusions, caps, and carency periods. BOTH files MUST be loaded before any coverage rule runs.
+   - If the tariff file is absent, mark all tariff-dependent rules (F07–F16) `n/a` and declare the gap.
 
 3. **Extract invoice transactions.** Internal shape: `items[] = {cups, description, quantity, unit_price, total_price, access_route?, specialty?}`.
 
@@ -122,15 +134,15 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
    Anti-fraud thresholds (F29–F42) per `checklist_base.md §4` and §6:
    - F32–F36 `fail` with `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
-   - Any F29–F42 `fail` with `confianza < 0.9` → `concepto_final = "ESCALAR_HUMANO"`.
-   - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → always escalate regardless of confidence.
+   - Any F29–F42 `fail` with `confianza < 0.9` → emit best-guess verdict; document uncertainty in `resumen_ejecutivo` (the task system handles escalation).
+   - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → document in `resumen_ejecutivo`; the task system handles escalation regardless of confidence.
 
    See `checklist_base.md §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
 
 5. **Compute `cierre` y publicar el checklist.**
 
    Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.3` and §4:
-   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key thresholds: tariff deviation >10% → `NO_APTA`; 2–10% → `APTA` with partial glosa; <2% → `APTA`.
+   - `concepto_final` and `en_devolucion` — follow decision logic defined in the Output Contract above. Key tariff thresholds: deviation >10% → rule `fail`; 2–10% → rule `fail` with partial glosa; <2% → rule `pass`.
    - `clasificacion`: `"Financiero"`.
    - `valor_facturado`, `valor_aprobado`, `valor_glosado`: compute from the invoice items and all failing rule `valor_glosado` values. `valor_glosado ≤ valor_facturado` always; if not, there is a calculation error — escalate.
    - `resumen_ejecutivo`: 1–2 sentences mentioning the tariff applied, the plan, and total disputed amount.
@@ -154,7 +166,11 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 - `financial_checklist_output.json` exists in the working directory and contains exactly 1 record with 42 evaluated rules.
 - Every finding with `resultado=fail` has an explicit calculation in `evidencia` (expected, charged, delta).
 - Total `valor_glosado` ≤ `invoice_total`.
-- Any failing critical rule → `concepto_final ≠ APTA`.
+- Any failing critical rule → `concepto_final = NO_APTA`.
+- `concepto_final` is `APTA` or `NO_APTA` — never any other value.
+- `en_devolucion` is a boolean (never null) in the final output.
+- When `en_devolucion = true`, `accion_requerida = "Rechazo"` and `resumen_ejecutivo` identifies the missing document(s).
+- `total_aprobado + total_glosado = total_facturado` always.
 - The skill did NOT read `admin_audit` nor `medical_audit` (independence).
 - If any anti-fraud rule (F29–F42) fails, there is at least one finding with `critica` or `mayor` severity.
 

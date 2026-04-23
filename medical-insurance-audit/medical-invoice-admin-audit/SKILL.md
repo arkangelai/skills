@@ -49,10 +49,12 @@ Then fill `meta` and append `cierre`:
 {
   "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-admin-v1" },
   "cierre": {
-    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "score_total": null,
+    "concepto_final": "APTA | NO_APTA",
+    "en_devolucion": false,
     "clasificacion": "Administrativo",
-    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
-    "resumen_ejecutivo": "<2-3 oraciones>"
+    "accion_requerida": "Correccion | Rechazo | null",
+    "resumen_ejecutivo": "<1-2 oraciones>"
   }
 }
 ```
@@ -68,7 +70,7 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 - `≥ 0.95`: direct document quote or verified system query (DIAN, BDUA).
 - `0.80–0.94`: specific document reference without literal quote.
 - `0.75–0.79`: strong inference with partial evidence.
-- `< 0.75` on any `critica` rule → `concepto_final` forced to `ESCALAR_HUMANO`.
+- `< 0.75` on any `critica` rule → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
 
 **`glosa_sugerida` shape (only when `resultado = fail`):**
 ```json
@@ -81,17 +83,22 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 }
 ```
 
-**`concepto_final` decision logic:**
-- `NO_APTA`: any `critica` rule with `fail` that is not subsanable (e.g. missing HC entirely).
-- `DEVOLUCION`: any `critica` rule with `fail` that is subsanable by submitting documents.
-- `ESCALAR_HUMANO`: any `critica` rule with `confianza < 0.75`, or ambiguous evidence.
-- `APTA`: all applicable rules `pass` and no escalation trigger.
+**`concepto_final` and `en_devolucion` decision logic:**
+- `concepto_final = APTA`: all applicable rules `pass`.
+- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
+- `en_devolucion = true`: any `critica` fail subsanable by document resubmission (missing authorization, missing operative note, etc.) — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for the expected recovery amount.
+- `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
+- `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
+- `accion_requerida = null`: when `concepto_final = APTA`.
+- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo` — the task system handles escalation.
 
 ## Procedure
 
 1. **Load inputs from the working directory.**
    - Read `metadata_input.json` to get `ips_nit`, `invoice_number`, `service_date`, `patient_document`, `documentos[]`, `cups_principales[]`.
    - Load each attachment from the paths listed in `documentos[]` — `invoice_xml`, `rips`, `clinical_history`, `authorization`, `epicrisis`, `operative_note` (if applicable given the CUPS).
+
+   All files listed in `documentos[]` MUST be attempted. A missing file is not a silent skip — declare its absence as evidence (e.g. `"autorizacion.pdf: no encontrado en el directorio de trabajo"`) and assess the impact on each dependent rule.
 
 2. **Run the DAMA-UK rule checklist.**
 
