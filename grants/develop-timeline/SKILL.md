@@ -1,6 +1,6 @@
 ---
 name: develop-timeline
-description: Create realistic grant project timelines (table, milestone, or narrative). Covers three phases (Startup, Implementation, Closeout), builds in reporting, and reality-checks against staff time and budget. Use when planning project phases, making Gantt charts, or demonstrating feasibility.
+description: Create realistic grant project timelines (table, milestone, or narrative). Use after the first proposal pass so activities, staffing, evaluation, and reporting are feasible before review.
 version: 1.0.0
 author: jose@arkangel.ai
 platforms: [macos, linux]
@@ -13,14 +13,25 @@ metadata:
 
 # Develop Timeline
 
-Creates realistic project timelines that show funders the work is feasible. Accounts for startup, overlap, milestones, reporting, and closeout — and does a reality check against staff and budget.
+Build the execution timeline after `develop-proposal` has produced the first pass of methods and objectives. The goal is to make the project look deliverable, not just interesting.
 
 ## When to Use
 
-- Planning project phases and milestones.
-- Creating Gantt charts or timeline tables.
-- Ensuring activities align with objectives.
-- Demonstrating project feasibility in a proposal.
+- After `develop-proposal` has drafted methods, objectives, and evaluation.
+- Before `develop-budget` and `grant-review`.
+- When a proposal looks promising but not yet operationally believable.
+- When you need a table, milestones, or narrative timeline.
+
+## Inputs
+
+The caller should pass or identify:
+
+- `CARPETA` or the local proposal path
+- grant duration
+- the current methods/objectives/evaluation draft
+- any fixed reporting or deliverable deadlines from the call
+
+If GitHub is unavailable, operate on the local proposal folder and emit the summary artifact in the conversation.
 
 ## Procedure
 
@@ -113,6 +124,7 @@ Creates realistic project timelines that show funders the work is feasible. Acco
    - No month is overloaded with activities.
 
 7. **Visual options** for final presentation: table in Word/Google Docs, Gantt chart (Asana, Monday, Excel), timeline graphics (Canva, PowerPoint).
+8. **Push the result back into the draft.** If the timeline exposes impossible sequencing, missing staffing, or overloaded quarters, update the proposal inputs before moving to `develop-budget` or `grant-review`.
 
 ## Pitfalls
 
@@ -132,5 +144,5 @@ Creates realistic project timelines that show funders the work is feasible. Acco
 ## References
 
 - `grants/develop-budget/SKILL.md` — budget spending must match timeline.
-- `grants/write-section/SKILL.md` — objectives drive the activities.
-- `grants/write-section/SKILL.md` — for the Methods section that feeds the timeline.
+- `grants/develop-proposal/SKILL.md` — objectives and methods drive the activities.
+- `grants/grant-review/SKILL.md` — the later review pass scores feasibility and execution realism.

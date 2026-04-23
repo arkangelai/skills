@@ -1,6 +1,6 @@
 ---
 name: develop-budget
-description: Create and justify a grant budget by standard categories (Personnel, Equipment, Supplies, Travel, Contractual, Other, Indirect). Produces a budget table + per-line justification tied to activities, respecting funder caps. Use for developing a budget section or justifying line items.
+description: Create and justify a grant budget by standard categories (Personnel, Equipment, Supplies, Travel, Contractual, Other, Indirect). Use after the first proposal pass so budget, methods, and timeline tell the same story.
 version: 1.0.0
 author: jose@arkangel.ai
 platforms: [macos, linux]
@@ -13,14 +13,24 @@ metadata:
 
 # Develop Budget
 
-Creates well-justified grant budgets: every line item connects to a project activity, every number is calculated and defensible, and the format matches funder requirements.
+Build the budget after `develop-proposal` has produced a coherent first pass and before `grant-review` scores feasibility. Every line item should connect to a project activity, fit the timeline, and survive reviewer scrutiny.
 
 ## When to Use
 
-- Creating a new project budget.
-- Justifying specific budget line items.
-- Aligning budget with the activities described in Methods.
-- Ensuring funder requirements (caps, allowed categories, indirect rates, match) are met.
+- After `develop-proposal` produces the first pass of the grant.
+- When a draft has methods but weak or missing budget logic.
+- Before `grant-review` so feasibility scoring has a real budget to inspect.
+- When you need a budget table plus line-by-line justification.
+
+## Inputs
+
+The caller should pass or identify:
+
+- `CARPETA` or the local proposal path
+- funder cap / indirect-rate rules if known
+- the current draft section that describes methods and staffing
+
+If GitHub is unavailable, operate on the local proposal folder and emit the summary artifact in the conversation.
 
 ## Procedure
 
@@ -33,7 +43,7 @@ Creates well-justified grant budgets: every line item connects to a project acti
    - Partnerships and subcontracts
    - Indirect cost rate (if applicable)
 
-2. **Check funder requirements** in `.cursorrules` / call rules:
+2. **Check funder requirements** in the proposal source pack (`sources/rules.md`, `sources/eligibility.md`, `.cursorrules`, or equivalent local notes):
    - Maximum budget allowed
    - Allowed expense categories
    - Indirect cost limits
@@ -109,6 +119,7 @@ Creates well-justified grant budgets: every line item connects to a project acti
    - Include in-kind contributions if relevant.
    - Personnel time adds up correctly across roles.
    - Round to reasonable amounts.
+   - If the draft or timeline changes materially, rerun this skill instead of patching numbers by hand.
 
 ## Pitfalls
 
@@ -127,6 +138,6 @@ Creates well-justified grant budgets: every line item connects to a project acti
 
 ## References
 
-- `grants/write-section/SKILL.md` — for budget-justification narrative style.
+- `grants/develop-proposal/SKILL.md` — first-pass methods, staffing, and narrative inputs.
 - `grants/develop-timeline/SKILL.md` — budget spending must align with timeline.
-- `grants/review-grant/SKILL.md` — Dimension 5 scoring criteria.
+- `grants/grant-review/SKILL.md` — the later review pass scores feasibility and budget coherence.

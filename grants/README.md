@@ -1,61 +1,62 @@
 # Grants Skills
 
-A set of atomic, agent-invocable skills for running a grant-proposal pipeline. Each skill can be invoked on its own; the harness (or the caller) is responsible for triggers, scheduling, and notification delivery. No skill in this folder sends messages, runs cron jobs, polls, or sleeps.
+This folder exposes **8 top-level skills** for taking a grant from discovery to submission. The public workflow is intentionally simple. Research, funder-fit analysis, evidence gathering, section writing, and PR-response work are still present, but they now live **inside** the top-level skills instead of appearing as separate top-level steps.
 
-## Pipeline map
-
-The pipeline has 7 phases in 4 owner-facing roles. One agent plays the roles in sequence; a browser agent handles navigation and form-fill. The project owner is the only human in the loop and holds the three approval gates.
+## Pipeline
 
 ```
-Scout ──[owner adds start-draft]──▶ Writer ──[opens PR + draft-for-review]──▶ Reviewer ──[owner merges PR]──▶ Submission ──▶ cycle closed
+1. scout-grants
+2. chrome-navigate
+3. develop-proposal
+4. develop-timeline
+5. develop-budget
+6. grant-review
+7. polish-grant
+8. submit
 ```
 
-| Role | Phase(s) | Entry trigger (harness-owned) | Skill to load |
-|---|---|---|---|
-| Scout | 1 | Invocation to evaluate opportunities | `scout-opportunities/` |
-| Writer | 2 + 3 | `start-draft` label added to a `grant-opportunity` Issue | `draft-proposal/` |
-| Reviewer | 4 + 5 + 6 | PR opened with `draft-for-review` label | `review-grant/` |
-| Submission | 7 | Draft PR merged | `submit-proposal/` |
+## Skills
 
-Browser work (download sources, fill forms): `chrome-navigate-grant/`.
-
-## Supporting skills
-
-| Skill | What it does |
+| Skill | Purpose |
 |---|---|
-| `funder-fit/` | Research a funder's priorities, then score a draft's alignment across 7 dimensions. |
-| `literature-review/` | Find and summarize research evidence for a grant. |
-| `write-section/` | Draft any grant section (Exec Summary, Needs, Goals/Objectives with SMART, Methods, Evaluation, Impact, Budget Justification, Capacity, Sustainability). |
-| `develop-budget/` | Build a budget table + per-line justification. |
-| `develop-timeline/` | Build a realistic project timeline (table / milestone / narrative). |
+| `scout-grants/` | Find opportunities, evaluate fit and eligibility, capture the opportunity in GitHub when available, and prepare the proposal workspace when the owner says go. |
+| `chrome-navigate/` | Use a browser-capable agent to enrich an opportunity by extracting rules, eligibility, evaluation criteria, form fields, and templates; later reuse it to fill the final form without submitting. |
+| `develop-proposal/` | Produce the first strong draft of the proposal from the source pack, including evidence gathering, section writing, and first-pass structure. |
+| `develop-timeline/` | Build the project timeline so methods, staffing, reporting, and delivery are feasible. |
+| `develop-budget/` | Build the budget and justification so the numbers tell the same story as the methods and timeline. |
+| `grant-review/` | Run the full pre-submit review: weighted scoring, funder-alignment check, blocker list, v2 rewrite, and learnings capture. |
+| `polish-grant/` | Read PR comments and owner feedback, apply accepted changes, reply to threads, and ship clean follow-up versions. |
+| `submit/` | Verify the approved source of truth, reuse `chrome-navigate/` for form-fill, stop before submit, then close the loop after the owner submits. |
 
-## How invocations connect
+## Operating Model
 
-Each skill is atomic: the caller passes the identifier (Issue #, PR #, folder path, or opportunity name) as an input. Skills read state from GitHub Issues/PRs and from files on disk — they do **not** assume session memory from a previous invocation.
+- Every skill is atomic. The caller passes identifiers or paths; the skill reads the current state fresh.
+- GitHub is preferred, but not required. If the grants repo or `gh` is unavailable, the skill should emit the same artifact in the conversation and write locally when possible.
+- No skill polls, sleeps, runs cron, or sends notifications on its own.
+- The browser agent never drafts. The drafting agent never submits.
+- The owner remains the only human approval gate for: pursuing an opportunity, merging the reviewed draft, and clicking final submit.
 
-Handoff signals live in GitHub (Issue labels, PR status) and in git (branches, commits). Example: the Writer opens a PR with label `draft-for-review`; the harness watches for that event and invokes `review-grant` with the PR number.
+## Standard Artifacts
 
-## Transversal rules
+Each opportunity should still converge on:
+
+`proposals/YYYY-MM_Name/`
+- `sources/`
+- `drafts/`
+- `attachments/`
+- `final/`
+
+If GitHub is unavailable, use the same folder structure locally and mirror the summary artifact in the conversation.
+
+## Cross-Cutting Rules
 
 - **Never invent data.** Use `[DATO PENDIENTE - requiere input de owner]`.
-- **Verify on-chain state before advancing.** After every commit or label change, assert the expected output matches (e.g., `gh api … --jq '.name'` returns the expected file); abort on mismatch. Do not report success from local state alone.
-- **Everything lives in git.** No cloud drive, no email attachments.
-- **Human approval gates:** Phase 1 Go decision, Phase 6 merge PR, Phase 7 hit submit. Agents never submit.
-- **Artifacts live in a single folder per opportunity:** `proposals/YYYY-MM_Name/` with subfolders `sources/`, `drafts/`, `attachments/`, `final/`. Organizational memory goes to `shared-resources/learnings/` (append-only).
-
-## Before executing any skill
-
-- Confirm the harness has terminal access and `gh` is authenticated for the target `<org>/grants` repo.
-- For browser work, resolve the browser agent via the preflight in `chrome-navigate-grant/`.
-
-## Pitfalls (cross-cutting)
-
-- Running Reviewer checks inside the Writer phase. Fix: handoff only happens when the PR has `draft-for-review`.
-- Committing to `main` when a draft branch was expected. Fix: every Writer/Reviewer step asserts `git branch --show-current` before committing.
-- Agent reports "I submitted it." Fix: the agent never submits. Only the project owner submits.
+- **Verify before advancing.** If a branch, file, issue, PR, or label is expected, assert it exists before claiming success.
+- **Keep the public workflow simple.** If a task feels like "section writing", "literature review", or "funder-fit scoring", perform it inside the appropriate top-level skill instead of surfacing a separate top-level step.
+- **Only the owner submits.** Agents may prepare and fill; they do not click submit.
 
 ## References
 
 - `shared-resources/50_TIPS_GANAR_GRANTS.md`
 - `shared-resources/learnings/INDEX.md`
-- The current project's `CLAUDE.md`.
+- The current project's `CLAUDE.md`
