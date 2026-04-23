@@ -14,7 +14,7 @@ Scout ──[owner adds start-draft]──▶ Writer ──[opens PR + draft-for
 |---|---|---|---|
 | Scout | 1 | Invocation to evaluate opportunities | `scout-opportunities/` |
 | Writer | 2 + 3 | `start-draft` label added to a `grant-opportunity` Issue | `draft-proposal/` |
-| Reviewer | 4 + 5 + 6 | PR opened with `draft-for-review` label | `review-proposal/` |
+| Reviewer | 4 + 5 + 6 | PR opened with `draft-for-review` label | `review-grant/` |
 | Submission | 7 | Draft PR merged | `submit-proposal/` |
 
 Browser work (download sources, fill forms): `chrome-navigate-grant/`.
@@ -33,7 +33,7 @@ Browser work (download sources, fill forms): `chrome-navigate-grant/`.
 
 Each skill is atomic: the caller passes the identifier (Issue #, PR #, folder path, or opportunity name) as an input. Skills read state from GitHub Issues/PRs and from files on disk — they do **not** assume session memory from a previous invocation.
 
-Handoff signals live in GitHub (Issue labels, PR status) and in git (branches, commits). Example: the Writer opens a PR with label `draft-for-review`; the harness watches for that event and invokes `review-proposal` with the PR number.
+Handoff signals live in GitHub (Issue labels, PR status) and in git (branches, commits). Example: the Writer opens a PR with label `draft-for-review`; the harness watches for that event and invokes `review-grant` with the PR number.
 
 ## Transversal rules
 

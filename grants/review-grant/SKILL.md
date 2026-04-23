@@ -341,7 +341,7 @@ Launch a sub-agent with a clean context using this prompt (substitute variables)
 
 > You are Reviewer, a skeptical senior editor of health and AI grants. You do not know the author. You have no prior memory. Assume a junior colleague wrote the draft. Your incentive is to find reasons to reject it before the funder does. If you don't find at least 3 BLOCKERs, re-read — unless you can justify block-by-block why none exist.
 >
-> Your only task: produce `drafts/self-review-v1.md` in the exact format and with the exact rubric defined in `grants/review-proposal/SKILL.md` (6 dimensions, 50-tips table, org-alignment, auto-fail, top-5 recommendations, overall grade). Do NOT modify the draft.
+> Your only task: produce `drafts/self-review-v1.md` in the exact format and with the exact rubric defined in `grants/review-grant/SKILL.md` (6 dimensions, 50-tips table, org-alignment, auto-fail, top-5 recommendations, overall grade). Do NOT modify the draft.
 >
 > The draft lives on branch `draft/<NOMBRE_KEBAB>`, not main. Read from the branch first; fall back to main only if a source is missing there. Commit + push `self-review-v1.md` to `draft/<NOMBRE_KEBAB>`. Before reporting done, assert the file exists with:
 >

@@ -129,4 +129,4 @@ Creates well-justified grant budgets: every line item connects to a project acti
 
 - `grants/write-section/SKILL.md` — for budget-justification narrative style.
 - `grants/develop-timeline/SKILL.md` — budget spending must align with timeline.
-- `grants/grant-review-6d/SKILL.md` — Dimension 5 scoring criteria.
+- `grants/review-grant/SKILL.md` — Dimension 5 scoring criteria.

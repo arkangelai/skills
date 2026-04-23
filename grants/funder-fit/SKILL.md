@@ -200,7 +200,7 @@ The caller chooses the mode at invocation. If unclear, ask the caller which is n
 
 ## References
 
-- `grants/review-proposal/SKILL.md` — deeper pre-submit audit (6 weighted dimensions + 50-tips + auto-fail).
+- `grants/review-grant/SKILL.md` — deeper pre-submit audit (6 weighted dimensions + 50-tips + auto-fail).
 - `grants/scout-opportunities/SKILL.md` — pipeline entry for new opportunities.
 - `grants/draft-proposal/SKILL.md` — consumer of the profile output.
 - `grants/write-section/SKILL.md` — where `score` mode's language suggestions are applied.

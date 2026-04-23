@@ -99,5 +99,5 @@ Finds and organizes research evidence to back claims in a grant proposal. Struct
 ## References
 
 - `grants/write-section/SKILL.md` — Statement of Need uses this evidence.
-- `grants/impact-statement/SKILL.md` — impact numbers should come from here.
-- `grants/research-funder/SKILL.md` — funder-priority evidence often overlaps.
+- `grants/write-section/SKILL.md` — impact numbers should be distilled into the relevant narrative section.
+- `grants/funder-fit/SKILL.md` — funder-priority evidence often overlaps.

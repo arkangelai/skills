@@ -132,5 +132,5 @@ Creates realistic project timelines that show funders the work is feasible. Acco
 ## References
 
 - `grants/develop-budget/SKILL.md` — budget spending must match timeline.
-- `grants/write-objectives/SKILL.md` — objectives drive the activities.
+- `grants/write-section/SKILL.md` — objectives drive the activities.
 - `grants/write-section/SKILL.md` — for the Methods section that feeds the timeline.

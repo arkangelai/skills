@@ -164,7 +164,6 @@ After every verification command, compare output to the expected pattern and **a
 
 ## References
 
-- `grants/pipeline-overview/SKILL.md`
+- `grants/README.md`
 - `grants/chrome-navigate-grant/SKILL.md` — how the browser agent fills forms (Role B).
-- `grants/review-proposal/SKILL.md` — the previous role and v3 path for last-minute changes.
-- `grants/slack-briefings/SKILL.md` — closing message format.
+- `grants/review-grant/SKILL.md` — the previous role and v3 path for last-minute changes.

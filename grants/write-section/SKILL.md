@@ -255,5 +255,5 @@ Well-structured Markdown with clear headers, bullets for lists, bold for emphasi
 
 - `grants/develop-budget/SKILL.md` — budget section alignment with Methods and Timeline.
 - `grants/develop-timeline/SKILL.md` — time-bound deadlines align with timeline.
-- `grants/review-proposal/SKILL.md` — the 6-dimension rubric this section will be scored against.
+- `grants/review-grant/SKILL.md` — the 6-dimension rubric this section will be scored against.
 - `grants/literature-review/SKILL.md` — evidence source for Statement of Need and Impact.

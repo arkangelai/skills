@@ -173,6 +173,6 @@ Before executing Role A or Role B, resolve which browser capability will run the
 
 ## References
 
-- `grants/pipeline-overview/SKILL.md`
+- `grants/README.md`
 - `grants/draft-proposal/SKILL.md` — the Writer role that prepares the navigation prompt in Phase 2.
 - `grants/submit-proposal/SKILL.md` — the Phase-7 handoff for Role B.
