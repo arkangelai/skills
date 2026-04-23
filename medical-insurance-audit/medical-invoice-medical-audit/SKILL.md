@@ -34,7 +34,7 @@ Additionally the skill resolves the applicable GPC before running rules:
 1. Extracts `diagnostico_principal` (CIE-10) from `factura.pdf`.
 2. Looks up the CIE-10 in `guias-clinicas/INDEX.md` (this skill's directory) to find the applicable GPC file.
 3. Loads `guias-clinicas/{gpc_file}.md` for criteria, indications, and standard of care.
-4. If no GPC matches → `meta.gpc_aplicada = null`, M04 → `n/a`, `concepto_final = ESCALAR_HUMANO`.
+4. If no GPC matches → `meta.gpc_aplicada = "n/a"`. Set rules M04, M06, M10, M14, M19, M22 to `resultado = "n/a"`. Audit continues normally — do not escalate solely because no GPC was found.
 
 ## Output Contract
 
@@ -51,12 +51,14 @@ Then fill `meta` and append `cierre`:
 
 ```json
 {
-  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or null>" },
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or \"n/a\">" },
   "cierre": {
-    "concepto_final": "APTA | NO_APTA | DEVOLUCION | ESCALAR_HUMANO",
+    "score_total": null,
+    "concepto_final": "APTA | NO_APTA",
+    "en_devolucion": false,
     "clasificacion": "Clinico",
-    "accion_requerida": "Ninguna | Correccion | Complemento | Rechazo | Escalar",
-    "resumen_ejecutivo": "<2-3 oraciones con GPC referenciada>"
+    "accion_requerida": "Correccion | Rechazo | null",
+    "resumen_ejecutivo": "<1-2 oraciones con GPC referenciada>"
   }
 }
 ```
@@ -67,9 +69,16 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 **Absence as evidence:** If looking for an operative note and it is not found after searching the full HC PDF by content keywords (`NOTA OPERATORIA`, `DESCRIPCIÓN QUIRÚRGICA`), the evidence must state: `"HC pp.1-40: no se encontro nota operatoria para CUPS {X}"`.
 
-**`concepto_final` specifics:**
-- M06 (`fail`) → always `ESCALAR_HUMANO` (GPC deviation without justification requires human clinical judgment).
-- HC OCR failure → single `conditional` finding, abort remaining rules, `ESCALAR_HUMANO`.
+**`concepto_final` and `en_devolucion` decision logic:**
+- `concepto_final = APTA`: all applicable rules `pass`.
+- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
+- `en_devolucion = true`: any `critica` fail subsanable by document resubmission — takes priority even when glosas also exist.
+- `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
+- `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
+- `accion_requerida = null`: when `concepto_final = APTA`.
+- M06 (`fail`) → `concepto_final = NO_APTA`; if HC justification is absent, set `en_devolucion = true`.
+- HC OCR failure → emit a single finding documenting the failure, set `en_devolucion = true`, `concepto_final = NO_APTA`, and note uncertainty in `resumen_ejecutivo`.
+- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo`.
 
 **`glosa_sugerida` shape (only when `resultado = fail`):**
 ```json
@@ -90,6 +99,8 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 2. **Load clinical ref_data.**
    - `guias-clinicas/INDEX.md` + `guias-clinicas/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
 
+   `guias-clinicas/INDEX.md` MUST be loaded before running any rule. If the CIE-10 maps to a GPC file, that file MUST be loaded before running M04, M06, M10, M14, M19, M22. If no match is found, set `gpc_aplicada = "n/a"` and mark those rules `n/a`.
+
 3. **Extract structured clinical data.**
    - `diagnostico_principal` (CIE-10 + description) and secondaries.
    - `procedimientos_realizados[]` (CUPS + date + professional).
@@ -108,19 +119,19 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
      - `Ecocardiograma 2026-04-09 "FEVI 32%" [calc: consistente con GPC_falla_cardiaca §2 criterios Framingham]`.
      - Absence: `HC pp.1-40 "no se encontró nota operatoria para CUPS {X} (búsqueda: NOTA OPERATORIA, DESCRIPCIÓN QUIRÚRGICA)"`.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual clinical evidence found. `pass`: cite the document and section that confirms the criterion is met (e.g. `"HC evolución 2026-04-10: BNP 380 pg/mL — criterio de estancia GPC_falla_cardiaca §3.2 cumplido"`). `fail`: cite the specific deficiency and its location (e.g. `"HC pp.1-40: no se encontró nota de evolución diaria para los días 2026-04-11 y 2026-04-12 — M23 incumplido"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"No hay CUPS quirúrgicos en la factura — M11 nota operatoria no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
-   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` forces human escalation.
+   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` on a critical rule → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 
    Two hard rules regardless of confidence:
-   - **M06 `fail` always forces `concepto_final = "ESCALAR_HUMANO"`** — GPC deviation without HC justification requires a human medical auditor.
-   - **HC OCR failure** → emit a single `conditional` finding and abort all remaining rules → `ESCALAR_HUMANO`.
+   - **M06 `fail` always forces `concepto_final = "NO_APTA"`** — if HC justification is absent, also set `en_devolucion = true`.
+   - **HC OCR failure** → emit a single finding documenting the failure, set `en_devolucion = true`, `concepto_final = NO_APTA`, and note uncertainty in `resumen_ejecutivo`.
 
    See `checklist_base.md §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
 
 5. **Compute `cierre` and publish the checklist.**
 
    Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.4` and §4:
-   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key overrides: M06 fail → always `ESCALAR_HUMANO`; any critical with `confianza < 0.75` → `ESCALAR_HUMANO`.
+   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key overrides: M06 fail → `NO_APTA` (set `en_devolucion = true` if HC justification absent); any critical with `confianza < 0.75` → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
    - `clasificacion`: `"Clinico"`.
    - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding.
 
@@ -145,9 +156,9 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 - `medical_checklist_output.json` exists in the working directory and contains exactly 1 record with 29 evaluated rules.
 - Every finding with `resultado=fail` has `evidencia` referencing a specific file and location.
-- If `concepto_final ≠ APTA`, at least one critical rule has `resultado=fail` OR `confianza < 0.75` on a critical rule.
+- If `concepto_final ≠ APTA`, at least one rule has `resultado=fail`; uncertainty (`confianza < 0.75` on a critical rule) is expressed in `resumen_ejecutivo`, not via a separate verdict value.
 - The skill did NOT read `admin_audit` nor `financial_audit` (independence).
-- If HC OCR failed, there is exactly one `conditional` finding and the skill aborted the rest of the evaluation.
+- If HC OCR failed, there is exactly one finding documenting the failure, `concepto_final = NO_APTA`, `en_devolucion = true`, and uncertainty is noted in `resumen_ejecutivo`.
 
 ## References
 

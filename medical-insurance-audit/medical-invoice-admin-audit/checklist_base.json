@@ -437,6 +437,7 @@
   "cierre": {
     "score_total": null,
     "concepto_final": null,
+    "en_devolucion": null,
     "clasificacion": null,
     "accion_requerida": null,
     "resumen_ejecutivo": null
