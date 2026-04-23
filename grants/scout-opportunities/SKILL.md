@@ -1,6 +1,6 @@
 ---
 name: scout-opportunities
-description: Discover, evaluate, and triage grant opportunities. Reviews `grant-opportunity` Issues, searches for new ones, dedupes, assigns P0/P1/P2/discarded, and creates/enriches GitHub Issues with required labels. Use for daily scouting, when asked to "scout grants", or to triage uncategorized Issues.
+description: Discover, evaluate, and triage grant opportunities. Reviews `grant-opportunity` Issues, searches for new ones, dedupes, assigns P0/P1/P2/discarded, and creates/enriches GitHub Issues with required labels. Use when invoked to scout grants or triage uncategorized `grant-opportunity` Issues. Cadence is owned by the harness, not this skill.
 version: 1.0.0
 author: jose@arkangel.ai
 platforms: [macos, linux]
@@ -17,23 +17,47 @@ Hybrid role: evaluate the GitHub Issues already created by the scouting workflow
 
 ## When to Use
 
-- Daily morning scouting cycle (~8am local time), Mon–Fri.
+- The harness invokes the skill on a scouting trigger (scheduled job, webhook, or manual run).
 - The project owner says "scout grants" / "evaluate today's Issues" / "find me more opportunities".
 - A pipeline of `grant-opportunity` Issues exists without `P0|P1|P2|discarded` labels.
 - A funder announces a new call and needs triage.
 
+Scheduling (cron, day-of-week, time-of-day) is the harness's responsibility. This skill has no opinion on when it runs.
+
+## Inputs (passed by the caller)
+
+The skill is atomic. The caller passes:
+
+```
+ORG              GitHub org owning the grants repo (e.g. arkangelai)
+```
+
+All other state (open Issues, labels) is read from GitHub at invocation time.
+
+## Preflight
+
+Before executing, verify:
+1. `gh` is available and authenticated for `<ORG>/grants`:
+   ```bash
+   gh auth status
+   gh repo view <ORG>/grants --json name --jq '.name'
+   ```
+   Expected: `gh auth status` reports "Logged in" and the second command returns `grants`. If either fails, abort and report the missing access. Do not install `gh` — the caller configures the harness.
+
 ## Procedure
+
+After every verification command, compare output to the expected pattern and **abort on mismatch** — do not report success from local state alone.
 
 1. **List open Issues without priority.**
    ```bash
-   gh issue list --repo <org>/grants --state open --json number,title,labels \
+   gh issue list --repo <ORG>/grants --state open --json number,title,labels \
      --jq '[.[] | select([.labels[].name] | map(test("^P[0-2]$|discarded"; "x")) | any | not) | {n:.number, t:.title}]'
    ```
-   Paste the output before continuing.
+   Expected output: a JSON array (possibly empty). If the command errors, abort.
 
 2. **For each unprioritized Issue, read it fully:**
    ```bash
-   gh issue view <N> --repo <org>/grants
+   gh issue view <N> --repo <ORG>/grants
    ```
    Capture: title, funder, grade from action (a/b/c/d), deadline, amount, official URL.
 
@@ -80,14 +104,14 @@ Hybrid role: evaluate the GitHub Issues already created by the scouting workflow
 
 8. **Apply labels. Always `grant-opportunity` + one of P0/P1/P2/discarded. Add `needs-partner` if applicable.**
    ```bash
-   gh issue edit <N> --repo <org>/grants --add-label "P0"
-   gh issue view <N> --repo <org>/grants --json labels --jq '[.labels[].name]'
+   gh issue edit <N> --repo <ORG>/grants --add-label "P0"
+   gh issue view <N> --repo <ORG>/grants --json labels --jq '[.labels[].name]'
    ```
-   Paste the verifier output. If `discarded`, close the Issue with `--reason "not planned"`.
+   Expected output: a JSON array containing the label you just added (e.g., `["grant-opportunity","P0"]`). Abort if the added label is absent. If `discarded`, close the Issue with `--reason "not planned"`.
 
 9. **Required fields for every new/enriched Issue:** name, funder, what it funds, amount, deadline, eligibility, official link, why it fits (evidence), risks/gaps, recommendation.
 
-10. **End-of-cycle summary** to the project owner (Slack or Issue):
+10. **End-of-cycle summary.** Emit this block to stdout and post it as a comment on the tracking / cycle log Issue. The skill only produces the artifact; routing it anywhere else is the caller's job.
     ```
     Scout for [date]:
     - Issues evaluated: [N]
@@ -107,13 +131,13 @@ Hybrid role: evaluate the GitHub Issues already created by the scouting workflow
 
 ## Verification
 
-- `gh issue list --repo <org>/grants --state open --search "no:label P0 P1 P2 discarded"` returns empty (or only Issues outside your cycle).
+- `gh issue list --repo <ORG>/grants --state open --search "no:label P0 P1 P2 discarded"` returns empty (or only Issues outside your cycle).
 - Every new/enriched Issue has the required labels (verified via `gh issue view <N> --json labels`).
 - Scout comment exists on every evaluated Issue (visible with `gh issue view <N> --comments`).
-- The end-of-cycle summary was delivered.
+- The end-of-cycle summary block was emitted and posted as a comment on the tracking/cycle Issue.
 
 ## References
 
-- `grants/pipeline-overview/SKILL.md` — full pipeline context.
+- `grants/README.md` — full pipeline context.
 - `grants/draft-proposal/SKILL.md` — next role (Writer) when owner adds `start-draft`.
-- `grants/slack-briefings/SKILL.md` — scout summary format for the owner.
+- `grants/funder-fit/SKILL.md` — deeper funder profiling for a promoted opportunity.

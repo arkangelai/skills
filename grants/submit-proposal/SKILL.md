@@ -21,53 +21,66 @@ Submission activates when the owner merges the draft PR. Its job is narrow: conf
 - A grant proposal is in state `APPROVED_FOR_SUBMISSION` and needs form-fill orchestration.
 - You need to close a submitted cycle (label swap, status update, learnings link).
 
+## Inputs (passed by the caller)
+
+The skill is atomic. The caller passes:
+
+```
+ISSUE_NUMBER      e.g. 260
+PR_NUMBER         e.g. 42
+ORG               GitHub org owning the grants repo
+NOMBRE_KEBAB      e.g. horizon-edctp3-digit-02
+CARPETA           e.g. 2026-09_HORIZON-EDCTP3-DIGIT-02
+TIPO_ENVIO        online form | narrative | mixed
+ARCHIVO_V2        source-of-truth file the browser agent reads
+ARCHIVOS_ADJUNTOS attachments (if any)
+FORMULARIO_URL    funder platform URL, from sources/rules.md or navigation-notes.md
+FUNDER            funder name
+FUNDER_KEBAB      learnings slug
+```
+
+If `TIPO_ENVIO` is `mixed`, define both the main source-of-truth and the attachments explicitly. All GitHub state is read from the PR and Issue at invocation time — the skill does not assume session memory from prior phases.
+
+## Preflight
+
+1. **`gh` access.** Verify `gh` is available and authenticated for `<ORG>/grants`:
+   ```bash
+   gh auth status
+   gh repo view <ORG>/grants --json name --jq '.name'
+   ```
+   Expected: "Logged in" + `grants`. Abort and report if either fails.
+2. **Browser agent.** Phase 7 needs a browser agent to fill the submission form. Before starting, run the preflight in `grants/chrome-navigate-grant/SKILL.md` — it resolves whether the harness has a built-in browser capability and, if not, asks the user which browser agent to use.
+
 ## Procedure
 
-### Variables
-
-```
-ISSUE_NUMBER      = inherited
-NOMBRE_KEBAB      = inherited
-CARPETA           = inherited
-PR_NUMBER         = inherited
-TIPO_ENVIO        = online form | narrative | mixed
-ARCHIVO_V2        = source-of-truth file Chrome reads
-ARCHIVOS_ADJUNTOS = attachments (if any)
-FORMULARIO_URL    = funder platform URL, from sources/rules.md or navigation-notes.md
-FUNDER            = funder name
-FUNDER_KEBAB      = learnings slug
-```
-
-If `TIPO_ENVIO` is mixed, define both the main source-of-truth and the attachments explicitly.
-
-### Steps
+After every verification command, compare output to the expected pattern and **abort on mismatch**.
 
 1. **Confirm the PR is actually merged.**
    ```bash
-   gh pr view <PR_NUMBER> --repo <org>/grants --json state,merged,mergeCommit,url
+   gh pr view <PR_NUMBER> --repo <ORG>/grants --json state,merged,mergeCommit,url
    ```
-   Output must contain `"state":"MERGED"` and `"merged":true`. If `OPEN` or `false`, do not advance.
+   Expected output must contain `"state":"MERGED"` and `"merged":true`. On `OPEN` or `false`, abort — do not advance.
 
-2. **Sync main and verify deliverables exist there.**
+2. **Sync main and assert deliverables exist there.**
    ```bash
    git checkout main && git pull
    ```
-   Then verify via `gh api` according to type:
+   Then assert via `gh api` according to type:
    - Online form: `proposals/<CARPETA>/drafts/field-mapping-responses-v2.md`
-   - Narrative: `proposals/<CARPETA>/drafts/proposal-v2.md` (+ `proposal-v2.docx` if generated)
+   - Narrative: `proposals/<CARPETA>/drafts/proposal-v2.md`
    - Mixed: `<ARCHIVO_V2>` + required `<ARCHIVOS_ADJUNTOS>`
 
-   At minimum `<ARCHIVO_V2>` must exist on main. Required attachments also must exist before advancing. Any 404 → stop.
+   At minimum `<ARCHIVO_V2>` must exist on main. Required attachments also must exist before advancing. Any 404 → abort.
 
-3. **Prepare the Chrome prompt.** Exact text to hand the owner to forward:
+3. **Prepare the browser-agent prompt.** Exact text to hand off (the browser agent resolved in the Preflight executes it):
 
-   > Chrome, Phase 7 — fill the form for `<FUNDER>`.
+   > Browser agent, Phase 7 — fill the form for `<FUNDER>`.
    >
    > Form URL:
    > `<FORMULARIO_URL>`
    >
    > Source-of-truth input (raw URL on main):
-   > `https://raw.githubusercontent.com/<org>/grants/main/proposals/<CARPETA>/drafts/<ARCHIVO_V2>`
+   > `https://raw.githubusercontent.com/<ORG>/grants/main/proposals/<CARPETA>/drafts/<ARCHIVO_V2>`
    >
    > Additional attachments / references:
    > `[list or 'none']`
@@ -78,18 +91,18 @@ If `TIPO_ENVIO` is mixed, define both the main source-of-truth and the attachmen
    > 3. If the input says `[DATO PENDIENTE]` or `[SECCION PENDIENTE - FLAG N]`, STOP and notify. Do not fill with anything invented.
    > 4. If the form requests an attachment, identify which one and flag if missing.
    > 5. When all fields are complete, do NOT click submit.
-   > 6. Notify the owner when the form is ready for final review.
+   > 6. Emit "Form complete. <X> fields filled. Ready for owner review."
    >
    > Reminder: the owner submits, not you.
 
 4. **Leave constancy on the Issue.**
    ```bash
-   gh issue comment <ISSUE_NUMBER> --repo <org>/grants --body "Phase 7 ready. Chrome prompt handed off. Chrome will fill without submitting using source of truth \`proposals/<CARPETA>/drafts/<ARCHIVO_V2>\`. Owner submits."
-   gh issue view <ISSUE_NUMBER> --repo <org>/grants --comments | tail -10
+   gh issue comment <ISSUE_NUMBER> --repo <ORG>/grants --body "Phase 7 ready. Browser-agent prompt handed off. Agent will fill without submitting using source of truth \`proposals/<CARPETA>/drafts/<ARCHIVO_V2>\`. Owner submits."
+   gh issue view <ISSUE_NUMBER> --repo <ORG>/grants --comments | tail -5
    ```
-   Then **stop**. Wait for the owner to confirm submit, or for Chrome to report a blocker.
+   Expected: your most recent comment appears at the tail. Abort on mismatch. Then **exit the skill**. The harness re-invokes this skill for Phase-7 closeout when the owner confirms submission (step 6 onward). If the browser agent reports `[DATO PENDIENTE]`, `[SECCION PENDIENTE]`, a missing attachment, or inconsistencies: emit a blocker artifact and exit; no submission with gaps. If the owner wants last-minute content changes, do NOT edit in Phase 7 — return to Reviewer for v3.
 
-5. **Wait for owner confirmation of submit.** Do not advance until you hear an explicit "Submitted, continue with status.md". If Chrome reports `[DATO PENDIENTE]`, `[SECCION PENDIENTE]`, a missing attachment, or inconsistencies: alert the owner immediately; no submission with gaps. If the owner wants last-minute content changes, do NOT edit in Phase 7 — go back to Reviewer for v3.
+5. **Re-invocation for closeout (Phase 7b).** On a second invocation triggered by the owner's explicit "submitted" signal, proceed to step 6. Otherwise stay exited.
 
 6. **Update `status.md` to SUBMITTED** (after owner confirms).
    ```bash
@@ -106,18 +119,18 @@ If `TIPO_ENVIO` is mixed, define both the main source-of-truth and the attachmen
    git commit -m "docs(status): submitted <NOMBRE_KEBAB> — refs #<ISSUE_NUMBER>"
    git push origin main
 
-   gh api "repos/<org>/grants/contents/proposals/<CARPETA>/status.md" --jq '.sha'
+   gh api "repos/<ORG>/grants/contents/proposals/<CARPETA>/status.md" --jq '.sha'
    ```
-   Must return a SHA, not 404.
+   Expected: a non-empty SHA string. On 404 or empty, abort.
 
 7. **Swap Issue labels.**
    ```bash
-   gh issue edit <ISSUE_NUMBER> --repo <org>/grants --remove-label "draft-for-review" --add-label "submitted"
-   gh issue view <ISSUE_NUMBER> --repo <org>/grants --json labels --jq '[.labels[].name]'
+   gh issue edit <ISSUE_NUMBER> --repo <ORG>/grants --remove-label "draft-for-review" --add-label "submitted"
+   gh issue view <ISSUE_NUMBER> --repo <ORG>/grants --json labels --jq '[.labels[].name]'
    ```
-   Output must include `submitted` and exclude `draft-for-review`.
+   Expected output: a JSON array that includes `submitted` and excludes `draft-for-review`. Abort on mismatch.
 
-8. **Send the owner the closing DM.** Format:
+8. **Emit the closing briefing (artifact only — the caller decides where to route it).**
    ```
    Submitted — <FUNDER> <grant name>
 
@@ -125,7 +138,7 @@ If `TIPO_ENVIO` is mixed, define both the main source-of-truth and the attachmen
    - Date: <YYYY-MM-DD>
    - Type: <TIPO_ENVIO>
    - Issue: #<ISSUE_NUMBER> (label: submitted)
-   - PR: https://github.com/<org>/grants/pull/<PR_NUMBER>
+   - PR: https://github.com/<ORG>/grants/pull/<PR_NUMBER>
    - Learnings captured in shared-resources/learnings/by-funder/<FUNDER_KEBAB>.md
 
    Cycle closed.
@@ -134,19 +147,20 @@ If `TIPO_ENVIO` is mixed, define both the main source-of-truth and the attachmen
 
 ## Pitfalls
 
-- **Symptom:** Owner said "merged", but `gh pr view` shows `OPEN`. **Cause:** The merge did not complete, or the owner confused PRs. **Fix:** Ask the owner to confirm. Do not advance until `merged: true`.
-- **Symptom:** Chrome hits `[DATO PENDIENTE]` mid-form. **Cause:** v2 was not fully depurated. **Fix:** Stop the cycle. Go back to Reviewer for v3. Never submit with pending data.
-- **Symptom:** A required attachment is missing from `proposals/<CARPETA>/attachments/`. **Cause:** Attachments were never gathered. **Fix:** Escalate to the owner before advancing. Do not submit incomplete.
+- **Symptom:** Caller said "merged", but `gh pr view` shows `OPEN`. **Cause:** The merge did not complete, or the wrong PR was named. **Fix:** Abort and ask the caller to confirm. Do not advance until `merged: true`.
+- **Symptom:** Browser agent hits `[DATO PENDIENTE]` mid-form. **Cause:** v2 was not fully depurated. **Fix:** Exit this phase and return to Reviewer for v3. Never submit with pending data.
+- **Symptom:** A required attachment is missing from `proposals/<CARPETA>/attachments/`. **Cause:** Attachments were never gathered. **Fix:** Escalate to the caller before advancing. Do not submit incomplete.
 - **Symptom:** Owner wants a last-minute copy edit. **Cause:** Post-merge tweaks. **Fix:** Do NOT edit in Phase 7. Return to Reviewer, produce v3, re-merge.
-- **Symptom:** Someone clicked submit (agent, Chrome, or CI). **Cause:** Role violation. **Fix:** Stop immediately. Only the owner clicks submit. If it happened, document it and review the cycle.
-- **Symptom:** Chrome improvises responses outside `<ARCHIVO_V2>`. **Cause:** Chrome interpreted fields beyond the mapping. **Fix:** Stop Chrome, correct with the exact mapping.
+- **Symptom:** Someone clicked submit (agent, browser agent, or CI). **Cause:** Role violation. **Fix:** Stop immediately. Only the owner clicks submit. If it happened, document it and review the cycle.
+- **Symptom:** Browser agent improvises responses outside `<ARCHIVO_V2>`. **Cause:** Agent interpreted fields beyond the mapping. **Fix:** Stop the agent, correct with the exact mapping.
+- **Symptom:** Phase 7 skill ran straight to closeout before the owner submitted. **Cause:** Ignored the exit-and-re-invoke split in steps 4–5. **Fix:** Phase 7 is two invocations — handoff, then closeout. No in-process wait.
 
 ## Verification
 
 - `gh pr view <PR_NUMBER> --json merged --jq '.merged'` returns `true`.
-- `gh api repos/<org>/grants/contents/proposals/<CARPETA>/status.md --jq '.sha'` returns a SHA.
+- `gh api repos/<ORG>/grants/contents/proposals/<CARPETA>/status.md --jq '.sha'` returns a non-empty SHA.
 - `gh issue view <ISSUE_NUMBER> --json labels --jq '[.labels[].name]'` contains `submitted` and not `draft-for-review`.
-- Owner received the closing DM.
+- Closing briefing artifact was emitted to stdout (the caller forwards it wherever needed).
 
 ## References
 

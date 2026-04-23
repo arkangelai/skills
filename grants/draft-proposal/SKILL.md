@@ -21,23 +21,35 @@ Writer activates when the project owner adds `start-draft` to a grant Issue. It 
 - An Issue has a Go decision and needs a folder + v1 draft.
 - You need to re-enter Writer after a pause (owner says "continue Writer at Step X").
 
-**Do not use:** to review a v1 draft (that's `grants/review-proposal`), to evaluate opportunities (that's `grants/scout-opportunities`), or to fill a submission form (that's `grants/submit-proposal`).
+**Do not use:** to review a v1 draft (that's `grants/review-grant`), to evaluate opportunities (that's `grants/scout-opportunities`), or to fill a submission form (that's `grants/submit-proposal`).
+
+## Inputs (passed by the caller)
+
+The skill is atomic. The caller passes:
+
+```
+ISSUE_NUMBER     e.g. 260
+ORG              GitHub org owning the grants repo
+NOMBRE_KEBAB     e.g. horizon-edctp3-digit-02
+CARPETA          e.g. 2026-09_HORIZON-EDCTP3-DIGIT-02
+FUNDER           e.g. EU Horizon Europe / EDCTP3
+```
+
+Branch is always `draft/<NOMBRE_KEBAB>`. Metadata that can start as "Por confirmar" and be validated by the browser agent: `OFICIAL_URL`, `DEADLINE`, `MONTO`, `ELEGIBILIDAD`, `TIPO_ENVIO`. Missing these does not block Phase 2.
+
+## Preflight
+
+1. **`gh` access.** Verify `gh` is available and authenticated for `<ORG>/grants`:
+   ```bash
+   gh auth status
+   gh repo view <ORG>/grants --json name --jq '.name'
+   ```
+   Expected: "Logged in" + `grants`. Abort and report if either fails.
+2. **Browser agent.** Phase 2 needs a browser agent to gather official sources. Before starting, invoke the preflight in `grants/chrome-navigate-grant/SKILL.md` — it resolves whether the harness has a built-in browser capability and, if not, asks the user which browser agent to use. Do not proceed with Phase 2 until a browser agent is resolved.
 
 ## Procedure
 
-Execute **one step at a time**. Paste the verifier output after each commit — no "I pushed it" without `gh api` output.
-
-### Minimum variables before starting
-
-```
-ISSUE_NUMBER  = e.g. 260
-NOMBRE_KEBAB  = e.g. horizon-edctp3-digit-02
-CARPETA       = e.g. 2026-09_HORIZON-EDCTP3-DIGIT-02
-BRANCH        = draft/<NOMBRE_KEBAB>
-FUNDER        = e.g. EU Horizon Europe / EDCTP3
-```
-
-Metadata that can start as "Por confirmar" and be validated by the browser agent: `OFICIAL_URL`, `DEADLINE`, `MONTO`, `ELEGIBILIDAD`, `TIPO_ENVIO`. Missing these does not block Phase 2.
+Execute **one step at a time**. After every verification command, compare output to the expected pattern and **abort on mismatch** — do not report success from local state alone.
 
 ### Phase 2 — Prep for the browser agent
 
@@ -53,20 +65,20 @@ Metadata that can start as "Por confirmar" and be validated by the browser agent
    git push origin main
    ```
 
-2. **Verify the scaffold reached GitHub (blocking).**
+2. **Assert the scaffold reached GitHub (blocking).**
    ```bash
-   gh api repos/<org>/grants/contents/proposals/<CARPETA>/README.md --jq '.name'
+   gh api repos/<ORG>/grants/contents/proposals/<CARPETA>/README.md --jq '.name'
    ```
-   Must return `README.md`. On 404, the push failed — diagnose with `git status`, `git log`, retry.
+   Expected output: `README.md`. On 404 or any other response, the push failed — diagnose with `git status` / `git log`, retry, and abort if it still fails.
 
-3. **Prepare the Chrome prompt** from `templates/chrome-prompt-base.md`, substituting `[NOMBRE_OPORTUNIDAD]`, `[OFFICIAL_LINK]`, `[CARPETA_OBJETIVO] = proposals/<CARPETA>`, `[NOTAS_EXTRA]`. If official URL is unconfirmed, tell Chrome to validate URL, deadline, amount, eligibility, submission type from the official source.
+3. **Prepare the browser-agent prompt** from `templates/browser-agent-prompt-base.md` (or `chrome-prompt-base.md` if that's what the repo has), substituting `[NOMBRE_OPORTUNIDAD]`, `[OFFICIAL_LINK]`, `[CARPETA_OBJETIVO] = proposals/<CARPETA>`, `[NOTAS_EXTRA]`. If the official URL is unconfirmed, instruct the browser agent to validate URL, deadline, amount, eligibility, and submission type from the official source. The actual execution is handed off to the browser agent resolved in the Preflight; see `grants/chrome-navigate-grant/SKILL.md` for that playbook.
 
 4. **Leave constancy on the Issue.**
    ```bash
-   gh issue comment <ISSUE_NUMBER> --repo <org>/grants --body "Phase 2 ready. Folder proposals/<CARPETA>/ created on main. Chrome prompt handed off. Waiting for sources."
-   gh issue view <ISSUE_NUMBER> --repo <org>/grants --comments | tail -10
+   gh issue comment <ISSUE_NUMBER> --repo <ORG>/grants --body "Phase 2 ready. Folder proposals/<CARPETA>/ created on main. Browser-agent prompt handed off. Waiting for sources."
+   gh issue view <ISSUE_NUMBER> --repo <ORG>/grants --comments | tail -5
    ```
-   Then **stop**. Wait for owner confirmation or verifiable evidence in `proposals/<CARPETA>/sources/`. If 30 min pass without signal, send one Slack reminder; max 2 reminders.
+   Expected: your most recent comment appears at the tail. Abort on mismatch. Then **exit the skill**. Phase 3 resumes on a separate invocation, triggered by the harness when `proposals/<CARPETA>/sources/` is populated (or when the owner manually re-runs the skill). Do not poll, sleep, or send reminders from inside the skill.
 
 ### Phase 3 — Draft v1
 
@@ -83,12 +95,13 @@ Metadata that can start as "Por confirmar" and be validated by the browser agent
    ```
    For partner FLAGs, include 3–5 plausible partners/profiles marked as hypotheses. Do NOT stop — continue to Step 7 and put `[SECCION PENDIENTE - FLAG N: descripción]` in affected sections.
 
-7. **Create the branch.**
+7. **Create the branch and assert.**
    ```bash
    git checkout main && git pull
    git checkout -b draft/<NOMBRE_KEBAB>
-   git branch --show-current   # must print draft/<NOMBRE_KEBAB>
+   git branch --show-current
    ```
+   Expected output of the last command: `draft/<NOMBRE_KEBAB>`. Abort on mismatch — do not commit from the wrong branch.
 
 8. **Choose the output filename. One name per type:**
    - Online form → `drafts/field-mapping-responses.md`
@@ -102,20 +115,20 @@ Metadata that can start as "Por confirmar" and be validated by the browser agent
    - Budget coherent with activities and timeline.
    - **Speed rule:** first commit in `drafts/` in < 20 min, even with several `[DATO PENDIENTE]` markers.
 
-10. **Commit v1 + double verification.**
+10. **Commit v1 + double assertion.**
     ```bash
     git add "proposals/<CARPETA>/drafts/"
     git commit -m "feat(proposal): v1 draft for <NOMBRE_KEBAB> — refs #<ISSUE_NUMBER>"
     git push -u origin draft/<NOMBRE_KEBAB>
 
-    gh api repos/<org>/grants/branches/draft/<NOMBRE_KEBAB> --jq '.name'
-    gh api "repos/<org>/grants/contents/proposals/<CARPETA>/drafts/<ARCHIVO>?ref=draft/<NOMBRE_KEBAB>" --jq '.name'
+    gh api repos/<ORG>/grants/branches/draft/<NOMBRE_KEBAB> --jq '.name'
+    gh api "repos/<ORG>/grants/contents/proposals/<CARPETA>/drafts/<ARCHIVO>?ref=draft/<NOMBRE_KEBAB>" --jq '.name'
     ```
-    Paste both outputs. Leave an Issue summary comment with: branch, exact path, deliverable type, draft state, pending gaps, open FLAGs.
+    Expected outputs: branch name, then filename. Any 404 or empty response → abort; the push did not land. Then leave an Issue summary comment with: branch, exact path, deliverable type, draft state, pending gaps, open FLAGs.
 
 11. **Open the PR.**
     ```bash
-    gh pr create --repo <org>/grants --base main --head draft/<NOMBRE_KEBAB> \
+    gh pr create --repo <ORG>/grants --base main --head draft/<NOMBRE_KEBAB> \
       --title "Proposal: [grant title]" \
       --body "Refs #<ISSUE_NUMBER>
 
@@ -129,16 +142,16 @@ Metadata that can start as "Por confirmar" and be validated by the browser agent
 
     Next: Reviewer in Phase 4, depurador in Phase 5."
 
-    gh pr list --repo <org>/grants --head draft/<NOMBRE_KEBAB> --json number,url
+    gh pr list --repo <ORG>/grants --head draft/<NOMBRE_KEBAB> --json number,url
     ```
     Save the PR number.
 
 12. **Swap Issue labels to signal handoff to Reviewer.**
     ```bash
-    gh issue edit <ISSUE_NUMBER> --repo <org>/grants --remove-label "start-draft" --add-label "draft-for-review"
-    gh issue view <ISSUE_NUMBER> --repo <org>/grants --json labels --jq '[.labels[].name]'
+    gh issue edit <ISSUE_NUMBER> --repo <ORG>/grants --remove-label "start-draft" --add-label "draft-for-review"
+    gh issue view <ISSUE_NUMBER> --repo <ORG>/grants --json labels --jq '[.labels[].name]'
     ```
-    Output must include `draft-for-review` and exclude `start-draft`. Writer role ends here.
+    Expected output: a JSON array that includes `draft-for-review` and excludes `start-draft`. Abort on mismatch. Writer role ends here — exit cleanly. The harness re-invokes `review-grant` on the `draft-for-review` label event.
 
 ### When to use `agent:blocked` (narrow)
 
@@ -157,15 +170,14 @@ Do **not** block for: missing folder, incomplete source pack, no formal scout br
 ## Verification
 
 - Output of `git branch --show-current` is `draft/<NOMBRE_KEBAB>`.
-- `gh api repos/<org>/grants/branches/draft/<NOMBRE_KEBAB> --jq '.name'` returns the branch name.
-- `gh api "repos/<org>/grants/contents/proposals/<CARPETA>/drafts/<ARCHIVO>?ref=draft/<NOMBRE_KEBAB>" --jq '.name'` returns the filename.
+- `gh api repos/<ORG>/grants/branches/draft/<NOMBRE_KEBAB> --jq '.name'` returns the branch name.
+- `gh api "repos/<ORG>/grants/contents/proposals/<CARPETA>/drafts/<ARCHIVO>?ref=draft/<NOMBRE_KEBAB>" --jq '.name'` returns the filename.
 - `gh pr list --head draft/<NOMBRE_KEBAB>` returns a PR with a number and URL.
 - Issue labels include `draft-for-review`, exclude `start-draft`.
 
 ## References
 
-- `grants/pipeline-overview/SKILL.md`
-- `grants/chrome-navigate-grant/SKILL.md` — what the browser agent does during Phase 2.
-- `grants/review-proposal/SKILL.md` — next role (Reviewer) after you open the PR.
-- `grants/grant-review-6d/SKILL.md` — the 6-dimension review criteria your draft will face.
+- `grants/README.md`
+- `grants/chrome-navigate-grant/SKILL.md` — browser-agent playbook, including preflight for resolving which browser tool to use.
+- `grants/review-grant/SKILL.md` — next role (Reviewer) after you open the PR; contains the 6-dimension rubric your draft will face.
 - `shared-resources/50_TIPS_GANAR_GRANTS.md`
