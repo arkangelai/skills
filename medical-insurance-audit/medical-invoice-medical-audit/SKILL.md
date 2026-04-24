@@ -70,15 +70,16 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 **Absence as evidence:** If looking for an operative note and it is not found after searching the full HC PDF by content keywords (`NOTA OPERATORIA`, `DESCRIPCIÓN QUIRÚRGICA`), the evidence must state: `"HC pp.1-40: no se encontro nota operatoria para CUPS {X}"`.
 
 **`concepto_final` and `en_devolucion` decision logic:**
-- `concepto_final = APTA`: all applicable rules `pass`.
-- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
-- `en_devolucion = true`: any `critica` fail subsanable by document resubmission — takes priority even when glosas also exist.
+- `NO_APTA`: any rule with `resultado = "fail"` (positive evidence of clinical violation) that is not subsanable.
+- `DEVOLUCION`: any rule with `resultado = "fail"` that is subsanable by the IPS submitting additional documents or corrections.
+- `APTA`: all applicable rules have `resultado = "pass"` or `"n/a"`. Rules with `"n/a"` due to missing clinical information are observations — they do NOT prevent an APTA verdict.
+- `en_devolucion = true`: any `critica` fail (positive evidence) subsanable by document resubmission — takes priority even when glosas also exist.
 - `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
 - `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
 - `accion_requerida = null`: when `concepto_final = APTA`.
-- M06 (`fail`) → `concepto_final = NO_APTA`; if HC justification is absent, set `en_devolucion = true`.
-- HC OCR failure → emit a single finding documenting the failure, set `en_devolucion = true`, `concepto_final = NO_APTA`, and note uncertainty in `resumen_ejecutivo`.
-- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo`.
+- M06 (`fail` with positive evidence of GPC deviation) → `concepto_final = NO_APTA`; if clinical justification is absent from all documents, set `en_devolucion = true`.
+- HC OCR failure → emit a single finding noting OCR quality issues, evaluate remaining rules with reduced confidence, note uncertainty in `resumen_ejecutivo`.
+- Note: `ESCALAR_HUMANO` is no longer a valid concepto_final value. Rules with low confidence (`confianza < 0.75`) should still render a verdict and add an observation noting the low confidence.
 
 **`glosa_sugerida` shape (only when `resultado = fail`):**
 ```json
@@ -94,7 +95,13 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 ## Procedure
 
 1. **Load inputs.**
-   Read `metadata_input.json` from the working directory. Load the listed clinical attachments from the paths in `documentos[]`: `clinical_history`, `epicrisis`, `operative_note` (if there is a surgical CUPS), `orden_medica`, `consentimiento_informado`, `administracion_medicamentos`, `interconsultas`.
+   Read `metadata_input.json` from the working directory. Read `case_evidence.json` (produced by Step 0 document-understanding skill) for pre-classified documents and extracted clinical facts.
+   
+   Load ALL files listed in `documentos[]` regardless of filename or extension. Use `case_evidence.json.clasificacion_documentos` to understand what each file contains. Do NOT search for files by document type name — the same clinical information may appear in an epicrisis, a combined HC PDF, or distributed across multiple documents.
+   
+   Use `case_evidence.json.disponibilidad_informacion` to determine what clinical information is available before evaluating rules. If information is not available, the corresponding rule becomes an observation (`resultado: "n/a"` with explanatory `observaciones`), not a fail.
+   
+   If `case_evidence.json` is not present, fall back to reading all files directly and classifying by content.
 
 2. **Load clinical ref_data.**
    - `guias-clinicas/INDEX.md` + `guias-clinicas/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
@@ -113,7 +120,12 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
    Load `checklist_base.json` (29 rules M01–M29) and follow `checklist_base.md` for each rule. Fill the four nullable fields per `checklist_base.md §2.3`:
 
-   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — `"n/a"` only when the rule structurally cannot apply (e.g. M11 operative note for a case with no surgical CUPS).
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"`
+     - `"pass"` — the clinical information required by this rule was found and satisfies the criteria.
+     - `"fail"` — POSITIVE EVIDENCE of a clinical violation (e.g., procedure contradicts GPC, medication dose is wrong per evidence in the documents, documented clinical trajectory doesn't justify the stay). NEVER mark `"fail"` because a document type is absent.
+     - `"n/a"` — the rule structurally does not apply (e.g. M11 for non-surgical CUPS), OR the clinical information needed to evaluate this rule is not available in any document and there is no evidence of a clinical violation. `observaciones` must explain what was searched for and not found.
+     
+     **Information over documents:** If the epicrisis contains the clinical information that a "complete HC" would contain (admission diagnosis, clinical trajectory, procedures, medications, discharge), evaluate rules against that information. Do not fail a rule because the information comes from an epicrisis instead of a standalone historia clinica document.
    - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. Reference the loaded GPC for rules M04, M06, M10, M14, M19, M22. Examples:
      - `HC p.5 "BNP 380 pg/mL en descenso. Se continúa furosemida IV" [calc: criterio estancia GPC_falla_cardiaca §3.2 cumplido]`.
      - `Ecocardiograma 2026-04-09 "FEVI 32%" [calc: consistente con GPC_falla_cardiaca §2 criterios Framingham]`.
@@ -122,9 +134,9 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
    - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` on a critical rule → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 
-   Two hard rules regardless of confidence:
-   - **M06 `fail` always forces `concepto_final = "NO_APTA"`** — if HC justification is absent, also set `en_devolucion = true`.
-   - **HC OCR failure** → emit a single finding documenting the failure, set `en_devolucion = true`, `concepto_final = NO_APTA`, and note uncertainty in `resumen_ejecutivo`.
+   Special handling:
+   - **M06 (GPC deviation):** If the agent finds positive evidence that a procedure deviates from the applicable GPC AND no justification is documented in any available clinical document, mark `resultado = "fail"`. If the agent cannot determine GPC alignment because clinical documentation is insufficient, mark `resultado = "n/a"` with an observation explaining what clinical information would be needed. Do NOT mark `"fail"` solely because the justification document is missing.
+   - **HC OCR failure** → emit a single `conditional` finding noting OCR quality issues and evaluate remaining rules with reduced confidence. Do not abort all rules.
 
    See `checklist_base.md §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
 

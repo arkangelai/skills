@@ -52,6 +52,30 @@ The skill produces the canonical `output.json` — single source of truth for th
 
 `devolucion` does not exist as an item-level hallazgo value — it is expressed via `resumen.en_devolucion = true` at the case level.
 
+**New: `observaciones` array (case-level):**
+
+The output now includes an `observaciones` array alongside `hallazgos`. This array contains rules that could not be evaluated due to missing information (`resultado = "n/a"` where the reason is missing documents or inaccessible external systems, not structural inapplicability).
+
+```json
+{
+  "hallazgos": [ /* items with hallazgo="conforme" or hallazgo="glosa" — only rules with resultado="pass" or "fail" */ ],
+  "observaciones": [
+    {
+      "regla": "A16",
+      "nombre": "Historia clinica completa y firmada",
+      "capa": "administrativo",
+      "motivo": "No se encontro historia clinica de ingreso completa. La informacion clinica disponible proviene de epicrisis.pdf y nota_quirurgica.pdf. No se detecto violacion.",
+      "informacion_buscada": "Notas de ingreso con anamnesis y examen fisico completo",
+      "documentos_revisados": ["epicrisis.pdf", "nota_quirurgica.pdf", "kardex_medicamentos.txt"],
+      "impacto_en_veredicto": "ninguno — observacion informativa"
+    }
+  ],
+  "resumen": { /* concepto_final computed ONLY from hallazgos, NOT from observaciones */ }
+}
+```
+
+Observations do NOT affect `concepto_final`, `total_glosado`, `tasa_objecion`, or any aggregate metric. They are informational items for the human auditor to optionally investigate.
+
 **`regla_aplicada`**: single string ID of the most severe rule that triggered the hallazgo (not an array).
 
 **`valor_objetado`**: the per-item objected amount (replaces any reference to `valor_glosado` per item).
@@ -64,19 +88,27 @@ The skill produces the canonical `output.json` — single source of truth for th
 
 **Money invariant:** `total_aprobado + total_glosado = total_facturado` always. Per item, `valor_a_reconocer = valor_facturado − valor_objetado`.
 
-**`concepto_final` and `en_devolucion` decision logic (evaluated in order; first match wins):**
-1. `APTA + en_devolucion=false + accion_requerida=null` — all items conforme across all three layers.
-2. `NO_APTA + en_devolucion=false + accion_requerida="Correccion"` — items glosados, no missing critical docs.
-3. `NO_APTA + en_devolucion=true + accion_requerida="Rechazo"` — any critica fail subsanable by document resubmission (missing authorization, missing HC, missing operative note). Takes priority even when glosas also exist. Still fill ALL item-level glosas and valor_objetado for expected recovery amount.
-4. When any critica rule has `confianza < 0.75`: emit best-guess verdict per rules 1–3, state uncertainty in `resumen_ejecutivo`. The task system handles escalation to human review.
+**`concepto_final` and `en_devolucion` decision logic:**
+
+Count ONLY rules with `resultado = "fail"` (positive evidence of violation) toward the verdict. Rules with `resultado = "n/a"` (including those due to missing information) are listed in `observaciones` and do NOT affect the verdict.
+
+1. `NO_APTA + accion_requerida="Rechazo"` — any rule with `resultado = "fail"` (positive evidence) that is not subsanable (e.g. confirmed expired contract, confirmed patient not covered, confirmed clinical violation without possible correction).
+2. `NO_APTA + accion_requerida="Complemento" + en_devolucion=true` — any rule with `resultado = "fail"` that is subsanable by the IPS submitting corrections (e.g. wrong tariff applied, fixable billing error, missing signature on a document that IS present).
+3. `APTA + accion_requerida=null` — all rules have `resultado = "pass"` or `"n/a"`, `tasa_objecion = 0.0`. Observations are listed separately.
+4. `APTA + accion_requerida="Correccion"` — some minor glosas exist (non-critical `resultado = "fail"`) but all are partial and subsanable (`tasa_objecion > 0` but no critical fails with positive evidence).
+
+Note: `ESCALAR_HUMANO` is no longer a valid concepto_final. Low-confidence findings are flagged as observations with a note about confidence level.
 
 ## Procedure
 
 1. **Load the three audit outputs.**
    Read `admin_checklist_output.json`, `medical_checklist_output.json`, and `financial_checklist_output.json` from the working directory. Validate all three `instrumento` values are present; abort if any file is missing or its `instrumento` field is wrong.
 
-2. **Collect every finding with `resultado=fail` or `conditional`.**
-   Ignore `pass` — they do not produce findings for a glosa.
+2. **Separate findings from observations.**
+   - Collect every rule with `resultado = "fail"` → these become `hallazgos` (actual findings with positive evidence of violation).
+   - Collect every rule with `resultado = "n/a"` WHERE the reason is missing information (not structural inapplicability) → these become `observaciones` (items the human auditor can optionally investigate).
+   - Rules with `resultado = "pass"` → these become `conforme` items in `hallazgos`.
+   - Rules with `resultado = "n/a"` due to structural inapplicability (e.g., A14 ambulance for non-transport case) → omit from both arrays.
 
 3. **Group findings by invoice item (CUPS + date).**
    No deduplication — all failing rules are preserved. For each invoice item, collect every `rule_id` from every layer that flagged it into `reglas_aplicadas[]`. The detail evidence per rule stays in the individual checklist JSONs; callers read those directly if they need per-rule evidence.

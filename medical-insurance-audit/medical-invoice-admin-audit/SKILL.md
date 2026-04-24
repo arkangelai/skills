@@ -84,19 +84,26 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 ```
 
 **`concepto_final` and `en_devolucion` decision logic:**
-- `concepto_final = APTA`: all applicable rules `pass`.
-- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
-- `en_devolucion = true`: any `critica` fail subsanable by document resubmission (missing authorization, missing operative note, etc.) — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for the expected recovery amount.
+- `NO_APTA`: any `critica` rule with `resultado = "fail"` (positive evidence of violation) that is not subsanable.
+- `DEVOLUCION`: any `critica` rule with `resultado = "fail"` that is subsanable by the IPS submitting additional documents or corrections.
+- `APTA`: all applicable rules have `resultado = "pass"` or `"n/a"`. Rules with `"n/a"` due to missing information are observations — they do NOT prevent an APTA verdict.
+- `en_devolucion = true`: any `critica` fail (positive evidence) subsanable by document resubmission — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for the expected recovery amount.
 - `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
 - `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
 - `accion_requerida = null`: when `concepto_final = APTA`.
-- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo` — the task system handles escalation.
+- Note: `ESCALAR_HUMANO` is no longer a valid concepto_final value. Rules with low confidence (`confianza < 0.75`) should still render a verdict (pass, fail, or n/a) and add an observation noting the low confidence for the human reviewer to prioritize.
 
 ## Procedure
 
 1. **Load inputs from the working directory.**
    - Read `metadata_input.json` to get `ips_nit`, `invoice_number`, `service_date`, `patient_document`, `documentos[]`, `cups_principales[]`.
-   - Load each attachment from the paths listed in `documentos[]` — `invoice_xml`, `rips`, `clinical_history`, `authorization`, `epicrisis`, `operative_note` (if applicable given the CUPS).
+   - Read `case_evidence.json` (produced by the document-understanding skill in Step 0). This file contains:
+     - `clasificacion_documentos`: what each file actually contains (classified by content, not filename)
+     - `hechos_extraidos`: structured facts extracted from all documents (patient, dates, diagnoses, procedures, medications, signatures)
+     - `disponibilidad_informacion`: boolean map of what information is available across all documents
+     - `consistencia_cruzada`: cross-document consistency check results
+   - Load all files listed in `documentos[]` from the working directory. Accept ANY file format (PDF, XML, TXT, JSON, images). Do NOT search for files by extension or filename pattern. Use `case_evidence.json.clasificacion_documentos` to understand what each file contains.
+   - If `case_evidence.json` is not present, fall back to reading all files in `documentos[]` directly and classifying them by content (read first pages, determine document type from content signals, not filename).
 
    All files listed in `documentos[]` MUST be attempted. A missing file is not a silent skip — declare its absence as evidence (e.g. `"autorizacion.pdf: no encontrado en el directorio de trabajo"`) and assess the impact on each dependent rule.
 
@@ -106,7 +113,12 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 
    For each rule, follow `checklist_base.md` §2.3 and §3. Fill the four nullable fields:
 
-   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` only when the rule structurally does not apply to this service type (e.g. A14 ambulance transport for a case with no transport).
+   - **`resultado`**: `"pass"` · `"fail"` · `"n/a"`
+     - `"pass"` — the information required by this rule was found in the available documents AND it satisfies the rule's criteria.
+     - `"fail"` — the agent has POSITIVE EVIDENCE of a rule violation. The required information was found and it contradicts the rule's criteria (e.g., dates don't match, NIT is wrong, signature is missing from a document that should have one, authorization doesn't cover the billed service). A rule MUST NOT be marked `"fail"` simply because a document is absent or information could not be found.
+     - `"n/a"` — EITHER the rule structurally does not apply to this service type (e.g. A14 ambulance transport for a case with no transport), OR the information needed to evaluate this rule is not available in any document and there is no evidence of a violation. When using `"n/a"` for missing information, `observaciones` MUST explain what information was searched for, where it was searched, and that no violation was detected. These become readable observations for the human auditor.
+     
+     **Core principle: innocent until proven guilty.** Absence of a document is not evidence of a violation. It is an observation. Only mark `"fail"` when you have found specific evidence that a rule's criteria are not met.
    - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. Examples:
      - Document quote: `HC p.3 "paciente egresa estable el 2026-04-13"`.
      - Reference with metadata: `autorizacion.pdf "Autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30"`.

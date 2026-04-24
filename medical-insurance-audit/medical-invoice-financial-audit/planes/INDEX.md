@@ -10,7 +10,7 @@ Ruteo para el sub-agente financiero: dado `plan_id` obtenido de BDUA, se carga e
 | `PLATA` | [plan_plata.md](plan_plata.md) | "Plan Plata Complementario", "Plata", "Intermedio" |
 | `BASICO` | [plan_basico.md](plan_basico.md) | "Plan Básico PBS", "Básico", "PBS", "POS" |
 
-Si `plan_id` no coincide con ninguno de los tres → `concepto_final = "ESCALAR_HUMANO"` con observación en F04.
+Si `plan_id` no coincide con ninguno de los tres → F04 `resultado = "n/a"` con observación explicando que el plan no pudo ser identificado. Se agrega observación para revisión humana.
 
 ## Comparativa resumida
 

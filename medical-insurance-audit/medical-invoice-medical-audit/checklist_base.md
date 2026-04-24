@@ -49,9 +49,13 @@ Si ningún CIE-10 coincide con las GPCs disponibles, el agente debe llenar `meta
 **Campos llenables:**
 
 #### `resultado`
-- `"pass"` — la regla se cumple.
-- `"fail"` — la regla se incumple → `glosa_sugerida` obligatoria.
-- `"n/a"` — la regla no aplica (ej. M11 nota operatoria cuando no hubo cirugía).
+- `"pass"` — la información clínica requerida por la regla fue encontrada en los documentos disponibles Y cumple los criterios de la regla.
+- `"fail"` — el agente tiene EVIDENCIA POSITIVA de una violación clínica. La información fue encontrada y contradice los criterios de la regla (ej. procedimiento contradice GPC, dosis incorrecta según evidencia en documentos, trayectoria clínica no justifica la estancia). Una regla NO DEBE marcarse `"fail"` simplemente porque un tipo de documento está ausente.
+- `"n/a"` — la regla no aplica estructuralmente (ej. M11 nota operatoria cuando no hubo cirugía), O la información clínica necesaria no está disponible en ningún documento y no hay evidencia de violación. Cuando se usa `"n/a"` por información faltante, `observaciones` DEBE explicar qué se buscó y no se encontró.
+
+**Principio: información sobre documentos.** Si la epicrisis contiene la información clínica que una "HC completa" contendría (diagnóstico de ingreso, trayectoria clínica, procedimientos, medicamentos, egreso), evaluar las reglas contra esa información. No marcar `"fail"` porque la información proviene de una epicrisis en lugar de un documento de historia clínica independiente.
+
+Requiere llenar `glosa_sugerida` SOLO cuando `resultado == "fail"`.
 
 #### `evidencia`
 Específica del dominio clínico. Ejemplos válidos:
@@ -105,7 +109,7 @@ Causales frecuentes en médico: **3** (soporte faltante), **4** (autorización n
 | Campo | Valores válidos |
 |---|---|
 | `resultado` | `"pass"` · `"fail"` · `"n/a"` · `null` (solo mientras no ha sido evaluado) |
-| `confianza` | Float 0.0–1.0. `0.90+`: evidencia unívoca alineada con GPC. `0.75–0.90`: requiere inferencia pero hay soporte en HC. `<0.75` en cualquier regla crítica → `concepto_final = "ESCALAR_HUMANO"`. |
+| `confianza` | Float 0.0–1.0. `0.90+`: evidencia unívoca alineada con GPC. `0.75–0.90`: requiere inferencia pero hay soporte en HC. `<0.75` en cualquier regla → el agente debe igualmente emitir un veredicto (`pass`, `fail`, o `n/a`) pero agregar una observación señalando la baja confianza para que el revisor humano priorice la verificación. La baja confianza por sí sola NO cambia el `concepto_final`. |
 | `glosa_sugerida` | `null` si `resultado != "fail"`. Objeto con 5 campos si `resultado == "fail"`. |
 | `glosa_sugerida.causal_num` | `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones |
 | `glosa_sugerida.causal_nombre` | Nombre que corresponde al `causal_num` (ej. `"Pertinencia"` para `"6"`) |
@@ -117,7 +121,7 @@ Causales frecuentes en médico: **3** (soporte faltante), **4** (autorización n
 | Campo | Valores válidos / cómo llenarlo |
 |---|---|
 | `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
-| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"`. Ver §4. `DEVOLUCION` se expresa como `NO_APTA` con `en_devolucion = true`. |
 | `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. Dimensión dominante del hallazgo. |
 | `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
 | `resumen_ejecutivo` | String. 1–2 frases. Debe nombrar cualquier regla crítica en `fail`. |
@@ -165,25 +169,30 @@ Peso total: **73**. Peso crítico: **48**. Peso mayor: **24**. Peso baja: **1**.
 ## 4. Umbrales y lógica de decisión
 
 ```
-si (M06 "fail"):                                           concepto_final = "ESCALAR_HUMANO"   # siempre
-si (cualquier regla crítica "fail" y no subsanable):       concepto_final = "NO_APTA"
-si (crítica "fail" subsanable con info adicional HC):      concepto_final = "DEVOLUCION"
-si (confianza < 0.75 en alguna crítica):                   concepto_final = "ESCALAR_HUMANO"
-si (caso atípico o dx raro sin GPC):                       concepto_final = "ESCALAR_HUMANO"
-si (sin críticas en fail):                                 concepto_final = "APTA"
-sino:                                                      concepto_final = "DEVOLUCION"
+si (existe alguna regla con resultado "fail" — evidencia positiva de violación clínica):
+    si (todas las reglas en fail son subsanables):             concepto_final = "DEVOLUCION", accion_requerida = "Complemento"
+    sino:                                                      concepto_final = "NO_APTA",   accion_requerida = "Rechazo"
+
+sino (todas las reglas aplicables tienen resultado "pass" o "n/a"):  concepto_final = "APTA", accion_requerida = null
+
+Nota: M06 con resultado "fail" (evidencia positiva de desviación de GPC sin justificación) → NO_APTA. Si la documentación clínica es insuficiente para determinar adherencia a GPC, M06 es "n/a" con observación, NO "fail".
+Nota: las reglas con resultado "n/a" por información faltante son observaciones — NO impiden un veredicto APTA.
+Nota: `ESCALAR_HUMANO` ya no es un valor válido de concepto_final. La baja confianza se documenta como observación.
 ```
 
 ---
 
-## 5. Cuándo escalar a humano
+## 5. Cuándo agregar observaciones para revisión humana
 
-- **Siempre:** M06 `fail` (desviación de GPC sin justificación).
-- **Siempre:** diagnóstico principal sin GPC en el corpus.
-- **Siempre:** uso de medicamento no-PBS sin MIPRES (M18 fail) en paciente pediátrico, oncológico o de alto costo.
-- **Siempre:** servicio experimental o fuera de vademécum aun con autorización.
-- **Condicional:** `confianza < 0.75` en cualquier regla crítica.
-- **Condicional:** desenlace con evento adverso grave (M29).
+Las siguientes condiciones generan **observaciones** (no cambian el `concepto_final`, pero se documentan para que el auditor humano priorice su revisión):
+
+- M06 con `resultado = "n/a"` por documentación clínica insuficiente para determinar adherencia a GPC.
+- Diagnóstico principal sin GPC en el corpus — M04 queda en `"n/a"` con observación.
+- Uso de medicamento no-PBS sin MIPRES (M18 fail con evidencia positiva) en paciente pediátrico, oncológico o de alto costo.
+- Servicio experimental o fuera de vademécum aun con autorización.
+- `confianza < 0.75` en cualquier regla — el agente emite su mejor veredicto pero señala la incertidumbre.
+- Desenlace con evento adverso grave (M29).
+- Información clínica necesaria para evaluar una regla no disponible en ningún documento — la regla se marca `"n/a"` con observación.
 
 ---
 
