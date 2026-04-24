@@ -86,13 +86,14 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 **`resultado`, `confianza`** follow the same rules as admin-audit.
 
 **`concepto_final` and `en_devolucion` decision logic:**
-- `concepto_final = APTA`: all applicable rules pass.
-- `concepto_final = NO_APTA`: any rule with `resultado = fail`.
-- `en_devolucion = true`: any `critica` fail subsanable by document resubmission — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for expected recovery amount.
+- `NO_APTA`: any rule with `resultado = "fail"` (positive evidence of violation) that is not subsanable.
+- `DEVOLUCION`: any rule with `resultado = "fail"` that is subsanable by the IPS submitting corrections.
+- `APTA`: all applicable rules have `resultado = "pass"` or `"n/a"`. Rules with `"n/a"` due to missing information or inaccessible external databases are observations — they do NOT prevent an APTA verdict.
+- `en_devolucion = true`: any `critica` fail (positive evidence) subsanable by document resubmission — takes priority even when glosas also exist. When `en_devolucion = true`, still fill all item glosas for expected recovery amount.
 - `accion_requerida = "Rechazo"`: when `en_devolucion = true`.
 - `accion_requerida = "Correccion"`: when `en_devolucion = false` and glosas exist.
 - `accion_requerida = null`: when `concepto_final = APTA`.
-- Uncertain (any `critica` with `confianza < 0.75`): emit best-guess verdict, document uncertainty in `resumen_ejecutivo`.
+- Note: `ESCALAR_HUMANO` is no longer a valid concepto_final value. Rules with low confidence should still render a verdict and add an observation noting the low confidence.
 
 **`glosa_sugerida` shape (only when `resultado = fail`):**
 ```json
@@ -113,7 +114,13 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 ## Procedure
 
 1. **Load inputs.**
-   Read `metadata_input.json` from the working directory. Load `invoice_xml`, `rips`, `clinical_history` (to validate services actually delivered), and `authorization` from the paths in `documentos[]`.
+   Read `metadata_input.json` from the working directory. Read `case_evidence.json` (produced by Step 0 document-understanding skill) for pre-classified documents, extracted invoice items, and authorization data.
+   
+   Load ALL files listed in `documentos[]` regardless of filename or extension. Use `case_evidence.json.clasificacion_documentos` to identify the invoice document (may be PDF, XML, or text), RIPS data (may be in any format), and authorization. Do NOT search for `*.xml` or `*rips*` file patterns.
+   
+   Use `case_evidence.json.factura_items` and `case_evidence.json.totales_factura` as the primary source for invoice line items. Cross-reference with the raw invoice document for verification.
+   
+   If `case_evidence.json` is not present, fall back to reading all files directly and extracting invoice items from whatever invoice document is available (PDF, XML, or text).
 
 2. **Load financial ref_data.**
    - Load `tarifarios/INDEX.md` to resolve the applicable tariff file per the precedence order defined there. Load the resolved CSV file(s) (`tarifarios/tarifario_contrato_eps_2026.csv` → `tarifarios/tarifario_iss_2001.csv` → `tarifarios/tarifario_soat_2026.csv`). BOTH `tarifarios/INDEX.md` AND the resolved CSV MUST be loaded before any tariff rule runs.
@@ -132,10 +139,16 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    - **`confianza`**: `0.95+` for exact numeric comparisons, `0.80–0.95` for plan coverage interpretation, `<0.80` for any anti-fraud rule forces escalation.
    - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `checklist_base.md §8`.
 
-   Anti-fraud thresholds (F29–F42) per `checklist_base.md §4` and §6:
-   - F32–F36 `fail` with `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
-   - Any F29–F42 `fail` with `confianza < 0.9` → emit best-guess verdict; document uncertainty in `resumen_ejecutivo` (the task system handles escalation).
-   - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → document in `resumen_ejecutivo`; the task system handles escalation regardless of confidence.
+   Anti-fraud thresholds (F29–F42):
+   - F32–F36 `fail` (with positive evidence) and `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
+   - Any F29–F42 `fail` (with positive evidence) and `confianza < 0.9` → `concepto_final = "NO_APTA"` with observation noting low confidence for human verification.
+   - Anti-fraud rules that cannot be evaluated due to missing external database access → `resultado = "n/a"` with observation.
+   - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → `concepto_final = "NO_APTA"` regardless of confidence.
+
+   **Rule-specific guidance for contract and external-system rules:**
+   - **F01 (Contrato activo):** The existence of a contract-specific tariff file (`tarifario_contrato_eps_2026.csv`) in the skill's reference data is evidence of a contractual relationship. If the tariff file references the prestador NIT found in the invoice, F01 should `"pass"` with an observation noting that the signed contract document was not in the case files. Only `"fail"` if there is positive evidence that no contract exists (e.g., prestador NIT not found in any tariff reference).
+   - **F03 (Anexos y otrosíes):** If no contract annexes are in the case files, mark `"n/a"` with observation. Absence of annexes is not evidence that unauthorized modifications were applied.
+   - **F32-F42 (Anti-fraud rules requiring external databases):** When the rule requires cross-referencing external databases (patient history across IPS, hospitalization overlaps, mortality records, provider patterns) and those databases are not accessible, mark `"n/a"` with an observation explaining what cross-check would be needed. Only mark `"fail"` when the agent has positive evidence of fraud from the available documents (e.g., two identical procedures billed on the same date found within the case files).
 
    See `checklist_base.md §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
 

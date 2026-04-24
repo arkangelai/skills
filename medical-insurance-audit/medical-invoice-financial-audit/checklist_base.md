@@ -53,7 +53,13 @@ Campos rúbrica (fijos): `id`, `nombre`, `severidad`, `peso`, `descripcion`, `ev
 Campos llenables — con matices financieros:
 
 #### `resultado`
-`"pass" | "fail" | "n/a"`. Usar `"n/a"` cuando la regla no aplica a la modalidad (p.ej. F19 PGP/cápita si la cuenta no está bajo esas modalidades).
+- `"pass"` — la información financiera requerida por la regla fue encontrada en los documentos disponibles Y cumple los criterios.
+- `"fail"` — el agente tiene EVIDENCIA POSITIVA de una violación financiera. La información fue encontrada y contradice los criterios (ej. tarifa excede contrato, doble cobro confirmado, liquidación incorrecta). Una regla NO DEBE marcarse `"fail"` simplemente porque un documento está ausente o un sistema externo no es accesible.
+- `"n/a"` — la regla no aplica a la modalidad (p.ej. F19 PGP/cápita si la cuenta no está bajo esas modalidades), O la información necesaria no está disponible y no hay evidencia de violación. Cuando se usa `"n/a"` por información faltante o bases de datos externas inaccesibles, `observaciones` DEBE explicar qué se buscó.
+
+**Principio central: inocente hasta que se demuestre lo contrario.** La ausencia de un documento (contrato, anexos) o la inaccesibilidad de bases externas (BDUA, ADRES, RUAF) no es evidencia de violación. Es una observación.
+
+Requiere llenar `glosa_sugerida` SOLO cuando `resultado == "fail"`.
 
 #### `evidencia`
 En financiero, la mayoría de evidencias son **comparativos numéricos**. Formatos típicos:
@@ -72,7 +78,7 @@ Obligatorio cuando:
 - `0.80–0.95` para inferencias contra el plan (p.ej. interpretación de "médicamente necesario").
 - `<0.80` en antifraude siempre escala (F32–F42).
 
-**Regla dura:** hallazgo antifraude (F32–F42) con confianza ≥0.9 → glosa automática; confianza <0.9 → `concepto_final = "ESCALAR_HUMANO"`.
+**Regla dura:** hallazgo antifraude (F32–F42) con confianza ≥0.9 y evidencia positiva → glosa automática; confianza <0.9 → `concepto_final = "NO_APTA"` con observación de baja confianza para verificación humana. Reglas antifraude que requieren bases de datos externas inaccesibles → `resultado = "n/a"` con observación.
 
 #### `glosa_sugerida`
 En financiero, la glosa debe incluir **monto**:
@@ -111,7 +117,7 @@ Campos estándar + tres específicos del financiero:
 | Campo | Valores válidos / cómo llenarlo |
 |---|---|
 | `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
-| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"`. Ver §4. `DEVOLUCION` se expresa como `NO_APTA` con `en_devolucion = true`. |
 | `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. |
 | `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
 | `resumen_ejecutivo` | String. 1–2 frases. Debe indicar el total glosado en COP. |
@@ -175,12 +181,18 @@ Peso total: **100**. Peso crítico: **54**. Peso mayor: **44**. Peso baja: **2**
 ## 4. Umbrales y lógica de decisión
 
 ```
-si (F32 / F33 / F34 / F35 / F36 en "fail" con confianza ≥0.9):    concepto_final = "NO_APTA" + bloqueo pagos adicionales al prestador durante revisión
-si (cualquier antifraude F29–F42 "fail" con confianza <0.9):       concepto_final = "ESCALAR_HUMANO"
-si (F17 / F19 / F26 "fail"):                                       concepto_final = "NO_APTA" (o "DEVOLUCION" si es corregible)
-si (diferencia tarifaria >10 % del valor facturado):               concepto_final = "NO_APTA"
-si (diferencia tarifaria 2–10 %):                                  concepto_final = "APTA con glosa parcial"
-si (diferencia <2 %):                                              concepto_final = "APTA"
+Solo reglas con resultado "fail" (evidencia positiva) cuentan para el veredicto:
+
+si (F32 / F33 / F34 / F35 / F36 en "fail" con evidencia positiva y confianza ≥0.9): concepto_final = "NO_APTA" + bloqueo pagos
+si (cualquier antifraude F29–F42 "fail" con evidencia positiva y confianza <0.9):    concepto_final = "NO_APTA" con observación de baja confianza
+si (antifraude sin acceso a base de datos externa):                                   resultado = "n/a" con observación
+si (F17 / F19 / F26 "fail" con evidencia positiva):                                  concepto_final = "NO_APTA" (o "DEVOLUCION" si es corregible)
+si (diferencia tarifaria >10 % del valor facturado):                                 concepto_final = "NO_APTA"
+si (diferencia tarifaria 2–10 %):                                                    concepto_final = "APTA con glosa parcial"
+si (diferencia <2 %):                                                                concepto_final = "APTA"
+si (todas las reglas "pass" o "n/a"):                                                concepto_final = "APTA"
+
+Nota: `ESCALAR_HUMANO` ya no es un valor válido. Las reglas con "n/a" por información faltante son observaciones que NO impiden APTA.
 ```
 
 `valor_aprobado` nunca puede ser negativo. Si `valor_glosado > valor_facturado`, hay error de cálculo — escalar.
@@ -237,12 +249,16 @@ Formato similar a F32, pero restringido a estancia (CUPS S10*). Debe incluir fec
 
 ---
 
-## 6. Umbrales de escalación a humano
+## 6. Cuándo agregar observaciones para revisión humana
 
-- Cualquier regla F32–F36 en `fail` con `confianza < 0.9` → **siempre** escala.
-- Hallazgo antifraude con monto total objetado >$10.000.000 COP → **siempre** escala (protección ante falso positivo costoso).
-- Prestador con score histórico en rojo (F42) + 2 o más reglas antifraude en fail en la misma cuenta → escalamiento + alerta a Superintendencia si procede.
-- Plan del afiliado no identificable con certeza (F04 con confianza <0.9) → bloquea el resto de la auditoría financiera hasta resolución.
+Las siguientes condiciones generan **observaciones** (no cambian el `concepto_final`, pero se documentan para que el auditor humano priorice su revisión):
+
+- Cualquier regla F32–F36 en `fail` con `confianza < 0.9` → `concepto_final = "NO_APTA"` con observación de baja confianza.
+- Reglas antifraude que requieren bases de datos externas inaccesibles → `resultado = "n/a"` con observación.
+- Hallazgo antifraude con monto total objetado >$10.000.000 COP → observación de alto impacto para revisión humana prioritaria.
+- Prestador con score histórico en rojo (F42) + 2 o más reglas antifraude en fail → observación + alerta a Superintendencia si procede.
+- Plan del afiliado no identificable con certeza (F04 con confianza <0.9) → F04 `resultado = "n/a"` con observación. Evaluar reglas de cobertura con el plan más conservador disponible.
+- Información necesaria para evaluar una regla financiera no disponible — la regla se marca `"n/a"` con observación.
 
 ---
 

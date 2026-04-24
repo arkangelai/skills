@@ -32,7 +32,7 @@ Extraída por el agente de `factura.pdf`. No se copia de `metadata_input_base.js
 ---
 
 ### `hallazgos`
-Array con un objeto por cada ítem facturado. Los ítems conformes y los glosados aparecen todos — ninguno se omite.
+Array con un objeto por cada ítem facturado. Los ítems conformes y los glosados aparecen todos — ninguno se omite. Solo contiene ítems con `resultado = "pass"` o `resultado = "fail"` de las capas de auditoría.
 
 | Campo | Valores válidos / cómo llenarlo |
 |---|---|
@@ -46,7 +46,7 @@ Array con un objeto por cada ítem facturado. Los ítems conformes y los glosado
 | `severidad` | `"critica"` · `"mayor"` · `"menor"` · `null`. Severidad de `regla_aplicada`. `null` si conforme. |
 | `valor_objetado` | Integer COP. Monto objetado del ítem. `0` si conforme. |
 | `valor_a_reconocer` | Integer COP. `valor_facturado − valor_objetado`. Igual a `valor_facturado` si conforme. |
-| `confianza` | Float 0.0–1.0 o `null`. Confianza en el hallazgo. `null` si conforme. `< 0.75` en regla crítica → `concepto_final = "ESCALAR_HUMANO"`. |
+| `confianza` | Float 0.0–1.0 o `null`. Confianza en el hallazgo. `null` si conforme. `< 0.75` genera una observación para revisión humana (no cambia `concepto_final`). |
 | `evidencia_requerida` | String o `null`. Qué debe presentar el prestador para subsanar. `null` si conforme. |
 | `glosa_sugerida` | `null` si conforme. Objeto con `causal_num`, `causal_nombre`, `texto`, `valor_glosado`, `moneda` si hay hallazgo. |
 
@@ -57,11 +57,26 @@ Array con un objeto por cada ítem facturado. Los ítems conformes y los glosado
 
 | Campo | Descripción |
 |---|---|
-| `causal_num` | Código Anexo 6 Res. 3047/2008: `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones. `null` si no hay mapeo claro — en ese caso `concepto_final = ESCALAR_HUMANO` hasta que un auditor asigne la causal en fix-review. |
+| `causal_num` | Código Anexo 6 Res. 3047/2008: `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones. `null` si no hay mapeo claro — se documenta como observación para que un auditor asigne la causal en fix-review. |
 | `causal_nombre` | Nombre legible de la causal (ej. `"Tarifas"`, `"Pertinencia"`). |
 | `texto` | Justificación concreta y trazable de la glosa. 1–2 oraciones. |
 | `valor_glosado` | Monto objetado en COP. En glosas tarifarias es la diferencia; en glosas de pertinencia o soportes es el valor total del ítem. |
 | `moneda` | Siempre `"COP"`. |
+
+---
+
+### `observaciones`
+Array de reglas que no pudieron ser evaluadas por información faltante (`resultado = "n/a"` donde la razón es documentos ausentes o sistemas externos inaccesibles, no inaplicabilidad estructural). Las observaciones NO afectan `concepto_final`, `total_glosado`, `tasa_objecion`, ni ninguna métrica agregada. Son ítems informativos para el auditor humano.
+
+| Campo | Descripción |
+|---|---|
+| `regla` | String. ID de la regla (ej. `"A16"`, `"M07"`, `"F01"`). |
+| `nombre` | String. Nombre de la regla. |
+| `capa` | `"administrativo"` · `"medico"` · `"financiero"`. Sub-agente que generó la observación. |
+| `motivo` | String. Por qué la regla no pudo ser evaluada (específico, citando qué se buscó). |
+| `informacion_buscada` | String. Qué información necesitaba la regla. |
+| `documentos_revisados` | Array de strings. Nombres de archivos que se revisaron. |
+| `impacto_en_veredicto` | Siempre `"ninguno — observacion informativa"`. |
 
 ---
 
@@ -76,25 +91,26 @@ Calculado por el orquestador al consolidar los tres sub-agentes.
 | `num_items` | Integer. Total de ítems en la factura. |
 | `num_conformes` | Integer. Ítems con `hallazgo == "conforme"`. |
 | `num_glosas` | Integer. Ítems con `hallazgo == "glosa"`. |
-| `num_devoluciones` | Integer. Ítems con `hallazgo == "devolucion"`. |
+| `num_observaciones` | Integer. Reglas con `resultado == "n/a"` por información faltante (no inaplicabilidad estructural). |
 | `tasa_objecion` | Float. `total_glosado / total_facturado × 100`. Un decimal. |
 | `glosas_por_capa` | Objeto con `administrativo`, `medico`, `financiero` (enteros). Conteo de glosas por sub-agente. |
-| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver lógica abajo. |
-| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"`. Ver lógica abajo. |
+| `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `null`. |
 | `resumen_ejecutivo` | String. 1–2 frases para el dashboard. Debe mencionar `concepto_final` y hallazgos críticos. |
 
 #### Lógica de `concepto_final`
 
+Solo reglas con `resultado = "fail"` (evidencia positiva de violación) cuentan para el veredicto. Las reglas con `resultado = "n/a"` (información faltante) se listan en `observaciones` y NO afectan el veredicto.
+
 ```
 # Evaluado en orden; primer match gana
-si (cualquier regla crítica en fail y no subsanable):      "NO_APTA"        → accion: "Rechazo"
-si (cualquier regla crítica en fail subsanable con docs):  "DEVOLUCION"     → accion: "Complemento"
-si (confianza < 0.75 en cualquier regla crítica):          "ESCALAR_HUMANO" → accion: "Escalar"
-si (antifraude F32–F36 con confianza < 0.9):               "ESCALAR_HUMANO" → accion: "Escalar"
-si (causal_num = null en cualquier hallazgo):              "ESCALAR_HUMANO" → accion: "Escalar"
-si (tasa_objecion == 0):                                   "APTA"           → accion: null
-si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → accion: "Correccion"
+si (cualquier regla con resultado "fail" y no subsanable):        "NO_APTA"  → accion: "Rechazo"
+si (cualquier regla con resultado "fail" subsanable):             "NO_APTA"  → accion: "Complemento", en_devolucion: true
+si (tasa_objecion > 0 y solo glosas parciales no-críticas):       "APTA"     → accion: "Correccion"
+si (tasa_objecion == 0, todas "pass" o "n/a"):                    "APTA"     → accion: null
 ```
+
+Nota: `ESCALAR_HUMANO` y `DEVOLUCION` ya no son valores válidos de `concepto_final`. La devolución se expresa como `NO_APTA` con `en_devolucion = true`. La baja confianza se documenta como observación.
 
 ---
 
@@ -153,6 +169,17 @@ si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → 
       "evidencia_requerida": null
     }
   ],
+  "observaciones": [
+    {
+      "regla": "A16",
+      "nombre": "Historia clinica completa y firmada",
+      "capa": "administrativo",
+      "motivo": "No se encontro historia clinica de ingreso completa. La informacion clinica disponible proviene de epicrisis.pdf y nota_quirurgica.pdf. No se detecto violacion.",
+      "informacion_buscada": "Notas de ingreso con anamnesis y examen fisico completo",
+      "documentos_revisados": ["epicrisis.pdf", "nota_quirurgica.pdf", "kardex_medicamentos.txt"],
+      "impacto_en_veredicto": "ninguno — observacion informativa"
+    }
+  ],
   "resumen": {
     "total_facturado": 7285000,
     "total_aprobado": 6685000,
@@ -160,7 +187,7 @@ si (tasa_objecion > 0 y solo glosas parciales):            "APTA"           → 
     "num_items": 8,
     "num_conformes": 7,
     "num_glosas": 1,
-    "num_devoluciones": 0,
+    "num_observaciones": 1,
     "tasa_objecion": 8.2,
     "glosas_por_capa": {
       "administrativo": 0,

@@ -54,9 +54,13 @@ Cada regla tiene **campos rúbrica** (fijos, no se tocan) y **campos llenables**
 
 #### `resultado`
 Valores válidos (strings):
-- `"pass"` — la regla se cumple.
-- `"fail"` — la regla se incumple. Requiere llenar `glosa_sugerida`.
-- `"n/a"` — la regla no aplica al caso (ej. A14 traslado en ambulancia cuando no hubo traslado).
+- `"pass"` — la información requerida por la regla fue encontrada en los documentos disponibles Y cumple los criterios de la regla.
+- `"fail"` — el agente tiene EVIDENCIA POSITIVA de una violación. La información fue encontrada y contradice los criterios de la regla (ej. fechas no coinciden, NIT incorrecto, firma ausente en un documento que debería tenerla, autorización no cubre el servicio facturado). Una regla NO DEBE marcarse `"fail"` simplemente porque un documento está ausente o la información no se encontró.
+- `"n/a"` — la regla no aplica estructuralmente al caso (ej. A14 traslado en ambulancia cuando no hubo traslado), O la información necesaria para evaluar esta regla no está disponible en ningún documento y no hay evidencia de violación. Cuando se usa `"n/a"` por información faltante, `observaciones` DEBE explicar qué información se buscó, dónde se buscó, y que no se detectó violación. Estas se convierten en observaciones legibles para el auditor humano.
+
+**Principio central: inocente hasta que se demuestre lo contrario.** La ausencia de un documento no es evidencia de una violación. Es una observación. Solo marcar `"fail"` cuando se ha encontrado evidencia específica de que los criterios de una regla no se cumplen.
+
+Requiere llenar `glosa_sugerida` SOLO cuando `resultado == "fail"`.
 
 #### `evidencia`
 Texto libre. Debe ser **verificable y específico**. Tres formatos válidos, en orden de preferencia:
@@ -78,7 +82,7 @@ Número `0.0`–`1.0`. Calibración sugerida:
 - `0.60–0.80` — evidencia indirecta o parcialmente ambigua.
 - `<0.60` — el agente no está seguro; escalar a humano obligatorio.
 
-Umbral operativo: **`confianza < 0.75` en cualquier regla crítica dispara `concepto_final = "ESCALAR_HUMANO"`**.
+Umbral operativo: cuando `confianza < 0.75` en cualquier regla, el agente debe igualmente emitir un veredicto (`pass`, `fail`, o `n/a`) pero agregar una observación señalando la baja confianza para que el revisor humano priorice la verificación. La baja confianza por sí sola NO cambia el `concepto_final`.
 
 #### `glosa_sugerida`
 Objeto o `null`. Estructura:
@@ -103,7 +107,7 @@ Objeto o `null`. Estructura:
 | Campo | Valores válidos / cómo llenarlo |
 |---|---|
 | `score_total` | `round(Σ(peso × 1 if resultado=="pass") / Σ(peso where resultado != "n/a") × 100, 1)`. Rango 0–100. `null` mientras se evalúa. |
-| `concepto_final` | `"APTA"` · `"NO_APTA"` · `"DEVOLUCION"` · `"ESCALAR_HUMANO"`. Ver §4. Determinado por lógica de reglas, no por score. |
+| `concepto_final` | `"APTA"` · `"NO_APTA"`. Ver §4. Determinado por lógica de reglas, no por score. `DEVOLUCION` se expresa como `NO_APTA` con `en_devolucion = true`. |
 | `clasificacion` | `"Administrativo"` · `"Tecnico"` · `"Clinico"` · `"Financiero"`. Dimensión dominante del hallazgo. |
 | `accion_requerida` | `"Correccion"` · `"Complemento"` · `"Rechazo"` · `"Escalar"` · `null`. |
 | `resumen_ejecutivo` | String. 1–2 frases para la UI. Debe mencionar explícitamente cualquier hallazgo crítico (regla crítica en `fail`). |
@@ -153,13 +157,13 @@ Las 21 reglas SOAT (S01–S21) están listadas en `checklist_soat_base.json` con
 El `concepto_final` se deriva del estado de las reglas — no de un score numérico:
 
 ```
-si (existe alguna regla crítica con resultado "fail"):
-    si (todas las criticas en fail son subsanables con complemento docs): concepto_final = "DEVOLUCION", accion_requerida = "Complemento"
-    sino:                                                                  concepto_final = "NO_APTA",   accion_requerida = "Rechazo"
+si (existe alguna regla con resultado "fail" — evidencia positiva de violación):
+    si (todas las reglas en fail son subsanables con complemento docs): concepto_final = "DEVOLUCION", accion_requerida = "Complemento"
+    sino:                                                                concepto_final = "NO_APTA",   accion_requerida = "Rechazo"
 
-sino si (alguna regla con confianza < 0.75):                               concepto_final = "ESCALAR_HUMANO", accion_requerida = "Escalar"
+sino (todas las reglas aplicables tienen resultado "pass" o "n/a"):       concepto_final = "APTA", accion_requerida = null
 
-sino si (no hay criticas en fail):                                         concepto_final = "APTA", accion_requerida = "Correccion" si hay mayores en fail, sino null
+Nota: las reglas con resultado "n/a" por información faltante son observaciones — NO impiden un veredicto APTA. Se listan en la sección de observaciones del output para revisión humana opcional.
 ```
 
 - **DEVOLUCION** ≠ glosa. Es pedir al prestador que adjunte documentación faltante *antes* de reabrir auditoría.
@@ -168,17 +172,18 @@ sino si (no hay criticas en fail):                                         conce
 
 ---
 
-## 5. Cuándo escalar a humano
+## 5. Cuándo agregar observaciones para revisión humana
 
-Dispara `ESCALAR_HUMANO` **cualquiera** de estas condiciones:
+Las siguientes condiciones generan **observaciones** (no cambian el `concepto_final`, pero se documentan para que el auditor humano priorice su revisión):
 
-1. Una regla crítica con `confianza < 0.75`.
-2. Dos o más reglas críticas en `fail` que se contradicen entre sí (p.ej. A05 dice derechos vigentes pero A07 dice pagador incorrecto).
+1. Una regla con `confianza < 0.75` — el agente emite su mejor veredicto pero señala la incertidumbre.
+2. Dos o más reglas en `fail` que se contradicen entre sí (p.ej. A05 dice derechos vigentes pero A07 dice pagador incorrecto).
 3. Caso atípico: pagador ≠ SOAT/EPS estándar (ARL, medicina prepagada, particular), pluri-afiliación, paciente internacional.
 4. Servicio de alto costo (>$50.000.000 COP) aunque todas las reglas estén en `pass`.
 5. Prestador en lista de "patrón recurrente de hallazgos" (ver checklist financiero F42).
+6. Información necesaria para evaluar una regla no disponible en ningún documento — la regla se marca `"n/a"` con observación.
 
-El agente debe poblar `observaciones` a nivel de regla **y** `cierre.resumen_ejecutivo` con la razón del escalamiento.
+El agente debe poblar `observaciones` a nivel de regla **y** `cierre.resumen_ejecutivo` con las razones.
 
 ---
 
