@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-medical-audit
 description: Runs the clinical-pertinence audit of a Colombian medical invoice (valid CIE-10 diagnosis, adherence to MinSalud Guías de Práctica Clínica, signed medical order with RETHUS-registered professional, procedures with indication and operative note, medications with correct dose/duration, justified diagnostic aids, inpatient stay with admission criteria and daily progress, and epicrisis with discharge plan). Generates medical_checklist_output.json with findings cited to the clinical history. Use it when the user asks to audit the clinical side of a case, review procedure pertinence, or run the medical sub-agent of the pipeline.
-version: 1.0.0
+version: 2.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
@@ -30,10 +30,12 @@ The question it answers: **was what was billed clinically necessary, appropriate
 
 **Template:** same `metadata_input.json` shape as admin-audit — see `../medical-invoice-gmail-intake/metadata_input.json`.
 
-Additionally the skill resolves the applicable GPC before running rules:
+**Optional environment variable:** `GUIAS_CLINICAS_PATH` — absolute path to the directory containing `INDEX.md` and the `GPC_*.md` clinical practice guideline files. This variable is **optional**. If it is not defined, empty, or points to a non-existent directory, the skill MUST continue normally: set `meta.gpc_aplicada = "n/a"`, mark all GPC-dependent rules (M04, M06, M10, M14, M19, M22) as `resultado = "n/a"` with an observation stating that no clinical guidelines directory was provided, and evaluate all remaining rules as usual.
+
+When `GUIAS_CLINICAS_PATH` is set and valid, the skill resolves the applicable GPC before running rules:
 1. Extracts `diagnostico_principal` (CIE-10) from `factura.pdf`.
-2. Looks up the CIE-10 in `guias-clinicas/INDEX.md` (this skill's directory) to find the applicable GPC file.
-3. Loads `guias-clinicas/{gpc_file}.md` for criteria, indications, and standard of care.
+2. Looks up the CIE-10 in `$GUIAS_CLINICAS_PATH/INDEX.md` to find the applicable GPC file.
+3. Loads `$GUIAS_CLINICAS_PATH/{gpc_file}.md` for criteria, indications, and standard of care.
 4. If no GPC matches → `meta.gpc_aplicada = "n/a"`. Set rules M04, M06, M10, M14, M19, M22 to `resultado = "n/a"`. Audit continues normally — do not escalate solely because no GPC was found.
 
 ## Output Contract
@@ -94,6 +96,9 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 ## Procedure
 
+0. **Validate environment.**
+   Check if `GUIAS_CLINICAS_PATH` is defined and non-empty. If set, verify the directory exists and contains `INDEX.md`. If `GUIAS_CLINICAS_PATH` is not set, empty, or the directory does not exist, log a warning and continue — set an internal flag `gpc_available = false`. The audit proceeds without GPC data; GPC-dependent rules (M04, M06, M10, M14, M19, M22) will be marked `n/a`.
+
 1. **Load inputs.**
    Read `metadata_input.json` from the working directory. Read `case_evidence.json` (produced by Step 0 document-understanding skill) for pre-classified documents and extracted clinical facts.
    
@@ -103,10 +108,12 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
    
    If `case_evidence.json` is not present, fall back to reading all files directly and classifying by content.
 
-2. **Load clinical ref_data.**
-   - `guias-clinicas/INDEX.md` + `guias-clinicas/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
+2. **Load clinical ref_data (if available).**
+   Skip this step if `gpc_available = false` (from step 0). Set `meta.gpc_aplicada = "n/a"` and mark rules M04, M06, M10, M14, M19, M22 as `resultado = "n/a"` with `observaciones = "GUIAS_CLINICAS_PATH no configurada — reglas GPC omitidas"`.
 
-   `guias-clinicas/INDEX.md` MUST be loaded before running any rule. If the CIE-10 maps to a GPC file, that file MUST be loaded before running M04, M06, M10, M14, M19, M22. If no match is found, set `gpc_aplicada = "n/a"` and mark those rules `n/a`.
+   When `gpc_available = true`:
+   - Load `$GUIAS_CLINICAS_PATH/INDEX.md` + `$GUIAS_CLINICAS_PATH/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
+   - `$GUIAS_CLINICAS_PATH/INDEX.md` MUST be loaded before running any rule. If the CIE-10 maps to a GPC file, that file MUST be loaded from `$GUIAS_CLINICAS_PATH/` before running M04, M06, M10, M14, M19, M22. If no match is found, set `gpc_aplicada = "n/a"` and mark those rules `n/a`.
 
 3. **Extract structured clinical data.**
    - `diagnostico_principal` (CIE-10 + description) and secondaries.
@@ -156,6 +163,7 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 ## Pitfalls
 
+- **Symptom:** All GPC-dependent rules (M04, M06, M10, M14, M19, M22) are `n/a`. **Cause:** `GUIAS_CLINICAS_PATH` environment variable is not set or points to a non-existent directory. **Fix:** Set the variable to the absolute path of the directory containing `INDEX.md` and the `GPC_*.md` files. The audit runs without GPC data, but these 6 rules cannot be evaluated.
 - **Symptom:** M01 flags a valid CIE-10 as invalid. **Cause:** outdated CIE-10 catalog (latest 2026 vs. local 2024). **Fix:** update catalog and retry; meanwhile use `resultado=conditional`.
 - **Symptom:** M04 false positives — reports "non GPC-adherent" for a legitimate edge case. **Cause:** the loaded GPC does not capture all accepted exceptions. **Fix:** if the HC explicitly mentions an accepted exception criterion, mark `resultado=pass` with note; otherwise `conditional` and escalate.
 - **Symptom:** M11 reports missing operative note when it is present. **Cause:** the note is embedded inside the main HC PDF, not a separate attachment. **Fix:** search by content ("NOTA OPERATORIA", "DESCRIPCIÓN QUIRÚRGICA") across the full HC PDF, not by filename.

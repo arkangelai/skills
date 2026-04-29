@@ -87,8 +87,8 @@ Each audit skill runs **isolated** — it does not see results from the other au
 | **Intake** | 1 | [`medical-invoice-gmail-intake`](./medical-invoice-gmail-intake) | → `metadata_input.json` |
 | **Audit** | 2 | [`medical-invoice-document-understanding`](./medical-invoice-document-understanding) | `metadata_input.json` + all docs → `case_evidence.json` |
 | | 3 | [`medical-invoice-admin-audit`](./medical-invoice-admin-audit) | `case_evidence.json` + `metadata_input.json` + `checklist_base.json` → audit output |
-| | 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `case_evidence.json` + `metadata_input.json` + `checklist_base.json` → audit output |
-| | 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `case_evidence.json` + `metadata_input.json` + `checklist_base.json` → audit output |
+| | 4 | [`medical-invoice-medical-audit`](./medical-invoice-medical-audit) | `case_evidence.json` + `metadata_input.json` + `checklist_base.json` + `$GUIAS_CLINICAS_PATH` → audit output |
+| | 5 | [`medical-invoice-financial-audit`](./medical-invoice-financial-audit) | `case_evidence.json` + `metadata_input.json` + `checklist_base.json` + `$TARIFARIOS_PATH` + `$PLANES_PATH` → audit output |
 | | 6 | [`medical-invoice-consolidator-audit`](./medical-invoice-consolidator-audit) | audit outputs → `output.json` (hallazgos + observaciones) |
 | **Claim denial** *(optional)* | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `output.json` → PDF |
 | | 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json` → revised `output.json` |
@@ -96,28 +96,26 @@ Each audit skill runs **isolated** — it does not see results from the other au
 
 ## Reference data
 
-Each audit skill ships with support files that the agent loads at runtime. These are bundled inside each skill directory — no external downloads required.
+Each audit skill ships with checklist templates (bundled inside the skill directory). Clinical guidelines, tariff schedules, and plan definitions are **external** — the calling agent must provide their location via environment variables.
 
-**Admin audit** (`medical-invoice-admin-audit/`)
+**Admin audit** (`medical-invoice-admin-audit/`) — bundled, no env vars required
 - `checklist_base.json` — DAMA-UK instrument, 27 rules (A01–A27)
 - `checklist_base.md` — rule descriptions, evidence requirements, decision logic
 - `checklist_soat_base.json` — SOAT-TEC variant for traffic-accident cases (21 rules S01–S21)
 
-**Medical audit** (`medical-invoice-medical-audit/`)
+**Medical audit** (`medical-invoice-medical-audit/`) — optionally uses `GUIAS_CLINICAS_PATH`
 - `checklist_base.json` — PERT-CLIN instrument, 29 rules (M01–M29)
 - `checklist_base.md` — rule descriptions, evidence requirements, decision logic
-- `guias-clinicas/INDEX.md` — maps CIE-10 prefixes to GPC files
-- `guias-clinicas/GPC_*.md` — 6 clinical practice guidelines (hypertension, coronary syndrome, arrhythmias, heart failure, respiratory ICU, obstetric)
+- External: `$GUIAS_CLINICAS_PATH/INDEX.md` — maps CIE-10 prefixes to GPC files
+- External: `$GUIAS_CLINICAS_PATH/GPC_*.md` — clinical practice guidelines per pathology
 
-**Financial audit** (`medical-invoice-financial-audit/`)
+**Financial audit** (`medical-invoice-financial-audit/`) — requires `TARIFARIOS_PATH` and `PLANES_PATH`
 - `checklist_base.json` — FIN-CTR instrument, 42 rules (F01–F42)
 - `checklist_base.md` — rule descriptions, evidence requirements, anti-fraud patterns, decision logic
-- `tarifarios/INDEX.md` — defines tariff precedence (contract > ISS 2001 > SOAT)
-- `tarifarios/tarifario_contrato_eps_2026.csv` — contract-specific tariff sheet
-- `tarifarios/tarifario_iss_2001.csv` — ISS 2001 fallback tariff
-- `tarifarios/tarifario_soat_2026.csv` — SOAT legal floor tariff
-- `planes/INDEX.md` — routes plan ID (ORO/PLATA/BASICO) to plan file
-- `planes/plan_oro.md`, `plan_plata.md`, `plan_basico.md` — coverages, exclusions, caps, carency periods, copays
+- External: `$TARIFARIOS_PATH/INDEX.md` — defines tariff precedence (contract > ISS 2001 > SOAT)
+- External: `$TARIFARIOS_PATH/tarifario_*.csv` — tariff schedule files
+- External: `$PLANES_PATH/INDEX.md` — routes plan ID (ORO/PLATA/BASICO) to plan file
+- External: `$PLANES_PATH/plan_*.md` — coverages, exclusions, caps, carency periods, copays
 
 ## Shared environment variables
 
@@ -126,6 +124,9 @@ Each audit skill ships with support files that the agent loads at runtime. These
 | `GOGCLI_CREDENTIALS_PATH` | 1, 9 | Path to `gogcli` OAuth credentials |
 | `GMAIL_WATCH_LABEL` | 1 | Label to watch (e.g. `INBOX`) |
 | `GMAIL_SENDER_ADDRESS` | 9 | Address the glosa is sent from |
+| `GUIAS_CLINICAS_PATH` | 4 | **Optional.** Absolute path to directory with `INDEX.md` + `GPC_*.md` clinical guidelines. If not set, GPC-dependent rules (M04, M06, M10, M14, M19, M22) are marked `n/a`. |
+| `TARIFARIOS_PATH` | 5 | **Required.** Absolute path to directory with `INDEX.md` + `tarifario_*.csv` tariff files |
+| `PLANES_PATH` | 5 | **Required.** Absolute path to directory with `INDEX.md` + `plan_*.md` plan files |
 
 ## Workflow states
 

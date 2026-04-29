@@ -66,7 +66,7 @@
           "severidad": "critica",
           "peso": 3,
           "descripcion": "El manejo clinico se ajusta a la GPC vigente (MinSalud o sociedad cientifica reconocida) para la patologia principal.",
-          "evidencia_requerida": "HC, protocolo institucional, GPC referenciada (carpeta guias-clinicas/).",
+          "evidencia_requerida": "HC, protocolo institucional, GPC referenciada (directorio $GUIAS_CLINICAS_PATH).",
           "dimensiones": ["Evidencia", "Adherencia"],
           "resultado": null,
           "evidencia": null,

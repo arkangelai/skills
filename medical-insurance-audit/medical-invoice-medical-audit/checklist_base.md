@@ -1,6 +1,6 @@
 # Checklist médico — Guía del auditor
 
-Documento maestro del instrumento **PERT-CLIN** (`checklist_base.json`). Explica qué significa cada campo del JSON, cómo llenarlo, cuándo consultar una GPC del corpus `guias-clinicas/`, qué valores son válidos y cuándo escalar a revisión humana.
+Documento maestro del instrumento **PERT-CLIN** (`checklist_base.json`). Explica qué significa cada campo del JSON, cómo llenarlo, cuándo consultar una GPC del directorio externo `$GUIAS_CLINICAS_PATH`, qué valores son válidos y cuándo escalar a revisión humana.
 
 ---
 
@@ -8,12 +8,12 @@ Documento maestro del instrumento **PERT-CLIN** (`checklist_base.json`). Explica
 
 El sub-agente médico valida la **pertinencia clínica** de cada servicio facturado: ¿el procedimiento estaba indicado?, ¿el medicamento era el correcto?, ¿la estancia estaba justificada?, ¿se siguió la guía de práctica clínica (GPC)?
 
-A diferencia del administrativo (formalidad) y financiero (tarifas), aquí el juicio es **clínico**. Por eso el JSON se complementa siempre con una GPC concreta del corpus `guias-clinicas/`.
+A diferencia del administrativo (formalidad) y financiero (tarifas), aquí el juicio es **clínico**. Por eso el JSON se complementa siempre con una GPC concreta del directorio externo `$GUIAS_CLINICAS_PATH`.
 
-### Relación con `guias-clinicas/`
+### Relación con guías clínicas externas
 
 1. El agente lee el **diagnóstico principal CIE-10** del radicado.
-2. Consulta `guias-clinicas/INDEX.md` para mapear el código CIE-10 → archivo GPC.
+2. Consulta `$GUIAS_CLINICAS_PATH/INDEX.md` para mapear el código CIE-10 → archivo GPC.
 3. Registra la guía seleccionada en `meta.gpc_aplicada` (p.ej. `"GPC_falla_cardiaca.md v2024"`).
 4. Usa esa GPC como referencia al evaluar M04, M06, M10, M14, M19, M22.
 
@@ -216,7 +216,7 @@ Las siguientes condiciones generan **observaciones** (no cambian el `concepto_fi
           "id": "M04", "nombre": "GPC vigente aplicada",
           "severidad": "critica", "peso": 3,
           "descripcion": "El manejo clinico se ajusta a la GPC vigente (MinSalud o sociedad cientifica reconocida) para la patologia principal.",
-          "evidencia_requerida": "HC, protocolo institucional, GPC referenciada (carpeta guias-clinicas/).",
+          "evidencia_requerida": "HC, protocolo institucional, GPC referenciada (directorio $GUIAS_CLINICAS_PATH).",
           "dimensiones": ["Evidencia", "Adherencia"],
           "resultado": "pass",
           "evidencia": "Dx principal I50.01 (falla cardíaca sistólica aguda). HC ingreso documenta Framingham 2 mayores + 2 menores (GPC §2). Manejo: furosemida 40 mg IV c/8h, enalapril 10 mg VO c/12h, carvedilol 6.25 mg VO c/12h — esquema alineado con GPC_falla_cardiaca §5 tabla 1. Ecocardiograma realizado día 1 (FEVI 32%).",

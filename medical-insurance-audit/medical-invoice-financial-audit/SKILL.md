@@ -1,7 +1,7 @@
 ---
 name: medical-invoice-financial-audit
 description: Runs the financial and anti-fraud audit of a Colombian medical invoice (active IPS contract with modality, affiliate plan and applicable tariff sheet, SOAT/ISS/proprietary manual with correct UVB/UVR, CUPS/CUM/INVIMA homologation, liquidation with surcharges and surgical access rules, packages vs. events, coverage limits and grace periods, copays, and 14 anti-fraud rules covering DIAN consecutive numbering, double-billing SOAT+EPS+ARL, overlapping stays, post-mortem services, upcoding, and unbundling). Generates financial_checklist_output.json. Use it when the user asks to audit tariffs/contracts/fraud or run the financial sub-agent of the pipeline.
-version: 1.0.0
+version: 2.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
@@ -30,18 +30,24 @@ The question it answers: **does the billed amount match the contract and the app
 
 **Template:** same `metadata_input.json` shape — see `../medical-invoice-gmail-intake/metadata_input.json`.
 
-Additionally the skill resolves two reference hierarchies from this skill's directory before running any rules:
+**Required environment variables:**
+- `TARIFARIOS_PATH` — absolute path to the directory containing `INDEX.md` and the `tarifario_*.csv` tariff files.
+- `PLANES_PATH` — absolute path to the directory containing `INDEX.md` and the `plan_*.md` plan files.
+
+If either variable is not defined or is empty, the skill MUST abort immediately with an error message: `"ERROR: {VARIABLE_NAME} is not set. Cannot run financial audit without reference data."`.
+
+Additionally the skill resolves two reference hierarchies before running any rules:
 
 **Plan resolution** (determines coverage rules, exclusions, caps, and carency):
 1. Extract `plan_afiliado` (ORO / PLATA / BASICO) from `plan_afiliados.json` using `paciente_documento`.
-2. Load `planes/INDEX.md` → identify plan file.
-3. Load `planes/plan_{id}.md` for the applicable coverage rules.
+2. Load `$PLANES_PATH/INDEX.md` → identify plan file.
+3. Load `$PLANES_PATH/plan_{id}.md` for the applicable coverage rules.
 
 **Tariff resolution** (ordered by precedence):
-1. Load `tarifarios/INDEX.md` — defines the precedence order.
-2. Contract-specific tariff (e.g. `tarifarios/tarifario_contrato_eps_2026.csv`) — highest priority.
-3. ISS 2001 tariff (`tarifarios/tarifario_iss_2001.csv`) — fallback if the contract references it.
-4. SOAT 2026 tariff (`tarifarios/tarifario_soat_2026.csv`) — legal floor for SOAT cases only.
+1. Load `$TARIFARIOS_PATH/INDEX.md` — defines the precedence order.
+2. Contract-specific tariff (e.g. `$TARIFARIOS_PATH/tarifario_contrato_eps_2026.csv`) — highest priority.
+3. ISS 2001 tariff (`$TARIFARIOS_PATH/tarifario_iss_2001.csv`) — fallback if the contract references it.
+4. SOAT 2026 tariff (`$TARIFARIOS_PATH/tarifario_soat_2026.csv`) — legal floor for SOAT cases only.
 
 The resolved `plan_afiliado` and `tarifario_aplicado` are written to `meta` before any rules run.
 
@@ -113,6 +119,9 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 ## Procedure
 
+0. **Validate environment.**
+   Check that `TARIFARIOS_PATH` and `PLANES_PATH` are defined and non-empty. Verify both directories exist and each contains `INDEX.md`. If any check fails, abort immediately with a clear error message naming the missing variable or file.
+
 1. **Load inputs.**
    Read `metadata_input.json` from the working directory. Read `case_evidence.json` (produced by Step 0 document-understanding skill) for pre-classified documents, extracted invoice items, and authorization data.
    
@@ -123,8 +132,8 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    If `case_evidence.json` is not present, fall back to reading all files directly and extracting invoice items from whatever invoice document is available (PDF, XML, or text).
 
 2. **Load financial ref_data.**
-   - Load `tarifarios/INDEX.md` to resolve the applicable tariff file per the precedence order defined there. Load the resolved CSV file(s) (`tarifarios/tarifario_contrato_eps_2026.csv` → `tarifarios/tarifario_iss_2001.csv` → `tarifarios/tarifario_soat_2026.csv`). BOTH `tarifarios/INDEX.md` AND the resolved CSV MUST be loaded before any tariff rule runs.
-   - Load `planes/INDEX.md` to identify the plan file for `plan_afiliado`. Load `planes/plan_{ORO|PLATA|BASICO}.md` for coverage rules, exclusions, caps, and carency periods. BOTH files MUST be loaded before any coverage rule runs.
+   - Load `$TARIFARIOS_PATH/INDEX.md` to resolve the applicable tariff file per the precedence order defined there. Load the resolved CSV file(s) (`$TARIFARIOS_PATH/tarifario_contrato_eps_2026.csv` → `$TARIFARIOS_PATH/tarifario_iss_2001.csv` → `$TARIFARIOS_PATH/tarifario_soat_2026.csv`). BOTH `$TARIFARIOS_PATH/INDEX.md` AND the resolved CSV MUST be loaded before any tariff rule runs.
+   - Load `$PLANES_PATH/INDEX.md` to identify the plan file for `plan_afiliado`. Load `$PLANES_PATH/plan_{ORO|PLATA|BASICO}.md` for coverage rules, exclusions, caps, and carency periods. BOTH files MUST be loaded before any coverage rule runs.
    - If the tariff file is absent, mark all tariff-dependent rules (F07–F16) `n/a` and declare the gap.
 
 3. **Extract invoice transactions.** Internal shape: `items[] = {cups, description, quantity, unit_price, total_price, access_route?, specialty?}`.
@@ -146,7 +155,7 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    - Anti-fraud finding with `valor_glosado > $10.000.000 COP` → `concepto_final = "NO_APTA"` regardless of confidence.
 
    **Rule-specific guidance for contract and external-system rules:**
-   - **F01 (Contrato activo):** The existence of a contract-specific tariff file (`tarifario_contrato_eps_2026.csv`) in the skill's reference data is evidence of a contractual relationship. If the tariff file references the prestador NIT found in the invoice, F01 should `"pass"` with an observation noting that the signed contract document was not in the case files. Only `"fail"` if there is positive evidence that no contract exists (e.g., prestador NIT not found in any tariff reference).
+   - **F01 (Contrato activo):** The existence of a contract-specific tariff file (`tarifario_contrato_eps_2026.csv`) in the reference data at `$TARIFARIOS_PATH` is evidence of a contractual relationship. If the tariff file references the prestador NIT found in the invoice, F01 should `"pass"` with an observation noting that the signed contract document was not in the case files. Only `"fail"` if there is positive evidence that no contract exists (e.g., prestador NIT not found in any tariff reference).
    - **F03 (Anexos y otrosíes):** If no contract annexes are in the case files, mark `"n/a"` with observation. Absence of annexes is not evidence that unauthorized modifications were applied.
    - **F32-F42 (Anti-fraud rules requiring external databases):** When the rule requires cross-referencing external databases (patient history across IPS, hospitalization overlaps, mortality records, provider patterns) and those databases are not accessible, mark `"n/a"` with an observation explaining what cross-check would be needed. Only mark `"fail"` when the agent has positive evidence of fraud from the available documents (e.g., two identical procedures billed on the same date found within the case files).
 
@@ -166,6 +175,7 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 ## Pitfalls
 
+- **Symptom:** Skill aborts immediately without evaluating any rule. **Cause:** `TARIFARIOS_PATH` or `PLANES_PATH` environment variable is not set or points to a non-existent directory. **Fix:** Set both variables to the absolute paths of the directories containing `INDEX.md` and their respective reference files.
 - **Symptom:** F13 false positives because of UVB factor. **Cause:** the contract uses UVB 2025 but the skill applied UVB 2026. **Fix:** read `uvb_factor` from `tarifario_contractual.csv` for the contract active on `service_date`, never from global variables.
 - **Symptom:** F32 flags "simultaneous" billing that is actually on different dates. **Cause:** the comparison used date-only (00:00 times). **Fix:** compare by hospitalization intervals, not exact `DATE`.
 - **Symptom:** F34 denies by post-mortem but the patient is alive. **Cause:** homonym in RUAF with a different document. **Fix:** cross by document + date of birth, never document alone.
