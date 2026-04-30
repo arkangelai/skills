@@ -63,6 +63,7 @@ On success, the skill creates a case task via the task assignment tool. The task
 | `pagador_nit` | string | DIAN XML → PDF extraction → body text | yes |
 | `pagador_nombre` | string | DIAN XML → PDF extraction → body text | yes |
 | `documentos` | string[] | Names of all downloaded attachments | yes |
+| `audit_perspective` | string | Always `"aseguradora"` — email intake is always triggered by the payer. For `"hospital"` (IPS self-audit before billing), create the task manually without using this skill. | no |
 
 The skill returns the envelope:
 
@@ -175,6 +176,7 @@ On validation failure: returns `{ "label_aplicado": "medical-invoice/error", "mo
    - **Upload the downloaded Gmail attachment files as task input files** — every file in the temp working directory is attached to the task so downstream audit skills can access them directly.
    - Assign `caso_id = "RAD-YYYYMMDD-{num_factura_normalizado}"`.
    - Assign `rad` in format `YYYYMMDD-NNNN` (sequential counter per day).
+   - Always set `audit_perspective = "aseguradora"` in the task context. Email-originated cases are always payer-initiated. To run a hospital self-audit (`audit_perspective = "hospital"`), create the task manually — do not use this intake skill.
    - Capture the `task_id` returned by the tool.
    - Clean up the temp folder after upload (or retain for debugging).
 

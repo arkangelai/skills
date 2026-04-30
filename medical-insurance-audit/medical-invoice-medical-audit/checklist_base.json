@@ -5,7 +5,8 @@
     "caso_id": null,
     "fecha_auditoria": null,
     "agente": null,
-    "gpc_aplicada": null
+    "gpc_aplicada": null,
+    "audit_perspective": null
   },
   "categorias": [
     {
@@ -282,6 +283,8 @@
           "descripcion": "Medicamentos fuera del PBS tienen justificacion clinica explicita y autorizacion (MIPRES u otra) antes de su uso.",
           "evidencia_requerida": "MIPRES, HC, autorizacion.",
           "dimensiones": ["Validez"],
+          "perspectiva_dependiente": true,
+          "perspectiva_nota": "La evaluacion clinica es identica en ambas perspectivas. En 'hospital' (task.context.audit_perspective): observaciones deben usar lenguaje de riesgo interno ('riesgo de glosa causal X si se radica sin MIPRES') en lugar de declarar la glosa. Ver SKILL.md §0.",
           "resultado": null,
           "evidencia": null,
           "observaciones": null,

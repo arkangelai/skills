@@ -128,6 +128,23 @@ Each audit skill ships with checklist templates (bundled inside the skill direct
 | `TARIFARIOS_PATH` | 5 | **Required.** Absolute path to directory with `INDEX.md` + `tarifario_*.csv` tariff files |
 | `PLANES_PATH` | 5 | **Required.** Absolute path to directory with `INDEX.md` + `plan_*.md` plan files |
 
+## Audit perspectives
+
+The `medical-audit` skill (skill 4) supports two perspectives set via **task context** (`task.context.audit_perspective`), not an environment variable — the same agent handles both depending on who creates the task:
+
+| `task.context.audit_perspective` | Who creates the task | What it produces |
+|---|---|---|
+| `aseguradora` *(default)* | Payer queues an audit of an IPS invoice | Glosas — payment denials addressed to the IPS billing team |
+| `hospital` | IPS queues a self-audit before billing | Riesgos de glosa — internal warnings to correct documentation before submitting to the payer |
+
+All 29 PERT-CLIN clinical rules apply identically in both perspectives. The only behavioral difference is in **M18** (non-PBS medications): in both cases the same check is performed (is MIPRES present?), but `observaciones` and `resumen_ejecutivo` use internal correction language when perspective is `hospital`.
+
+**How to activate each perspective:**
+- `aseguradora`: created automatically by skill 1 (gmail-intake) or manually via `ark tasks create` — this is the default.
+- `hospital`: create the task manually via `ark tasks create` with `context.audit_perspective = "hospital"`. Do not use skill 1 for hospital self-audits — email intake always produces `aseguradora` cases.
+
+The consolidator (skill 6) reads `meta.audit_perspective` from the medical checklist and propagates it to `output.json.resumen.audit_perspective`. Skills 7, 8, and 9 (claim-denial generation and delivery) are external systems — they should check `output.json.resumen.audit_perspective` before running and skip Phase 3 for `hospital` cases.
+
 ## Workflow states
 
 Each skill reads and writes status from `output.json resumen.label` and `resumen.status`. The table below documents the vocabulary:

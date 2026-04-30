@@ -104,6 +104,8 @@ Note: `ESCALAR_HUMANO` is no longer a valid concepto_final. Low-confidence findi
 1. **Load the three audit outputs.**
    Read `admin_checklist_output.json`, `medical_checklist_output.json`, and `financial_checklist_output.json` from the working directory. Validate all three `instrumento` values are present; abort if any file is missing or its `instrumento` field is wrong.
 
+   Read `meta.audit_perspective` from `medical_checklist_output.json` (default: `"aseguradora"` if absent). This value must be propagated to `resumen.audit_perspective` in the final output and governs the framing of `resumen_ejecutivo`.
+
 2. **Separate findings from observations.**
    - Collect every rule with `resultado = "fail"` → these become `hallazgos` (actual findings with positive evidence of violation).
    - Collect every rule with `resultado = "n/a"` WHERE the reason is missing information (not structural inapplicability) → these become `observaciones` (items the human auditor can optionally investigate).
@@ -143,7 +145,8 @@ Note: `ESCALAR_HUMANO` is no longer a valid concepto_final. Low-confidence findi
    - `glosas_por_capa` = sum of `valor_objetado` for glosa items per layer.
    - `en_devolucion` = `true` if any critica fail is subsanable by document resubmission; `false` otherwise.
    - `concepto_final` = per decision logic above.
-   - `resumen_ejecutivo` = 1–2 sentences for the dashboard mentioning `concepto_final`, `en_devolucion`, and key findings.
+   - `resumen_ejecutivo` = 1–2 sentences for the dashboard mentioning `concepto_final`, `en_devolucion`, and key findings. **If `audit_perspective = "hospital"`**: frame every finding as an internal action item — use "corrija antes de radicar", "riesgo de glosa causal X", "el pagador objetará si no se corrige". Do not use language that implies the payer has already decided (no "se glosa", no "se rechaza").
+   - `audit_perspective` = propagate the value read from `medical_checklist_output.json.meta.audit_perspective`.
 
 7. **Generate output.json.**
    Using the `output.json` template as the schema reference, build the consolidated object from scratch. Example shape:
@@ -197,6 +200,7 @@ Note: `ESCALAR_HUMANO` is no longer a valid concepto_final. Low-confidence findi
        "concepto_final": "NO_APTA",
        "en_devolucion": false,
        "accion_requerida": "Correccion",
+       "audit_perspective": "aseguradora",
        "resumen_ejecutivo": "Factura con 1 glosa financiera (F13 sobretarifa CUPS 890201, $300.000). Concepto NO_APTA con corrección requerida."
      }
    }
