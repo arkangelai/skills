@@ -28,7 +28,7 @@ La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a
 
 ## Input Contract
 
-**Template:** `context.json` en el directorio de trabajo — schema `hospitals/devolucion/context` (`salmona-api/lib/hospitales/devolucion/schemas/context.schema.json`).
+**Template:** `context.json` en el directorio de trabajo — schema `hospitals/devolucion/context`.
 
 Campos clave:
 
@@ -53,7 +53,7 @@ El skill genera **dos archivos** en el directorio de trabajo.
 
 ### 1. `progress-respuesta.json`
 
-Schema: `hospitals/devolucion/progress-respuesta` (`salmona-api/lib/hospitales/devolucion/schemas/progress-respuesta.schema.json`).
+Schema: `hospitals/devolucion/progress-respuesta`.
 
 ```json
 {
@@ -134,7 +134,7 @@ Schema: `hospitals/devolucion/progress-respuesta` (`salmona-api/lib/hospitales/d
 
 ### 2. `output.json`
 
-Schema: `hospitals/devolucion/output` (`salmona-api/lib/hospitales/devolucion/schemas/output.schema.json`).
+Schema: `hospitals/devolucion/output`.
 
 Consolida el progress en la estructura que consume el UI de Salmona:
 
@@ -257,11 +257,9 @@ Consolida el progress en la estructura que consume el UI de Salmona:
 
 ## References
 
-- `salmona-api/lib/hospitales/devolucion/schemas/` — schemas canónicos: `context.schema.json`, `progress-respuesta.schema.json`, `output.schema.json`.
-- `salmona-api/lib/hospitales/devolucion/data/HOSP-GL-1048/` — caso de ejemplo con context, progress y output de referencia.
-- `skills/medical-insurance-audit/medical-invoice-admin-audit/SKILL.md` — patrón de instrumento DAMA-UK (causales 3–4).
-- `skills/medical-insurance-audit/medical-invoice-medical-audit/SKILL.md` — patrón de instrumento PERT-CLIN (causales 1–2).
-- `skills/medical-insurance-audit/medical-invoice-financial-audit/SKILL.md` — patrón de instrumento FIN-CTR (causales 5–7).
+- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — instrumento DAMA-UK (causales 3–4), incluyendo `checklist_base.json` y `checklist_base.md`.
+- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — instrumento PERT-CLIN (causales 1–2).
+- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — instrumento FIN-CTR (causales 5–7).
 - Resolución 3047/2008 Anexo 6 — causales de glosa (1–7) y plazos de respuesta.
 - Resolución 1536/2022 — estructura RIPS.
 - Resolución 1995/1999 — historia clínica mínima.
