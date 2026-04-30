@@ -1,6 +1,6 @@
 ---
 name: hospital-devolucion-audit
-description: Analiza glosas o devoluciones técnicas recibidas de una EPS y produce una respuesta argumental ítem por ítem para que la IPS pueda defender, aceptar o reradicar cada cargo objetado. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según la causal de cada línea glosada. Emite progress-respuesta.json y output.json. Usar cuando la IPS recibe una glosa y necesita construir la respuesta dentro del plazo de 15 días hábiles (Res. 3047/2008).
+description: Analiza glosas o devoluciones técnicas recibidas de una EPS y produce una respuesta argumental ítem por ítem para que la IPS pueda defender, aceptar o reradicar cada cargo objetado. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según la causal de cada línea glosada. Emite progress-respuesta.json y devolucion_output.json. Usar cuando la IPS recibe una glosa y necesita construir la respuesta dentro del plazo de 15 días hábiles (Res. 3047/2008).
 version: 1.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -25,6 +25,8 @@ La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a
 - Auditoría preventiva: la IPS quiere anticipar qué ítems son vulnerables antes de radicar la factura.
 
 **No usar:** si el caso no tiene `context.json` en el directorio de trabajo; si el análisis ya está publicado y no se solicitó reanálisis.
+
+**IMPORTANTE — aislamiento de flujo:** Este skill pertenece exclusivamente al flujo `hospital_devolucion_audit`. No usar si `task_type != hospital_devolucion_audit`. No es un paso del pipeline de 9 skills (flujos `aseguradora` / `hospital` self-audit) — su input (`context.json`), sus outputs (`progress-respuesta.json`, `devolucion_output.json`) y su schema de tarea son completamente distintos. Un orquestador que no encuentra `task_type = hospital_devolucion_audit` en la tarea debe ignorar este skill por completo.
 
 ## Input Contract
 
@@ -132,7 +134,7 @@ Schema: `hospitals/devolucion/progress-respuesta`.
 
 ---
 
-### 2. `output.json`
+### 2. `devolucion_output.json`
 
 Schema: `hospitals/devolucion/output`.
 
@@ -220,7 +222,7 @@ Consolida el progress en la estructura que consume el UI de Salmona:
 
 4. **Generar `progress-respuesta.json`** con el schema exacto. Los campos `instrumento` y `descripcion` son constantes — copiarlos literalmente del schema.
 
-5. **Generar `output.json`** consolidando desde el progress:
+5. **Generar `devolucion_output.json`** consolidando desde el progress:
    - Completar `glosa` con los campos del `context.json`.
    - `diagnostico_principal`: extraer de la HC o los documentos clínicos. Si no se encuentra, usar `"Sin diagnóstico documentado"`.
    - Construir `hallazgos` solo para ítems con `decision_item != aceptar`. Seleccionar la regla principal aplicada (`regla_aplicada`) como la de mayor peso en la decisión.
@@ -246,13 +248,13 @@ Consolida el progress en la estructura que consume el UI de Salmona:
 ## Verification
 
 - [ ] `progress-respuesta.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/progress-respuesta`.
-- [ ] `output.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/output`.
+- [ ] `devolucion_output.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/output`.
 - [ ] `instrumento == "RESPUESTA-GLOSA"` y `descripcion` es la cadena literal del schema.
 - [ ] `Σ items_glosados[*].valor_glosado == cierre.valor_total_glosado`.
 - [ ] `cierre.valor_total_defendible + cierre.valor_total_aceptado == cierre.valor_total_glosado`.
 - [ ] Para cada ítem: `valor_a_defender + valor_a_aceptar == valor_glosado`.
 - [ ] Ningún ítem con `confianza < 0.80` en todas sus reglas de soporte tiene `decision_item = disputar`.
-- [ ] `hallazgos` en `output.json` no contiene ítems con `decision_item = aceptar`.
+- [ ] `hallazgos` en `devolucion_output.json` no contiene ítems con `decision_item = aceptar`.
 - [ ] Cada `evidencia` contiene archivo + sección/página + cita o justificación específica.
 
 ## References
