@@ -1,0 +1,45 @@
+{
+  "caso_id": "HOSP-GL-1048",
+  "tipo_documento": "glosa",
+  "num_documento": "GL-004821",
+  "num_factura_original": "FC-982144",
+  "prestador_nombre": "Clínica del Country",
+  "prestador_nit": "860.008.600-4",
+  "pagador_id": "sura",
+  "pagador_nombre": "EPS Sura",
+  "pagador_nit": "800.088.702-2",
+  "paciente_alias": "Paciente C-1842",
+  "paciente_documento_alias": "CC ***1842",
+  "fecha_ingreso": "2026-04-03",
+  "fecha_egreso": "2026-04-08",
+  "fecha_glosa": "2026-04-12",
+  "fecha_vencimiento": "2026-04-30",
+  "valor_facturado": 18420000,
+  "valor_glosado": 1530000,
+  "lineas": [
+    {
+      "id": "L-02",
+      "codigo": "S55201",
+      "descripcion": "Kit de laparoscopia avanzada",
+      "fecha_servicio": "2026-04-05",
+      "cantidad": 1,
+      "valor_facturado": 2450000,
+      "valor_glosado": 370000,
+      "causal_num": "3",
+      "motivo_glosa": "Tarifa del insumo quirúrgico supera el valor pactado en el contrato PBS + quirúrgico Sura 2026. Se reconoce COP 2.080.000 según anexo tarifario vigente.",
+      "accion": "corregir"
+    },
+    {
+      "id": "L-03",
+      "codigo": "UCI-DIA",
+      "descripcion": "Estancia UCI adulto",
+      "fecha_servicio": "2026-04-06",
+      "cantidad": 2,
+      "valor_facturado": 3700000,
+      "valor_glosado": 1160000,
+      "causal_num": "2",
+      "motivo_glosa": "No se evidencian criterios de severidad suficientes para justificar estancia en UCI por 2 días. La EPS reconoce 1 día por el postoperatorio inmediato.",
+      "accion": "disputar"
+    }
+  ]
+}

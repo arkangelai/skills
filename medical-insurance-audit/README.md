@@ -1,12 +1,22 @@
-# Medical Insurance Audit — Skills Pipeline
+# Medical Insurance Audit — Flujos y Skills
 
-Nine modular skills that implement the end-to-end audit pipeline for Colombian medical invoices (EPS–IPS), from Gmail intake to glosa (claim denial) delivery.
-
-Each skill is **modular and independent** — they can run standalone or be chained together by an orchestrator.
+Esta área contiene **tres flujos de auditoría independientes** para facturas médicas colombianas (EPS–IPS). Cada flujo tiene un `task_type` distinto, un contrato de input/output propio y un conjunto de skills que no se solapan con los de los otros flujos. Un orquestador nunca debe mezclar skills de flujos distintos en una misma ejecución.
 
 Domain terms that remain in Spanish are proper nouns from Colombian healthcare regulation (glosa, RAD, RIPS, EPS, IPS, CUPS, BDUA, RETHUS, MIPRES, DIAN, causal, Anexo 6).
 
-## Pipeline
+## Flujos
+
+| Flujo | `task_type` | Quién lo usa | Skills involucrados | Output final |
+|---|---|---|---|---|
+| **1 — EPS audita factura IPS** | `medical_invoice_audit` | EPS / aseguradora | Skills 1–9 | `output.json` |
+| **2 — IPS self-audit** | `medical_invoice_audit` + `audit_perspective = "hospital"` | IPS antes de radicar | Skills 2–6 (sin Phase 3) | `output.json` |
+| **3 — IPS responde una glosa** | `hospital_devolucion_audit` | IPS al recibir glosa de EPS | `hospital-devolucion-audit` | `devolucion_output.json` |
+
+Los flujos 1 y 2 comparten el mismo conjunto de skills; la diferencia es `audit_perspective` en el contexto de la tarea y si se ejecuta o no Phase 3. El flujo 3 es completamente independiente: skill distinto, input distinto (`context.json` en lugar de `metadata_input.json`), y no produce ni consume ningún archivo de los flujos 1 y 2.
+
+## Pipeline — Flujos 1 y 2
+
+> Aplica exclusivamente a `task_type = medical_invoice_audit`. No aplica al flujo 3.
 
 The pipeline runs in three phases: an isolated intake that enqueues cases, a sequential audit core that produces `output.json`, and optional claim-denial skills triggered on user request.
 
@@ -80,7 +90,21 @@ Each audit skill runs **isolated** — it does not see results from the other au
               └───────────────────────────────┘
 ```
 
-## Skills
+## Flujo 3 — hospital-devolucion-audit
+
+> `task_type = hospital_devolucion_audit`
+
+Skill standalone que analiza glosas recibidas de la EPS y construye la respuesta argumental ítem por ítem para que la IPS defienda, acepte o reradique cada cargo.
+
+**Input:** `context.json` (schema `hospitals/devolucion/context`) + documentos clínicos en el directorio de trabajo.
+
+**Outputs:**
+- `progress-respuesta.json` — análisis detallado por ítem (schema `hospitals/devolucion/progress-respuesta`)
+- `devolucion_output.json` — resumen consolidado para el UI de Salmona (schema `hospitals/devolucion/output`)
+
+**Aislamiento:** ningún archivo de este flujo (`context.json`, `progress-respuesta.json`, `devolucion_output.json`) es producido o consumido por los skills 1–9. El directorio de trabajo de un caso `hospital_devolucion_audit` nunca contiene `metadata_input.json`, `case_evidence.json`, `admin_checklist_output.json`, `medical_checklist_output.json`, `financial_checklist_output.json` ni `output.json`.
+
+## Skills — Flujos 1 y 2
 
 | Phase | # | Name | Key inputs / outputs |
 |---|---|---|---|
@@ -93,6 +117,7 @@ Each audit skill runs **isolated** — it does not see results from the other au
 | **Claim denial** *(optional)* | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `output.json` → PDF |
 | | 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json` → revised `output.json` |
 | | 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | `output.json` + PDF → sent |
+| **Flujo 3** | — | [`hospital-devolucion-audit`](./hospital-devolucion-audit) | `context.json` + docs → `progress-respuesta.json` + `devolucion_output.json` |
 
 ## Reference data
 
@@ -146,6 +171,8 @@ All 29 PERT-CLIN clinical rules apply identically in both perspectives. The only
 The consolidator (skill 6) reads `meta.audit_perspective` from the medical checklist and propagates it to `output.json.resumen.audit_perspective`. Skills 7, 8, and 9 (claim-denial generation and delivery) are external systems — they should check `output.json.resumen.audit_perspective` before running and skip Phase 3 for `hospital` cases.
 
 ## Workflow states
+
+> Aplica solo a los flujos 1 y 2 (`task_type = medical_invoice_audit`). El flujo 3 (`hospital_devolucion_audit`) no usa este vocabulario de labels ni status.
 
 Each skill reads and writes status from `output.json resumen.label` and `resumen.status`. The table below documents the vocabulary:
 
