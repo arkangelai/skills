@@ -17,7 +17,7 @@ A diferencia del administrativo (formalidad) y financiero (tarifas), aquí el ju
 3. Registra la guía seleccionada en `meta.gpc_aplicada` (p.ej. `"GPC_falla_cardiaca.md v2024"`).
 4. Usa esa GPC como referencia al evaluar M04, M06, M10, M14, M19, M22.
 
-Si ningún CIE-10 coincide con las GPCs disponibles, el agente debe llenar `meta.gpc_aplicada = null`, M04 queda en `"n/a"` con observación, y se escala a humano (§5 de `checklist_base.md`).
+Si ningún CIE-10 coincide con las GPCs disponibles, el agente debe llenar `meta.gpc_aplicada = null`, M04 queda en `"n/a"` con observación explicativa, y el audit continúa normalmente — las reglas GPC-dependientes (M04, M06, M10, M14, M19, M22) se marcan `"n/a"`. No escalar por ausencia de GPC.
 
 ---
 
@@ -96,11 +96,12 @@ Dos gatillos adicionales en médico:
 |---|---|
 | `causal_num` | `"1"` Facturación · `"2"` Tarifas · `"3"` Soportes · `"4"` Autorización · `"5"` Cobertura · `"6"` Pertinencia · `"7"` Anulaciones |
 | `causal_nombre` | Nombre que corresponde al `causal_num` (ej. `"Pertinencia"` para `"6"`) |
-| `texto` | String. Justificación breve y trazable. 1–2 oraciones. |
+| `texto` | String. Justificación breve y trazable. 1–2 oraciones. **Si `AUDIT_PERSPECTIVE = hospital`**: redactar como predicción ("el pagador objetará este ítem por causal X"), no como glosa emitida. |
 | `valor_glosado` | Integer COP o `null` si el agente médico no puede determinarlo; el financiero lo consolida. |
 | `moneda` | Siempre `"COP"`. |
 
 - `glosa_sugerida` es **obligatoria** si `resultado == "fail"`. Debe ser `null` si `resultado == "pass"` o `"n/a"`.
+- Con `AUDIT_PERSPECTIVE = hospital`: `glosa_sugerida` representa el **riesgo de glosa previsto** — se llena igual para que el equipo de facturación anticipe la objeción del pagador.
 
 Causales frecuentes en médico: **3** (soporte faltante), **4** (autorización no-PBS), **5** (cobertura), **6** (pertinencia).
 
@@ -170,11 +171,12 @@ Peso total: **73**. Peso crítico: **48**. Peso mayor: **24**. Peso baja: **1**.
 
 ```
 si (existe alguna regla con resultado "fail" — evidencia positiva de violación clínica):
-    si (todas las reglas en fail son subsanables):             concepto_final = "DEVOLUCION", accion_requerida = "Complemento"
-    sino:                                                      concepto_final = "NO_APTA",   accion_requerida = "Rechazo"
+    si (todas las reglas en fail son subsanables):   concepto_final = "NO_APTA", en_devolucion = true,  accion_requerida = "Complemento"
+    sino:                                            concepto_final = "NO_APTA", en_devolucion = false, accion_requerida = "Rechazo"
 
 sino (todas las reglas aplicables tienen resultado "pass" o "n/a"):  concepto_final = "APTA", accion_requerida = null
 
+Nota: `concepto_final` solo tiene dos valores válidos: "APTA" y "NO_APTA". "DEVOLUCION" no es un valor válido — se expresa como NO_APTA + en_devolucion = true.
 Nota: M06 con resultado "fail" (evidencia positiva de desviación de GPC sin justificación) → NO_APTA. Si la documentación clínica es insuficiente para determinar adherencia a GPC, M06 es "n/a" con observación, NO "fail".
 Nota: las reglas con resultado "n/a" por información faltante son observaciones — NO impiden un veredicto APTA.
 Nota: `ESCALAR_HUMANO` ya no es un valor válido de concepto_final. La baja confianza se documenta como observación.
@@ -188,7 +190,7 @@ Las siguientes condiciones generan **observaciones** (no cambian el `concepto_fi
 
 - M06 con `resultado = "n/a"` por documentación clínica insuficiente para determinar adherencia a GPC.
 - Diagnóstico principal sin GPC en el corpus — M04 queda en `"n/a"` con observación.
-- Uso de medicamento no-PBS sin MIPRES (M18 fail con evidencia positiva) en paciente pediátrico, oncológico o de alto costo.
+- Uso de medicamento no-PBS sin MIPRES (M18 fail con evidencia positiva) en paciente pediátrico, oncológico o de alto costo. **Con `AUDIT_PERSPECTIVE = hospital`**: documentar además como aviso al equipo de facturación ("corrija antes de radicar").
 - Servicio experimental o fuera de vademécum aun con autorización.
 - `confianza < 0.75` en cualquier regla — el agente emite su mejor veredicto pero señala la incertidumbre.
 - Desenlace con evento adverso grave (M29).
@@ -237,7 +239,9 @@ Las siguientes condiciones generan **observaciones** (no cambian el `concepto_fi
 }
 ```
 
-### 6.2 Ejemplo `fail` — medicamento no-PBS sin MIPRES → glosa causal 3
+### 6.2 Ejemplo `fail` — medicamento no-PBS sin MIPRES
+
+#### 6.2a AUDIT_PERSPECTIVE = aseguradora (glosa emitida)
 
 ```json
 {
@@ -254,6 +258,27 @@ Las siguientes condiciones generan **observaciones** (no cambian el `concepto_fi
     "causal_num": "3",
     "causal_nombre": "Soportes",
     "texto": "Sacubitril/Valsartán (no-PBS) facturado sin soporte MIPRES ni autorización previa del pagador. Resolución 1885/2018 art. 14.",
+    "valor_glosado": 842000,
+    "moneda": "COP"
+  }
+}
+```
+
+#### 6.2b AUDIT_PERSPECTIVE = hospital (riesgo de glosa interno)
+
+Mismos `resultado`, `evidencia` y `confianza`. Solo cambia `observaciones` y el `texto` de `glosa_sugerida`:
+
+```json
+{
+  "id": "M18",
+  "resultado": "fail",
+  "evidencia": "Factura ítem 12: Sacubitril/Valsartán 49/51 mg × 60 comp ($842.000). Medicamento no incluido en PBS (vademécum 2026). No se encontró MIPRES, junta técnica ni autorización en el expediente. HC evolución día 3 menciona 'inicio sacubitril/valsartán' sin referencia a autorización.",
+  "observaciones": "CORRIJA ANTES DE RADICAR — El pagador objetará este ítem por causal 3 (Soportes). Adjunte el MIPRES o la autorización previa del pagador antes de enviar la cuenta. Medicamento clínicamente indicado (FEVI <35%, NYHA II) — solo falta el soporte formal.",
+  "confianza": 0.91,
+  "glosa_sugerida": {
+    "causal_num": "3",
+    "causal_nombre": "Soportes",
+    "texto": "Riesgo de glosa: Sacubitril/Valsartán (no-PBS) sin MIPRES ni autorización en el expediente. El pagador aplicará causal 3 si se radica sin este soporte.",
     "valor_glosado": 842000,
     "moneda": "COP"
   }

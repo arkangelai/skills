@@ -6,7 +6,7 @@ author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
   hermes:
-    tags: [medical, audit, clinical, gpc, cie10, rethus, colombia, eps]
+    tags: [medical, audit, clinical, gpc, cie10, rethus, colombia, eps, hospital]
     category: medical-insurance-audit
     requires_toolsets: [terminal]
 ---
@@ -19,10 +19,10 @@ The question it answers: **was what was billed clinically necessary, appropriate
 
 ## When to Use
 
-- The orchestrator dispatches the **clinical** leg of a case.
+- The orchestrator dispatches the **clinical** leg of a case (task created with `task.context.audit_perspective = "aseguradora"`, or field absent).
 - The user asks "audit pertinence for invoice {RAD}" or "run the medical-auditor on case X".
 - Re-auditing a case with doubtful clinical findings after human-review.
-- Evaluating pertinence before authorizing a non-PBS service (preventive use).
+- **Hospital self-audit before billing**: the IPS wants to verify its own clinical documentation before submitting to the payer (set `AUDIT_PERSPECTIVE=hospital`). All 29 PERT-CLIN rules apply; only M18 framing and `cierre` language differ.
 
 **Do not use:** if the case does not have HC or epicrisis attached; if `medical_audit` is already published and a re-audit was not requested.
 
@@ -53,7 +53,7 @@ Then fill `meta` and append `cierre`:
 
 ```json
 {
-  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or \"n/a\">" },
+  "meta": { "caso_id": "...", "fecha_auditoria": "...", "agente": "agente-medico-v1", "gpc_aplicada": "<GPC filename or \"n/a\">", "audit_perspective": "aseguradora | hospital" },
   "cierre": {
     "score_total": null,
     "concepto_final": "APTA | NO_APTA",
@@ -96,7 +96,23 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 ## Procedure
 
-0. **Validate environment.**
+0. **Read audit perspective from task context.**
+   Read `task.context.audit_perspective` from the current task (via `ark tasks get <task_id>`).
+
+   Normalize: trim whitespace and convert to lowercase before comparing.
+   Valid values: `"aseguradora"`, `"hospital"`.
+   If the field is absent, null, empty, or any other value → use `"aseguradora"` as default and write a warning to `meta`: `"audit_perspective desconocido '{valor}' — usando default aseguradora"`.
+
+   Write the resolved value to `meta.audit_perspective` in the output.
+
+   | Value | Meaning | Output framing |
+   |---|---|---|
+   | `aseguradora` | Payer audits the IPS invoice | Findings are glosas — payment will be denied. `concepto_final = NO_APTA` means the invoice is rejected. `resumen_ejecutivo` is addressed to the billing team of the IPS. |
+   | `hospital` | IPS self-audits before billing | Findings are **riesgos de glosa** — internal warnings. `concepto_final = NO_APTA` means "do not submit as-is". `resumen_ejecutivo` must use actionable internal language ("corrija antes de radicar"). `glosa_sugerida` fields are still filled and represent what the payer *would* say — useful for the billing team to anticipate objections. |
+
+   **M18 under `hospital` perspective:** the clinical evaluation is identical — verify that every non-PBS medication has MIPRES or equivalent authorization. The difference is only in `observaciones` phrasing: use "riesgo de glosa causal X si se radica sin MIPRES" rather than declaring a glosa. Do NOT change `resultado` logic or `glosa_sugerida` structure.
+
+0a. **Validate GPC environment.**
    Check if `GUIAS_CLINICAS_PATH` is defined and non-empty. If set, verify the directory exists and contains `INDEX.md`. If `GUIAS_CLINICAS_PATH` is not set, empty, or the directory does not exist, log a warning and continue — set an internal flag `gpc_available = false`. The audit proceeds without GPC data; GPC-dependent rules (M04, M06, M10, M14, M19, M22) will be marked `n/a`.
 
 1. **Load inputs.**
@@ -109,7 +125,7 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
    If `case_evidence.json` is not present, fall back to reading all files directly and classifying by content.
 
 2. **Load clinical ref_data (if available).**
-   Skip this step if `gpc_available = false` (from step 0). Set `meta.gpc_aplicada = "n/a"` and mark rules M04, M06, M10, M14, M19, M22 as `resultado = "n/a"` with `observaciones = "GUIAS_CLINICAS_PATH no configurada — reglas GPC omitidas"`.
+   Skip this step if `gpc_available = false` (from step 0a). Set `meta.gpc_aplicada = "n/a"` and mark rules M04, M06, M10, M14, M19, M22 as `resultado = "n/a"` with `observaciones = "GUIAS_CLINICAS_PATH no configurada — reglas GPC omitidas"`.
 
    When `gpc_available = true`:
    - Load `$GUIAS_CLINICAS_PATH/INDEX.md` + `$GUIAS_CLINICAS_PATH/{gpc}.md` — CIE-10 → GPC routing and full clinical criteria.
@@ -152,7 +168,7 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
    Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.4` and §4:
    - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key overrides: M06 fail → `NO_APTA` (set `en_devolucion = true` if HC justification absent); any critical with `confianza < 0.75` → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
    - `clasificacion`: `"Clinico"`.
-   - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding.
+   - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding. **If `AUDIT_PERSPECTIVE = hospital`**: frame every finding as an internal action item — use language like "corrija antes de radicar", "riesgo de glosa causal X", "el pagador objetará este ítem si no se adjunta MIPRES". Avoid language that implies the payer has already decided (no "se glosa", no "se rechaza").
 
    Generate `medical_checklist_output.json` from scratch and write to the working directory.
 
