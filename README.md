@@ -45,56 +45,119 @@ albuquerque-v3/
 
 ## Skill catalog
 
-### Grants pipeline — see [`GRANTS.md`](./GRANTS.md)
-
-| Skill | Purpose |
-|---|---|
-| `scout-grants` | Discover, screen, and brief grant opportunities. |
-| `chrome-navigate` | Browser-driven enrichment and form-fill for grant portals. |
-| `develop-proposal` | Write the first strong pass of the proposal. |
-| `develop-budget` | Build and justify the budget by standard categories. |
-| `develop-timeline` | Build a feasible project timeline. |
-| `grant-review` | Pre-submit review with weighted scoring and v2 rewrite. |
-| `polish-grant` | Apply review/owner feedback into a clean follow-up version. |
-| `submit` | Verify approved source of truth and close the cycle after submission. |
-
-### Medical insurance audit (Colombia EPS-IPS) — see [`AUDIT.md`](./AUDIT.md)
-
-| Skill | Purpose |
-|---|---|
-| `medical-invoice-gmail-intake` | Watch Gmail and enqueue invoice cases for audit. |
-| `medical-invoice-document-understanding` | Step 0 — extract structured evidence from case documents. |
-| `medical-invoice-admin-audit` | Administrative audit (DAMA-UK, ~27 rules). |
-| `medical-invoice-medical-audit` | Clinical-pertinence audit (PERT-CLIN, ~29 rules). |
-| `medical-invoice-financial-audit` | Tariff and anti-fraud audit (FIN-CTR, ~42 rules + 14 fraud). |
-| `medical-invoice-consolidator-audit` | Merge findings, assign Anexo 6 causales, decide concepto_final. |
-| `medical-invoice-fix-review` | Apply human auditor edits to the consolidated output. |
-| `medical-invoice-claim-denial-generator` | Produce the formal glosa PDF (versioned). |
-| `medical-invoice-claim-denial-gmail-sender` | Send the final glosa via Gmail with delivery log. |
-| `hospital-devolucion-audit` | IPS-side: build per-item argumentation to respond to a glosa. |
-
-### Medical reference
-
-| Skill | Purpose |
-|---|---|
-| `cups-lookup` | Local CLI for the Colombian CUPS 2026 catalog (Res. 2706/2025). |
-| `icd10-lookup` | Local CLI for the CMS ICD-10-CM FY2026 diagnosis code set. |
-
-### Writing
-
-| Skill | Purpose |
-|---|---|
-| `copy-writer` | Improves copy using "Made to Stick" SUCCESs principles. |
-
-### Vendored from OpenClaw (third-party, OSS)
-
-These were imported from [OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills) under their original licenses. See each skill's `NOTICE.md`.
-
-| Skill | License | Purpose |
+| Category | Count | Use this when… |
 |---|---|---|
-| `markitdown` | MIT (Microsoft) | Convert PDFs/DOCX/XLSX/audio/images to Markdown for LLM-friendly processing. |
-| `markdown-mermaid-writing` | Apache-2.0 (Superior Byte Works) | Standard for writing markdown reports with embedded Mermaid diagrams. |
-| `medical-entity-extractor` | MIT (NAPSTER AI) | Extract symptoms, medications, lab values, and diagnoses from patient messages. |
+| [Grants pipeline](#grants-pipeline-8-skills) | 8 | Working on a grant proposal — discovery → scoping → drafting → review → submission. |
+| [Medical insurance audit](#medical-insurance-audit-10-skills) | 10 | Auditing Colombian EPS-IPS medical invoices, generating glosas, or responding to glosas. |
+| [Medical reference](#medical-reference-2-skills) | 2 | Validating CUPS or ICD-10 codes from clinical documents. |
+| [Writing](#writing-1-skill) | 1 | Sharpening copy, marketing, or pitch text. |
+| [Vendored OSS](#vendored-from-openclaw-3-skills) | 3 | Document-to-Markdown, mermaid diagrams, or extracting medical entities. |
+
+> **How to invoke any skill (Claude Code):** type `/skill-name` for a direct trigger, or just describe the task in natural language — the agent loads the skill automatically when the description matches.
+
+---
+
+### Grants pipeline (8 skills)
+
+Reference doc: [`GRANTS.md`](./GRANTS.md).
+
+**Workflow**
+
+```
+  1.scout-grants ─▶ 2.chrome-navigate ─▶ 3.develop-proposal ─▶ 4.develop-timeline ─▶ 5.develop-budget
+                                                                                              │
+                                                                                              ▼
+                          8.submit ◀── 7.polish-grant ◀── 6.grant-review ◀───────────────────┘
+```
+
+| # | Skill | When to use | How to invoke |
+|---|---|---|---|
+| 1 | [`scout-grants`](./skills/scout-grants/) | Triaging new grant calls; deciding go/no-go | `/scout-grants` · "find grants for X" / "is this call worth pursuing?" |
+| 2 | [`chrome-navigate`](./skills/chrome-navigate/) | After scout says go — extract rules, eligibility, form fields from the funder portal | `/chrome-navigate` · "extract rules from this grant portal" |
+| 3 | [`develop-proposal`](./skills/develop-proposal/) | Owner says "write the first draft" | `/develop-proposal` · "write the first draft of this proposal" |
+| 4 | [`develop-timeline`](./skills/develop-timeline/) | Methods exist; need a feasible execution timeline | `/develop-timeline` · "build the project timeline" |
+| 5 | [`develop-budget`](./skills/develop-budget/) | Methods + timeline exist; need numbers to match | `/develop-budget` · "build the budget for this proposal" |
+| 6 | [`grant-review`](./skills/grant-review/) | Draft + timeline + budget exist; need quality gate | `/grant-review` · "review this grant" / "is this ready?" |
+| 7 | [`polish-grant`](./skills/polish-grant/) | PR has review/owner comments to address | `/polish-grant` · "address the review comments" |
+| 8 | [`submit`](./skills/submit/) | Final draft approved; ready to close the cycle | `/submit` · "prepare submission" / "close this grant cycle" |
+
+---
+
+### Medical insurance audit (10 skills)
+
+Reference doc: [`AUDIT.md`](./AUDIT.md). The pipeline has three flows; the diagram below shows the most common one (Flow 1: EPS audits an IPS invoice).
+
+**Workflow — Flow 1 (EPS audita factura IPS)**
+
+```
+  Phase 1 (intake)
+    medical-invoice-gmail-intake ─▶ enqueues case
+
+  Phase 2 (audit core, sequential)
+    medical-invoice-document-understanding (Step 0)
+        │
+        ├─▶ medical-invoice-admin-audit
+        ├─▶ medical-invoice-medical-audit
+        └─▶ medical-invoice-financial-audit
+                    │
+                    ▼
+        medical-invoice-consolidator-audit ─▶ output.json
+                    │
+                    ▼ (if human review needed)
+        medical-invoice-fix-review
+
+  Phase 3 (claim denial, on demand)
+    medical-invoice-claim-denial-generator ─▶ glosa.pdf
+        │
+        ▼
+    medical-invoice-claim-denial-gmail-sender ─▶ delivered to IPS
+```
+
+**Independent flow — IPS responds to a glosa:** [`hospital-devolucion-audit`](./skills/hospital-devolucion-audit/) (does not interact with the pipeline above).
+
+| # | Skill | When to use | How to invoke |
+|---|---|---|---|
+| 1 | [`medical-invoice-gmail-intake`](./skills/medical-invoice-gmail-intake/) | A new invoice arrives by email and needs to enter the audit queue | `/medical-invoice-gmail-intake` · "process invoices from inbox" |
+| 2 | [`medical-invoice-document-understanding`](./skills/medical-invoice-document-understanding/) | Step 0 of the audit — read all case documents and produce `case_evidence.json` | `/medical-invoice-document-understanding` · "extract evidence from this case" |
+| 3 | [`medical-invoice-admin-audit`](./skills/medical-invoice-admin-audit/) | Audit identity, RIPS, authorizations, timeliness (~27 rules) | `/medical-invoice-admin-audit` · "audit the administrative side" |
+| 4 | [`medical-invoice-medical-audit`](./skills/medical-invoice-medical-audit/) | Audit clinical pertinence vs. MinSalud GPC (~29 rules) | `/medical-invoice-medical-audit` · "audit the clinical pertinence" |
+| 5 | [`medical-invoice-financial-audit`](./skills/medical-invoice-financial-audit/) | Audit contract, tariff, and anti-fraud (~42 + 14 rules) | `/medical-invoice-financial-audit` · "audit the financial side" |
+| 6 | [`medical-invoice-consolidator-audit`](./skills/medical-invoice-consolidator-audit/) | The 3 audits ran; merge findings + assign Anexo 6 causales | `/medical-invoice-consolidator-audit` · "consolidate the audits" |
+| 7 | [`medical-invoice-fix-review`](./skills/medical-invoice-fix-review/) | A human auditor left comments to apply | `/medical-invoice-fix-review` · "apply review comments" |
+| 8 | [`medical-invoice-claim-denial-generator`](./skills/medical-invoice-claim-denial-generator/) | Case is `auto-denial` or `claim-denial-ready` — generate the glosa PDF | `/medical-invoice-claim-denial-generator` · "generate the glosa PDF" |
+| 9 | [`medical-invoice-claim-denial-gmail-sender`](./skills/medical-invoice-claim-denial-gmail-sender/) | Glosa PDF is approved — send it to the IPS by email | `/medical-invoice-claim-denial-gmail-sender` · "send the glosa to the IPS" |
+| — | [`hospital-devolucion-audit`](./skills/hospital-devolucion-audit/) | An IPS receives a glosa and needs to defend/accept/reradicate item by item | `/hospital-devolucion-audit` · "respond to this glosa" |
+
+---
+
+### Medical reference (2 skills)
+
+Self-contained CLIs. No workflow — invoke directly when you need to validate a code.
+
+| Skill | When to use | How to invoke |
+|---|---|---|
+| [`cups-lookup`](./skills/cups-lookup/) | Validate or search a CUPS 2026 procedure code (Colombia, Res. 2706/2025) | `/cups-lookup` · "validate CUPS 871020" / "find CUPS for X" · CLI: `node cups-lookup.js validate 871020` |
+| [`icd10-lookup`](./skills/icd10-lookup/) | Validate or search an ICD-10-CM code (CMS FY2026) | `/icd10-lookup` · "validate ICD-10 E11.9" / "find code for diabetes" · CLI: `node icd10-lookup.js validate E11.9` |
+
+---
+
+### Writing (1 skill)
+
+| Skill | When to use | How to invoke |
+|---|---|---|
+| [`copy-writer`](./skills/copy-writer/) | Rewriting marketing, LinkedIn, landing-page, pitch, or email copy | `/copy-writer` · "make this stickier" / "rewrite this" / "this sounds corporate" |
+
+---
+
+### Vendored from OpenClaw (3 skills)
+
+Imported from [OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills) under their original licenses. See each skill's `NOTICE.md`.
+
+| Skill | License | When to use | How to invoke |
+|---|---|---|---|
+| [`markitdown`](./skills/markitdown/) | MIT (Microsoft) | Convert any PDF/DOCX/XLSX/PPTX/audio/image/HTML/EPub to Markdown for LLM processing | `/markitdown` · "convert this PDF to markdown" · CLI: `markitdown file.pdf` |
+| [`markdown-mermaid-writing`](./skills/markdown-mermaid-writing/) | Apache-2.0 (Superior Byte Works) | Writing reports, decision records, or pipeline docs that need diagrams (flowcharts, sequence, ER, gantt, etc.) | `/markdown-mermaid-writing` · "write a status report with mermaid diagrams" |
+| [`medical-entity-extractor`](./skills/medical-entity-extractor/) | MIT (NAPSTER AI) | Extracting symptoms, medications, lab values, and diagnoses from unstructured patient messages | `/medical-entity-extractor` · "extract entities from this patient message" |
 
 ---
 
