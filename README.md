@@ -16,29 +16,85 @@ It's not code that runs blindly — it's procedural knowledge the agent decides 
 
 ## Repo structure
 
+All skills live flat under `skills/`. Group them in your head by reading the `description`, not by folder.
+
 ```
-skills/
-├── README.md                   # this file
-├── CONTRIBUTING.md             # how to contribute
+albuquerque-v3/
+├── README.md             # this file
+├── CONTRIBUTING.md       # how to contribute
+├── GRANTS.md             # grants pipeline reference
+├── AUDIT.md              # medical insurance audit pipeline reference
+├── scripts/              # shared scripts (optional)
 ├── templates/
-│   └── skill-template/         # blank template, copy it to start
-│       └── SKILL.md
-├── examples/
-│   └── eps-audit/              # example skill
-│       └── SKILL.md
-└── <category>/                 # medical, engineering, ops, research, ...
+│   └── skill-template/   # blank template, copy it to start
+└── skills/               # all skills, one folder each
     └── <skill-name>/
-        ├── SKILL.md            # required
-        ├── references/         # supporting docs (optional)
-        ├── templates/          # output templates (optional)
-        ├── scripts/            # executable helpers (optional)
-        └── assets/             # images, data (optional)
+        ├── SKILL.md      # required
+        ├── references/   # supporting docs (optional)
+        ├── templates/    # output templates (optional)
+        ├── scripts/      # executable helpers (optional)
+        └── assets/       # images, data (optional)
 ```
 
 **Conventions:**
-- Names in `kebab-case`: `eps-audit`, `clinical-note-reviewer`, `deploy-staging`.
-- Group by category (`medical/`, `engineering/`, `ops/`, `research/`, `sales/`). If it doesn't fit, create a new category.
+- Names in `kebab-case`: `clinical-note-reviewer`, `deploy-staging`, `grant-review`.
 - One skill = one folder. Don't mix several in a single `SKILL.md`.
+- Pipelines (e.g. grants, audit) keep a top-level reference doc (`GRANTS.md`, `AUDIT.md`) describing how the skills compose.
+
+---
+
+## Skill catalog
+
+### Grants pipeline — see [`GRANTS.md`](./GRANTS.md)
+
+| Skill | Purpose |
+|---|---|
+| `scout-grants` | Discover, screen, and brief grant opportunities. |
+| `chrome-navigate` | Browser-driven enrichment and form-fill for grant portals. |
+| `develop-proposal` | Write the first strong pass of the proposal. |
+| `develop-budget` | Build and justify the budget by standard categories. |
+| `develop-timeline` | Build a feasible project timeline. |
+| `grant-review` | Pre-submit review with weighted scoring and v2 rewrite. |
+| `polish-grant` | Apply review/owner feedback into a clean follow-up version. |
+| `submit` | Verify approved source of truth and close the cycle after submission. |
+
+### Medical insurance audit (Colombia EPS-IPS) — see [`AUDIT.md`](./AUDIT.md)
+
+| Skill | Purpose |
+|---|---|
+| `medical-invoice-gmail-intake` | Watch Gmail and enqueue invoice cases for audit. |
+| `medical-invoice-document-understanding` | Step 0 — extract structured evidence from case documents. |
+| `medical-invoice-admin-audit` | Administrative audit (DAMA-UK, ~27 rules). |
+| `medical-invoice-medical-audit` | Clinical-pertinence audit (PERT-CLIN, ~29 rules). |
+| `medical-invoice-financial-audit` | Tariff and anti-fraud audit (FIN-CTR, ~42 rules + 14 fraud). |
+| `medical-invoice-consolidator-audit` | Merge findings, assign Anexo 6 causales, decide concepto_final. |
+| `medical-invoice-fix-review` | Apply human auditor edits to the consolidated output. |
+| `medical-invoice-claim-denial-generator` | Produce the formal glosa PDF (versioned). |
+| `medical-invoice-claim-denial-gmail-sender` | Send the final glosa via Gmail with delivery log. |
+| `hospital-devolucion-audit` | IPS-side: build per-item argumentation to respond to a glosa. |
+
+### Medical reference
+
+| Skill | Purpose |
+|---|---|
+| `cups-lookup` | Local CLI for the Colombian CUPS 2026 catalog (Res. 2706/2025). |
+| `icd10-lookup` | Local CLI for the CMS ICD-10-CM FY2026 diagnosis code set. |
+
+### Writing
+
+| Skill | Purpose |
+|---|---|
+| `copy-writer` | Improves copy using "Made to Stick" SUCCESs principles. |
+
+### Vendored from OpenClaw (third-party, OSS)
+
+These were imported from [OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills) under their original licenses. See each skill's `NOTICE.md`.
+
+| Skill | License | Purpose |
+|---|---|---|
+| `markitdown` | MIT (Microsoft) | Convert PDFs/DOCX/XLSX/audio/images to Markdown for LLM-friendly processing. |
+| `markdown-mermaid-writing` | Apache-2.0 (Superior Byte Works) | Standard for writing markdown reports with embedded Mermaid diagrams. |
+| `medical-entity-extractor` | MIT (NAPSTER AI) | Extract symptoms, medications, lab values, and diagnoses from patient messages. |
 
 ---
 
@@ -47,7 +103,7 @@ skills/
 ### 1. Copy the template
 
 ```bash
-cp -r templates/skill-template medical/my-skill
+cp -r templates/skill-template skills/my-skill
 ```
 
 ### 2. Edit `SKILL.md`
@@ -99,8 +155,7 @@ Good: `"Audits Colombian EPS billing accounts in RIPS format against resolution 
 
 **With Claude Code:**
 ```bash
-# Copy the folder to your personal or project skills directory
-cp -r medical/my-skill ~/.claude/skills/
+cp -r skills/my-skill ~/.claude/skills/
 # Or for a project: .claude/skills/
 ```
 
@@ -108,7 +163,7 @@ Then invoke it from Claude Code: `/my-skill` or simply describe the task and let
 
 **With Hermes Agent:**
 ```bash
-cp -r medical/my-skill ~/.hermes/skills/medical/
+cp -r skills/my-skill ~/.hermes/skills/
 hermes chat --toolsets skills -q "use my-skill to..."
 ```
 
@@ -116,7 +171,7 @@ hermes chat --toolsets skills -q "use my-skill to..."
 
 ```bash
 git checkout -b add/my-skill
-git add medical/my-skill
+git add skills/my-skill
 git commit -m "Add my-skill: <what it does in one line>"
 git push origin add/my-skill
 gh pr create --fill
@@ -146,17 +201,14 @@ required_environment_variables:
 
 ---
 
-## Suggested categories
+## Importing third-party skills
 
-| Category | For what |
-|---|---|
-| `medical/` | Clinical audit, CUPS/CIE-10 codes, RIPS, practice guidelines, medical record review |
-| `engineering/` | Deployments, debugging, code review, infra migrations |
-| `ops/` | Internal processes, onboarding, billing, compliance |
-| `research/` | Experiments, model evaluation, benchmarking |
-| `sales/` | Proposals, demos, commercial follow-up |
+When importing a skill from an external source (OpenClaw, other agent repos):
 
-If something doesn't fit, create the category. Don't over-engineer.
+1. **Verify the license.** Only import skills with an explicit permissive license (MIT, Apache-2.0, BSD, etc.). Skills without a LICENSE file or with "All Rights Reserved" / proprietary headers should not be copied — re-implement the concept from scratch instead.
+2. **Preserve attribution.** Keep the original LICENSE file, copyright header, and any author/source metadata.
+3. **Add a `NOTICE.md`** in the skill folder documenting source URL, license, and import date.
+4. **Don't modify on import.** Land the import as-is, then adapt in a follow-up commit so reviewers can see what changed vs. upstream.
 
 ---
 
@@ -182,4 +234,4 @@ Write for the common denominator: any human new to Arkangel should be able to re
 
 ## Contact
 
-Questions, proposals for new categories, or skills you're not sure how to package → open an issue or write in `#ai-tooling`.
+Questions, proposals for new skills, or skills you're not sure how to package → open an issue or write in `#ai-tooling`.
