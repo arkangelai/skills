@@ -5,13 +5,13 @@
 [![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
-[![Skills Count](https://img.shields.io/badge/Skills-24-brightgreen?style=for-the-badge)](./skills)
+[![Skills Count](https://img.shields.io/badge/Skills-29-brightgreen?style=for-the-badge)](./skills)
 [![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
 **The Arkangel skill library — battle-tested agent procedures for healthcare, grants, and operations in Colombia.**
 
-*24 curated skills · Medical insurance audit · Grants pipeline · Clinical reference · Document tooling*
+*29 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Clinical reference · Document tooling*
 
 [Catalog](#-skill-catalog) · [Quickstart](#-quickstart) · [Create a skill](#-create-a-skill-in-5-steps) · [Contributing](./CONTRIBUTING.md)
 
@@ -123,9 +123,14 @@ albuquerque-v3/
 </thead>
 <tbody>
 <tr>
-  <td>🩺 <a href="#-medical-insurance-audit-10-skills">Medical insurance audit</a></td>
-  <td align="center"><b>10</b></td>
-  <td>Auditing Colombian EPS-IPS medical invoices, generating glosas, or responding to glosas.</td>
+  <td>🩺 <a href="#-medical-insurance-audit-11-skills">Medical insurance audit</a></td>
+  <td align="center"><b>11</b></td>
+  <td>Auditing Colombian EPS-IPS medical invoices, reviewing pre-autorizaciones, generating or responding to glosas.</td>
+</tr>
+<tr>
+  <td>🧑‍⚕️ <a href="#-clinical-operations-4-skills">Clinical operations</a></td>
+  <td align="center"><b>4</b></td>
+  <td>Writing IPS-side clinical reports, simplifying patient documents, looking up GPC MinSalud, or pulling PubMed evidence.</td>
 </tr>
 <tr>
   <td>💰 <a href="#-grants-pipeline-8-skills">Grants pipeline</a></td>
@@ -180,7 +185,7 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
 
 ---
 
-### 🩺 Medical insurance audit (10 skills)
+### 🩺 Medical insurance audit (11 skills)
 
 Reference doc: [`AUDIT.md`](./AUDIT.md). The pipeline has three flows; the diagram below shows the most common one (Flow 1: EPS audits an IPS invoice).
 
@@ -224,6 +229,30 @@ Reference doc: [`AUDIT.md`](./AUDIT.md). The pipeline has three flows; the diagr
 | 8 | [`medical-invoice-claim-denial-generator`](./skills/medical-invoice-claim-denial-generator/) | Case is `auto-denial` or `claim-denial-ready` — generate the glosa PDF | `/medical-invoice-claim-denial-generator` · "generate the glosa PDF" |
 | 9 | [`medical-invoice-claim-denial-gmail-sender`](./skills/medical-invoice-claim-denial-gmail-sender/) | Glosa PDF is approved — send it to the IPS by email | `/medical-invoice-claim-denial-gmail-sender` · "send the glosa to the IPS" |
 | — | [`hospital-devolucion-audit`](./skills/hospital-devolucion-audit/) | An IPS receives a glosa and needs to defend/accept/reradicate item by item | `/hospital-devolucion-audit` · "respond to this glosa" |
+| — | [`prior-authorization-review`](./skills/prior-authorization-review/) | Reviewing a pre-autorización request *before* the service is rendered (PBS / MIPRES / contrato) | `/prior-authorization-review` · "should we authorize this medication?" / "review this pre-auth" |
+
+---
+
+### 🧑‍⚕️ Clinical operations (4 skills)
+
+IPS-side and patient-facing tools that complement the audit pipeline. Each one is independently invocable, but they compose well: a clinical report drafted with `clinical-report-writer` is grounded in `gpc-minsalud-lookup` recommendations, backed by `pubmed-search` evidence, and translated for patients via `patient-document-simplifier`.
+
+```
+                   ┌─ pubmed-search ──────────┐
+                   │  (evidence)              │
+                   ▼                          ▼
+  gpc-minsalud-lookup ──▶ clinical-report-writer ──▶ patient-document-simplifier
+       (standard of care)        (epicrisis,           (plain Spanish,
+                                  evolución,            for the patient)
+                                  nota operatoria)
+```
+
+| Skill | When to use | How to invoke |
+|---|---|---|
+| [`pubmed-search`](./skills/pubmed-search/) | Need peer-reviewed evidence to back a clinical decision, glosa response, or grant claim | `/pubmed-search` · "find RCTs on bevacizumab in ROP" / "evidence for IV magnesium in asthma" |
+| [`gpc-minsalud-lookup`](./skills/gpc-minsalud-lookup/) | Need to cite a Colombian GPC recommendation in an audit, glosa, or clinical decision | `/gpc-minsalud-lookup` · "what does GPC say about HTA?" / "find recommendation for DM2 follow-up" |
+| [`clinical-report-writer`](./skills/clinical-report-writer/) | Drafting an epicrisis, evolución, nota operatoria, or interconsulta in Colombian standard format | `/clinical-report-writer` · "write the epicrisis from this case" / "format this discharge summary" |
+| [`patient-document-simplifier`](./skills/patient-document-simplifier/) | Translating a glosa, prescription, or discharge summary into plain Spanish for a patient | `/patient-document-simplifier` · "explain this glosa to my patient" / "simplify this discharge summary" |
 
 ---
 
