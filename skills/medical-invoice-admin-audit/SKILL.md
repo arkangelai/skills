@@ -34,7 +34,7 @@ Loads each document listed in `metadata_input.json.documentos` from the local wo
 
 ## Output Contract
 
-**Template:** `checklist_base.json` in this directory — DAMA-UK instrument, 27 rules (A01–A27). For SOAT cases use `checklist_soat_base.json` instead. See `checklist_base.md` for rule descriptions and evidence requirements.
+**Template:** `references/checklist_base.json` in this directory — DAMA-UK instrument, 27 rules (A01–A27). For SOAT cases use `references/checklist_soat_base.json` instead. See `references/checklist_base.md` for rule descriptions and evidence requirements.
 
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
@@ -59,7 +59,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Generate `admin_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
+Generate `admin_checklist_output.json` from scratch using `references/checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **Rules for `resultado`:**
 - `pass` — rule satisfied with evidence.
@@ -109,9 +109,9 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
 
 2. **Run the DAMA-UK rule checklist.**
 
-   Load `checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a known SOAT/ADRES payer NIT, load `checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
+   Load `references/checklist_base.json` (DAMA-UK, 27 rules A01–A27). If `pagador_nit` matches a known SOAT/ADRES payer NIT, load `references/checklist_soat_base.json` instead (SOAT-TEC, 21 rules S01–S21).
 
-   For each rule, follow `checklist_base.md` §2.3 and §3. Fill the four nullable fields:
+   For each rule, follow `references/checklist_base.md` §2.3 and §3. Fill the four nullable fields:
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"`
      - `"pass"` — the information required by this rule was found in the available documents AND it satisfies the rule's criteria.
@@ -125,20 +125,20 @@ Generate `admin_checklist_output.json` from scratch using `checklist_base.json` 
      - Absence: `HC pp.1-40 "no se encontró firma en historia clínica"`.
      Never use vague statements like `"se verifica en HC"` without a specific citation.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual evidence found. `pass`: cite the document, field, or system query that confirms compliance (e.g. `"autorización #AUT-2026-04412, vigente 2026-04-01/2026-04-30 — coincide con fechas de atención"`). `fail`: cite the specific discrepancy and where it was found (e.g. `"RIPS AC campo numDocumento = '12345678'; HC p.1 cédula = '123456780' — dígito extra"`). `n/a`: explain why the rule structurally cannot apply to this case (e.g. `"Caso sin transporte de ambulancia — A14 no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
-   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
-   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use the causal map in `checklist_base.md §7` to assign `causal_num` and `causal_nombre`. `valor_glosado` may be `null` if the financial auditor will determine it.
+   - **`confianza`**: per scale in `references/checklist_base.md` §2.3` — `0.95+` for direct quote or live system query, `0.80–0.95` for strong reference, `0.60–0.80` for partial evidence, `<0.60` forces human escalation.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use the causal map in `references/checklist_base.md` §7` to assign `causal_num` and `causal_nombre`. `valor_glosado` may be `null` if the financial auditor will determine it.
 
-   See `checklist_base.md §6` for filled pass/fail examples.
+   See `references/checklist_base.md` §6` for filled pass/fail examples.
 
 4. **Compute `cierre` and complete the checklist.**
 
-   Once all rules are filled, compute and append the `cierre` block per `checklist_base.md §2.4`:
-   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`:
+   Once all rules are filled, compute and append the `cierre` block per `references/checklist_base.md` §2.4`:
+   - `concepto_final` — follow rule-based decision logic in `references/checklist_base.md` §4`:
    - `clasificacion`: `"Administrativo"`.
    - `resumen_ejecutivo`: 1–2 sentences mentioning any critical finding explicitly.
 
 5. **Generate the output.**
-   Using `checklist_base.json` as the schema template, generate `admin_checklist_output.json` from scratch with all filled rules, `meta`, and `cierre`. Write to the working directory.
+   Using `references/checklist_base.json` as the schema template, generate `admin_checklist_output.json` from scratch with all filled rules, `meta`, and `cierre`. Write to the working directory.
 
 6. **Emit detailed evidence.**
    Each `finding.evidencia` must be **citable**: file + section/line/page.

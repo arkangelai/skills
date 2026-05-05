@@ -28,9 +28,16 @@ La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a
 
 **IMPORTANTE — aislamiento de flujo:** Este skill pertenece exclusivamente al flujo `hospital_devolucion_audit`. No usar si `task_type != hospital_devolucion_audit`. No es un paso del pipeline de 9 skills (flujos `aseguradora` / `hospital` self-audit) — su input (`context.json`), sus outputs (`progress-respuesta.json`, `devolucion_output.json`) y su schema de tarea son completamente distintos. Un orquestador que no encuentra `task_type = hospital_devolucion_audit` en la tarea debe ignorar este skill por completo.
 
+## Templates / Examples
+
+Ver `references/` para ejemplos del schema de cada archivo:
+- `references/context_template.json` — input esperado en el directorio de trabajo.
+- `references/progress_respuesta_template.json` — output intermedio.
+- `references/devolucion_output_template.json` — output final.
+
 ## Input Contract
 
-**Template:** `context.json` en el directorio de trabajo — schema `hospitals/devolucion/context`.
+`context.json` en el directorio de trabajo — schema `hospitals/devolucion/context` (ver `references/context_template.json`).
 
 Campos clave:
 

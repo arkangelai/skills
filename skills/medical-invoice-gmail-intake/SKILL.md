@@ -35,6 +35,12 @@ Once metadata is assembled, the skill creates a case task via the task assignmen
 
 **Do not use:** if the email has no attachments (not a medical invoice); if it already has label `medical-invoice/intake` (avoid double processing); if a task already exists in the task assignment tool for the same `invoice_cuv`.
 
+## Templates / Examples
+
+See `references/` for example schemas:
+- `references/input_template.md` — markdown describing the task input shape.
+- `references/metadata_input_template.json` — example of the metadata payload produced for the next pipeline step.
+
 ## Input Contract
 
 The trigger is a Gmail message event (push notification or polling result). No structured JSON input is required by the caller. The skill reads directly from Gmail using `gogcli`.

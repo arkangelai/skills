@@ -14,7 +14,7 @@ const { execSync } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 
-const TOOL  = path.join(__dirname, 'cups-lookup.js');
+const TOOL  = path.join(__dirname, '..', 'cups-lookup.js');
 const CASES = path.join(__dirname, 'test_cases.json');
 
 const GREEN  = '\x1b[92m';

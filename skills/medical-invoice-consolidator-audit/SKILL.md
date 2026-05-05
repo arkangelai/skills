@@ -42,9 +42,9 @@ Also reads `factura.pdf` directly to populate the `factura` block in the output.
 
 ## Output Contract
 
-**Template:** `output.json` in this directory — canonical structure for `hallazgos[]` (per CUPS item) and `resumen`. See `output.md` for detailed field-by-field specifications.
+**Template:** `references/output_template.json` — canonical structure for `hallazgos[]` (per CUPS item) and `resumen`. See `references/output_template.md` for detailed field-by-field specifications.
 
-The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Generate from scratch using the `output.json` template as the schema reference. Write to the working directory.
+The skill produces the canonical `output.json` — single source of truth for the glosa generator and Gmail sender. Generate from scratch using `references/output_template.json` as the schema reference. Write to the working directory.
 
 **`hallazgo` values (item level):**
 - `conforme`: all layers passed for this item. `capa`, `regla_aplicada`, `severidad`, `glosa_sugerida` are all `null`; `valor_objetado = 0`.
@@ -149,7 +149,7 @@ Note: `ESCALAR_HUMANO` is no longer a valid concepto_final. Low-confidence findi
    - `audit_perspective` = propagate the value read from `medical_checklist_output.json.meta.audit_perspective`.
 
 7. **Generate output.json.**
-   Using the `output.json` template as the schema reference, build the consolidated object from scratch. Example shape:
+   Using `references/output_template.json` as the schema reference, build the consolidated object from scratch. Example shape:
    ```json
    {
      "caso_id": "RAD-20260402-FV08142",

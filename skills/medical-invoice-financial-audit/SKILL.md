@@ -53,7 +53,7 @@ The resolved `plan_afiliado` and `tarifario_aplicado` are written to `meta` befo
 
 ## Output Contract
 
-**Template:** `checklist_base.json` in this directory — FIN-CTR instrument, 42 rules (F01–F42). See `checklist_base.md` for rule descriptions and evidence requirements.
+**Template:** `references/checklist_base.json` in this directory — FIN-CTR instrument, 42 rules (F01–F42). See `references/checklist_base.md` for rule descriptions and evidence requirements.
 
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
@@ -85,7 +85,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Generate `financial_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
+Generate `financial_checklist_output.json` from scratch using `references/checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **Evidence format for tariff rules (mandatory):** `"{CUPS}: esperado={X} ({fuente}); cobrado={Y}; delta={Y-X} ({pct}%)"`. Never use generic descriptions like "tariff mismatch".
 
@@ -140,13 +140,13 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 4. **Run the FIN-CTR rule checklist.**
 
-   Load `checklist_base.json` (42 rules F01–F42) and follow `checklist_base.md` for each rule, using the resolved `plan_afiliado` and `tarifario_aplicado` from the Input Contract step. Fill the four nullable fields per `checklist_base.md §2.2`:
+   Load `references/checklist_base.json` (42 rules F01–F42) and follow `references/checklist_base.md` for each rule, using the resolved `plan_afiliado` and `tarifario_aplicado` from the Input Contract step. Fill the four nullable fields per `references/checklist_base.md` §2.2`:
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"` — use `"n/a"` when the rule doesn't apply to the billing modality (e.g. F19 PGP/cápita for an event-based contract).
-   - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. For tariff rules the calc is mandatory: `tarifario_contrato_eps_2026.csv p.47 [calc: CUPS 890201: esperado=85000; cobrado=120000; delta=35000 (41.2%)]`. For anti-fraud rules follow templates in `checklist_base.md §5`.
+   - **`evidencia`**: unified format — `{file} [p.{page}] ["{quoted_text}"] [calc: {formula}]`. For tariff rules the calc is mandatory: `tarifario_contrato_eps_2026.csv p.47 [calc: CUPS 890201: esperado=85000; cobrado=120000; delta=35000 (41.2%)]`. For anti-fraud rules follow templates in `references/checklist_base.md` §5`.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual financial evidence found. `pass`: cite the tariff source and the matching calculation (e.g. `"CUPS 890201: tarifario_contrato_eps_2026.csv línea 47, precio_base=$85.000; cobrado=$85.000 — coincide exactamente"`). `fail`: cite the discrepancy with the full calculation (e.g. `"CUPS 893150: esperado=$42.000 (ISS 2001 ×1.4 UVB 2026); cobrado=$65.000; delta=+$23.000 (54.8%) — F13 supera umbral"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"Contrato por eventos — F19 cápita no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
    - **`confianza`**: `0.95+` for exact numeric comparisons, `0.80–0.95` for plan coverage interpretation, `<0.80` for any anti-fraud rule forces escalation.
-   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `checklist_base.md §8`.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. `valor_glosado` is **mandatory** in the financial auditor (not nullable). Use causal map in `references/checklist_base.md` §8`.
 
    Anti-fraud thresholds (F29–F42):
    - F32–F36 `fail` (with positive evidence) and `confianza ≥ 0.9` → `concepto_final = "NO_APTA"` + payment block.
@@ -159,11 +159,11 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
    - **F03 (Anexos y otrosíes):** If no contract annexes are in the case files, mark `"n/a"` with observation. Absence of annexes is not evidence that unauthorized modifications were applied.
    - **F32-F42 (Anti-fraud rules requiring external databases):** When the rule requires cross-referencing external databases (patient history across IPS, hospitalization overlaps, mortality records, provider patterns) and those databases are not accessible, mark `"n/a"` with an observation explaining what cross-check would be needed. Only mark `"fail"` when the agent has positive evidence of fraud from the available documents (e.g., two identical procedures billed on the same date found within the case files).
 
-   See `checklist_base.md §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
+   See `references/checklist_base.md` §7` for filled pass/fail examples including tariff overcharge (F13) and upcoding (F37).
 
 5. **Compute `cierre` y publicar el checklist.**
 
-   Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.3` and §4:
+   Once all rules are filled, compute and append `cierre` per `references/checklist_base.md` §2.3` and §4:
    - `concepto_final` and `en_devolucion` — follow decision logic defined in the Output Contract above. Key tariff thresholds: deviation >10% → rule `fail`; 2–10% → rule `fail` with partial glosa; <2% → rule `pass`.
    - `clasificacion`: `"Financiero"`.
    - `valor_facturado`, `valor_aprobado`, `valor_glosado`: compute from the invoice items and all failing rule `valor_glosado` values. `valor_glosado ≤ valor_facturado` always; if not, there is a calculation error — escalate.
@@ -171,7 +171,7 @@ Generate `financial_checklist_output.json` from scratch using `checklist_base.js
 
 6. **Generate the output.**
 
-   Generate `financial_checklist_output.json` from scratch and write to the working directory. Mandatory financial evidence shows the explicit calculation — `checklist_base.md §2.2` details the required format per rule type.
+   Generate `financial_checklist_output.json` from scratch and write to the working directory. Mandatory financial evidence shows the explicit calculation — `references/checklist_base.md` §2.2` details the required format per rule type.
 
 ## Pitfalls
 

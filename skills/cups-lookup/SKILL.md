@@ -83,7 +83,7 @@ Zero external dependencies. Requires Node 18+. Reads the bundled CSV catalog. Al
 - `node cups-lookup.js validate 01.0.1.99` returns `{"status": "invalid", "sugerencias": [...]}`.
 - `node cups-lookup.js lookup 90.1.0.01` returns `grupo: "90"` and `categoria: "90.1.0"`.
 - `node cups-lookup.js search biopsia cerebro` returns ≥1 result whose description contains `BIOPSIA` and `CEREBRO`.
-- Full test suite: `node test_cups.js` → all 41 tests pass.
+- Full test suite: `node references/test_cups.js` → all 41 tests pass.
 
 ## References
 

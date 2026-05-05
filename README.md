@@ -1,8 +1,42 @@
+<div align="center">
+
 # Arkangel Skills
 
-Shared library of **skills** for the AI agents we use at Arkangel (Claude Code, Hermes Agent, and any runtime compatible with [skill.sh](https://skill.sh)).
+[![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
+[![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
+[![Skills Count](https://img.shields.io/badge/Skills-24-brightgreen?style=for-the-badge)](./skills)
+[![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
+[![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
-The idea is simple: whenever someone solves a repeatable problem with an agent — an EPS audit, a clinical review flow, a deployment command, a regulatory checklist — they package it as a **skill** and push it here. That way the next person who needs it doesn't start from scratch.
+**The Arkangel skill library — battle-tested agent procedures for healthcare, grants, and operations in Colombia.**
+
+*24 curated skills · Medical insurance audit · Grants pipeline · Clinical reference · Document tooling*
+
+[Catalog](#-skill-catalog) · [Quickstart](#-quickstart) · [Create a skill](#-create-a-skill-in-5-steps) · [Contributing](./CONTRIBUTING.md)
+
+</div>
+
+---
+
+## What Is This?
+
+**Arkangel Skills** is a shared library of **skills** for the AI agents we use across the company — [Claude Code](https://docs.claude.com/en/docs/claude-code/skills), [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills), and any runtime compatible with the [skill.sh](https://skill.sh) standard.
+
+Whenever someone solves a repeatable problem with an agent — an EPS audit, a clinical review flow, a grant proposal cycle, a deployment command — they package it as a **skill** and push it here. The next person who needs it doesn't start from scratch.
+
+> Built **for Arkangel** — not OpenClaw, not a generic public collection. The skills here encode our processes, our regulations (Resolución 2275, Anexo 6, GPC MinSalud), our funders, and our internal toolchain.
+
+### Why this library matters
+
+| Without skills | With Arkangel Skills |
+|---|---|
+| Generic AI responses about Colombian healthcare | Real audits against Anexo 6 causales, RIPS, contracts |
+| Manual grant triage and drafting | Scout → propose → review → submit pipeline |
+| Each engineer reinvents the same workflow | One canonical procedure, versioned in git |
+| CUPS/ICD-10 codes copy-pasted from PDFs | Validated lookups against MinSalud Res. 2706/2025 + CMS FY2026 |
+| Glosa responses written from scratch | `hospital-devolucion-audit` defends/accepts item by item |
+| Knowledge trapped in someone's head | A `SKILL.md` anyone can read and improve |
 
 ---
 
@@ -11,6 +45,44 @@ The idea is simple: whenever someone solves a repeatable problem with an agent �
 A skill is a folder with natural-language instructions that the agent loads **only when relevant**. Formally: a `SKILL.md` with YAML frontmatter + markdown, optionally accompanied by scripts, templates, or references.
 
 It's not code that runs blindly — it's procedural knowledge the agent decides when to apply.
+
+## 🚀 Quickstart
+
+<details open>
+<summary><b>Claude Code</b> — drop in and invoke</summary>
+
+```bash
+# Clone the library
+git clone https://github.com/arkangelai/skills.git
+cd skills
+
+# Install all skills globally for Claude Code
+mkdir -p ~/.claude/skills
+cp -r skills/* ~/.claude/skills/
+
+# Or install one skill into the current project
+mkdir -p .claude/skills
+cp -r skills/grant-review .claude/skills/
+```
+
+Then in Claude Code: type `/grant-review` (or any other skill), or just describe the task in natural language — the agent loads the skill automatically when the description matches.
+</details>
+
+<details>
+<summary><b>Hermes Agent</b></summary>
+
+```bash
+mkdir -p ~/.hermes/skills
+cp -r skills/* ~/.hermes/skills/
+hermes chat --toolsets skills -q "use grant-review to check this proposal"
+```
+</details>
+
+<details>
+<summary><b>Other skill.sh runtimes</b></summary>
+
+The skills follow the open [skill.sh](https://skill.sh) standard — copy the folder into whatever path your runtime reads. Each runtime uses whichever subset of the YAML frontmatter it understands; the rest is ignored gracefully.
+</details>
 
 ---
 
@@ -43,21 +115,46 @@ albuquerque-v3/
 
 ---
 
-## Skill catalog
+## 📚 Skill catalog
 
-| Category | Count | Use this when… |
-|---|---|---|
-| [Grants pipeline](#grants-pipeline-8-skills) | 8 | Working on a grant proposal — discovery → scoping → drafting → review → submission. |
-| [Medical insurance audit](#medical-insurance-audit-10-skills) | 10 | Auditing Colombian EPS-IPS medical invoices, generating glosas, or responding to glosas. |
-| [Medical reference](#medical-reference-2-skills) | 2 | Validating CUPS or ICD-10 codes from clinical documents. |
-| [Writing](#writing-1-skill) | 1 | Sharpening copy, marketing, or pitch text. |
-| [Vendored OSS](#vendored-from-openclaw-3-skills) | 3 | Document-to-Markdown, mermaid diagrams, or extracting medical entities. |
+<table>
+<thead>
+<tr><th>Category</th><th>Count</th><th>Use this when…</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>🩺 <a href="#-medical-insurance-audit-10-skills">Medical insurance audit</a></td>
+  <td align="center"><b>10</b></td>
+  <td>Auditing Colombian EPS-IPS medical invoices, generating glosas, or responding to glosas.</td>
+</tr>
+<tr>
+  <td>💰 <a href="#-grants-pipeline-8-skills">Grants pipeline</a></td>
+  <td align="center"><b>8</b></td>
+  <td>Working on a grant proposal — discovery → scoping → drafting → review → submission.</td>
+</tr>
+<tr>
+  <td>🔎 <a href="#-medical-reference-2-skills">Medical reference</a></td>
+  <td align="center"><b>2</b></td>
+  <td>Validating CUPS 2026 or ICD-10-CM codes from clinical documents.</td>
+</tr>
+<tr>
+  <td>✍️ <a href="#%EF%B8%8F-writing-1-skill">Writing</a></td>
+  <td align="center"><b>1</b></td>
+  <td>Sharpening copy, marketing, or pitch text.</td>
+</tr>
+<tr>
+  <td>📦 <a href="#-vendored-from-openclaw-3-skills">Vendored OSS</a></td>
+  <td align="center"><b>3</b></td>
+  <td>Document-to-Markdown, mermaid diagrams, or extracting medical entities.</td>
+</tr>
+</tbody>
+</table>
 
-> **How to invoke any skill (Claude Code):** type `/skill-name` for a direct trigger, or just describe the task in natural language — the agent loads the skill automatically when the description matches.
+> **💡 How to invoke any skill (Claude Code):** type `/skill-name` for a direct trigger, or just describe the task in natural language — the agent loads the skill automatically when the description matches.
 
 ---
 
-### Grants pipeline (8 skills)
+### 💰 Grants pipeline (8 skills)
 
 Reference doc: [`GRANTS.md`](./GRANTS.md).
 
@@ -83,7 +180,7 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
 
 ---
 
-### Medical insurance audit (10 skills)
+### 🩺 Medical insurance audit (10 skills)
 
 Reference doc: [`AUDIT.md`](./AUDIT.md). The pipeline has three flows; the diagram below shows the most common one (Flow 1: EPS audits an IPS invoice).
 
@@ -130,7 +227,7 @@ Reference doc: [`AUDIT.md`](./AUDIT.md). The pipeline has three flows; the diagr
 
 ---
 
-### Medical reference (2 skills)
+### 🔎 Medical reference (2 skills)
 
 Self-contained CLIs. No workflow — invoke directly when you need to validate a code.
 
@@ -141,7 +238,7 @@ Self-contained CLIs. No workflow — invoke directly when you need to validate a
 
 ---
 
-### Writing (1 skill)
+### ✍️ Writing (1 skill)
 
 | Skill | When to use | How to invoke |
 |---|---|---|
@@ -149,7 +246,7 @@ Self-contained CLIs. No workflow — invoke directly when you need to validate a
 
 ---
 
-### Vendored from OpenClaw (3 skills)
+### 📦 Vendored from OpenClaw (3 skills)
 
 Imported from [OpenClaw Medical Skills](https://github.com/FreedomIntelligence/OpenClaw-Medical-Skills) under their original licenses. See each skill's `NOTICE.md`.
 
@@ -161,7 +258,7 @@ Imported from [OpenClaw Medical Skills](https://github.com/FreedomIntelligence/O
 
 ---
 
-## How to create a skill in 5 steps
+## 🛠 Create a skill in 5 steps
 
 ### 1. Copy the template
 

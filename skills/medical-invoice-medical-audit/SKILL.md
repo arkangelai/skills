@@ -40,7 +40,7 @@ When `GUIAS_CLINICAS_PATH` is set and valid, the skill resolves the applicable G
 
 ## Output Contract
 
-**Template:** `checklist_base.json` in this directory — PERT-CLIN instrument, 29 rules (M01–M29). See `checklist_base.md` for rule descriptions and evidence requirements.
+**Template:** `references/checklist_base.json` in this directory — PERT-CLIN instrument, 29 rules (M01–M29). See `references/checklist_base.md` for rule descriptions and evidence requirements.
 
 Load the template and fill every rule's nullable fields:
 - `resultado`: `"pass" | "fail" | "n/a"`
@@ -65,7 +65,7 @@ Then fill `meta` and append `cierre`:
 }
 ```
 
-Generate `medical_checklist_output.json` from scratch using `checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
+Generate `medical_checklist_output.json` from scratch using `references/checklist_base.json` as the schema template. Fill every rule. Return the complete filled checklist.
 
 **`resultado`, `confianza`, and `glosa_sugerida`** follow the same rules as admin-audit. Evidence must cite the clinical document: `"HC ingreso p.3: motivo consulta dolor hipocondrio derecho..."`.
 
@@ -141,7 +141,7 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
 
 4. **Run the PERT-CLIN rule checklist.**
 
-   Load `checklist_base.json` (29 rules M01–M29) and follow `checklist_base.md` for each rule. Fill the four nullable fields per `checklist_base.md §2.3`:
+   Load `references/checklist_base.json` (29 rules M01–M29) and follow `references/checklist_base.md` for each rule. Fill the four nullable fields per `references/checklist_base.md` §2.3`:
 
    - **`resultado`**: `"pass"` · `"fail"` · `"n/a"`
      - `"pass"` — the clinical information required by this rule was found and satisfies the criteria.
@@ -154,19 +154,19 @@ Generate `medical_checklist_output.json` from scratch using `checklist_base.json
      - `Ecocardiograma 2026-04-09 "FEVI 32%" [calc: consistente con GPC_falla_cardiaca §2 criterios Framingham]`.
      - Absence: `HC pp.1-40 "no se encontró nota operatoria para CUPS {X} (búsqueda: NOTA OPERATORIA, DESCRIPCIÓN QUIRÚRGICA)"`.
    - **`observaciones`**: mandatory for every rule — state explicitly why the rule is `pass`, `fail`, or `n/a` using the actual clinical evidence found. `pass`: cite the document and section that confirms the criterion is met (e.g. `"HC evolución 2026-04-10: BNP 380 pg/mL — criterio de estancia GPC_falla_cardiaca §3.2 cumplido"`). `fail`: cite the specific deficiency and its location (e.g. `"HC pp.1-40: no se encontró nota de evolución diaria para los días 2026-04-11 y 2026-04-12 — M23 incumplido"`). `n/a`: explain structurally why the rule cannot apply (e.g. `"No hay CUPS quirúrgicos en la factura — M11 nota operatoria no aplica"`). Vague phrases ("cumple", "no aplica", "se verifica") with no citation are invalid.
-   - **`confianza`**: per scale in `checklist_base.md §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` on a critical rule → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
-   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `checklist_base.md §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
+   - **`confianza`**: per scale in `references/checklist_base.md` §2.3` — `0.90+` for unambiguous GPC-aligned evidence, `<0.75` on a critical rule → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
+   - **`glosa_sugerida`**: fill only when `resultado = "fail"`. Use causal map in `references/checklist_base.md` §7`. Causales frecuentes: 3 (soportes), 4 (autorización), 6 (pertinencia).
 
    Special handling:
    - **M06 (GPC deviation):** If the agent finds positive evidence that a procedure deviates from the applicable GPC AND no justification is documented in any available clinical document, mark `resultado = "fail"`. If the agent cannot determine GPC alignment because clinical documentation is insufficient, mark `resultado = "n/a"` with an observation explaining what clinical information would be needed. Do NOT mark `"fail"` solely because the justification document is missing.
    - **HC OCR failure** → emit a single `conditional` finding noting OCR quality issues and evaluate remaining rules with reduced confidence. Do not abort all rules.
 
-   See `checklist_base.md §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
+   See `references/checklist_base.md` §6` for filled pass/fail examples (including M18 non-PBS without MIPRES).
 
 5. **Compute `cierre` and publish the checklist.**
 
-   Once all rules are filled, compute and append `cierre` per `checklist_base.md §2.4` and §4:
-   - `concepto_final` — follow rule-based decision logic in `checklist_base.md §4`. Key overrides: M06 fail → `NO_APTA` (set `en_devolucion = true` if HC justification absent); any critical with `confianza < 0.75` → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
+   Once all rules are filled, compute and append `cierre` per `references/checklist_base.md` §2.4` and §4:
+   - `concepto_final` — follow rule-based decision logic in `references/checklist_base.md` §4`. Key overrides: M06 fail → `NO_APTA` (set `en_devolucion = true` if HC justification absent); any critical with `confianza < 0.75` → emit best-guess verdict and document uncertainty in `resumen_ejecutivo`.
    - `clasificacion`: `"Clinico"`.
    - `resumen_ejecutivo`: 1–2 sentences referencing the GPC applied and any critical finding. **If `AUDIT_PERSPECTIVE = hospital`**: frame every finding as an internal action item — use language like "corrija antes de radicar", "riesgo de glosa causal X", "el pagador objetará este ítem si no se adjunta MIPRES". Avoid language that implies the payer has already decided (no "se glosa", no "se rechaza").
 
