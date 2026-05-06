@@ -5,7 +5,7 @@ description: Audit any open deal against the Arkangel sales submarine — which 
 
 # Deal Health
 
-`deal-health` is the diagnostic skill for the pipeline. It tells you which deals are alive, which are stuck, and exactly what's missing to advance — measured against the submarine compartments in `SALES.md`.
+`deal-health` is the diagnostic skill for the pipeline. It tells you which deals are alive, which are stuck, and exactly what's missing to advance — measured against the submarine compartments in `sales-pipeline`.
 
 ## When to Use
 
@@ -123,6 +123,6 @@ If Attio MCP is unavailable, ask the user for the deal data inline (compartment,
 
 ## References
 
-- [`SALES.md`](../../SALES.md) — criterios de cierre por compartimento.
+- [`sales-pipeline`](../sales-pipeline/) — criterios de cierre por compartimento.
 - [`precall-brief`](../precall-brief/) — para preparar la próxima reunión que destrabe el deal.
 - [`postcall-recap`](../postcall-recap/) — para que el estado del deal en Attio refleje la realidad.

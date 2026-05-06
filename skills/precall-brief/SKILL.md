@@ -33,7 +33,7 @@ The skill operates in **hybrid mode**:
    - If not found or Attio unavailable: ask the user for compartment number, attendees, and last known state. Do not assume.
 
 2. **Identify the open compartment.**
-   - Map the deal state to one of the 7 compartments defined in `SALES.md`.
+   - Map the deal state to one of the 7 compartments defined in `sales-pipeline`.
    - State explicitly which compartment is open and which one we want to open after this meeting.
 
 3. **Build the prospect brief.**
@@ -49,7 +49,7 @@ The skill operates in **hybrid mode**:
 5. **Draft the Up-Front Contract.**
    - Verbal text, not formal. 3–5 lines.
    - Cover: tiempo de la reunión / agenda / outcomes posibles ("avanzamos a X / no avanzamos / lo pensamos no es opción") / next step propuesto.
-   - The outcomes have to match the compartment exit criteria from `SALES.md`.
+   - The outcomes have to match the compartment exit criteria from `sales-pipeline`.
 
 6. **Generate compartment-specific questions.**
    - Compartment 1 (qualify): match dolor, presupuesto, DM.
@@ -111,6 +111,6 @@ The skill operates in **hybrid mode**:
 
 ## References
 
-- [`SALES.md`](../../SALES.md) — submarino completo, criterios de cierre por compartimento.
+- [`sales-pipeline`](../sales-pipeline/) — submarino completo, criterios de cierre por compartimento.
 - [`postcall-recap`](../postcall-recap/) — el siguiente paso después de la reunión.
 - [`deal-health`](../deal-health/) — cuando el deal lleva tiempo sin moverse.

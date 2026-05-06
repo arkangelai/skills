@@ -40,7 +40,7 @@ If transcript is missing, ask once. Do not invent recap from nothing.
    - **Next step:** what was committed by both sides and by when.
 
 3. **Map the recap to a compartment transition.**
-   - Did this meeting close the open compartment? Match against the exit criteria in `SALES.md`.
+   - Did this meeting close the open compartment? Match against the exit criteria in `sales-pipeline`.
    - If yes: state which compartment opens next.
    - If no: state what's missing to close it. The next meeting must aim at the same compartment.
 
@@ -107,7 +107,7 @@ If transcript is missing, ask once. Do not invent recap from nothing.
 ## Pitfalls
 
 - **Síntoma:** el recap inventa dolor que el prospecto no dijo. **Causa:** el LLM completó "lo que probablemente quería decir". **Fix:** cada bullet de dolor debe tener un quote o referencia explícita al transcript. Si no hay, no se incluye.
-- **Síntoma:** se avanza `pipeline_stage` cuando el compartimento no cerró. **Causa:** se confundió "se habló de X" con "X quedó cerrado". **Fix:** el avance solo ocurre si los criterios de cierre del `SALES.md` se cumplen. Cuando hay duda, no avanzar.
+- **Síntoma:** se avanza `pipeline_stage` cuando el compartimento no cerró. **Causa:** se confundió "se habló de X" con "X quedó cerrado". **Fix:** el avance solo ocurre si los criterios de cierre del `sales-pipeline` se cumplen. Cuando hay duda, no avanzar.
 - **Síntoma:** la cuantificación del dolor sale en moneda mezclada (USD y COP) o sin moneda. **Causa:** el prospecto dijo el número sin especificar. **Fix:** asume COP por defecto en deals locales; pide confirmación al usuario si hay ambigüedad.
 - **Síntoma:** el follow-up email no incluye un UFC. **Causa:** se trató como "thank you note". **Fix:** todo follow-up incluye una propuesta concreta de próxima reunión con outcomes posibles. Sin UFC, el deal pierde momentum.
 - **Síntoma:** se duplican notas en Attio (la misma reunión queda dos veces). **Causa:** se corrió la skill dos veces sobre el mismo transcript. **Fix:** la skill verifica si ya hay nota con la misma fecha antes de crear una nueva.
@@ -121,6 +121,6 @@ If transcript is missing, ask once. Do not invent recap from nothing.
 
 ## References
 
-- [`SALES.md`](../../SALES.md) — criterios de cierre por compartimento.
+- [`sales-pipeline`](../sales-pipeline/) — criterios de cierre por compartimento.
 - [`precall-brief`](../precall-brief/) — el paso anterior, antes de la reunión.
 - [`deal-health`](../deal-health/) — auditoría periódica del deal.
