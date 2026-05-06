@@ -5,13 +5,13 @@
 [![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
-[![Skills Count](https://img.shields.io/badge/Skills-29-brightgreen?style=for-the-badge)](./skills)
+[![Skills Count](https://img.shields.io/badge/Skills-31-brightgreen?style=for-the-badge)](./skills)
 [![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
 **The Arkangel skill library — battle-tested agent procedures for healthcare, grants, and operations in Colombia.**
 
-*29 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Clinical reference · Document tooling*
+*31 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Model training · Clinical reference · Document tooling*
 
 [Catalog](#-skill-catalog) · [Quickstart](#-quickstart) · [Create a skill](#-create-a-skill-in-5-steps) · [Contributing](./CONTRIBUTING.md)
 
@@ -131,6 +131,11 @@ albuquerque-v3/
   <td>🧑‍⚕️ <a href="#-clinical-operations-4-skills">Clinical operations</a></td>
   <td align="center"><b>4</b></td>
   <td>Writing IPS-side clinical reports, simplifying patient documents, looking up GPC MinSalud, or pulling PubMed evidence.</td>
+</tr>
+<tr>
+  <td>🧠 <a href="#-model-training-2-skills">Model training</a></td>
+  <td align="center"><b>2</b></td>
+  <td>Training calibrated, production-grade ML models — employee attrition (HR/SST) or clinical screening (Hippocrates EHR, TRIPOD+AI).</td>
 </tr>
 <tr>
   <td>💰 <a href="#-grants-pipeline-8-skills">Grants pipeline</a></td>
@@ -253,6 +258,30 @@ IPS-side and patient-facing tools that complement the audit pipeline. Each one i
 | [`gpc-minsalud-lookup`](./skills/gpc-minsalud-lookup/) | Need to cite a Colombian GPC recommendation in an audit, glosa, or clinical decision | `/gpc-minsalud-lookup` · "what does GPC say about HTA?" / "find recommendation for DM2 follow-up" |
 | [`clinical-report-writer`](./skills/clinical-report-writer/) | Drafting an epicrisis, evolución, nota operatoria, or interconsulta in Colombian standard format | `/clinical-report-writer` · "write the epicrisis from this case" / "format this discharge summary" |
 | [`patient-document-simplifier`](./skills/patient-document-simplifier/) | Translating a glosa, prescription, or discharge summary into plain Spanish for a patient | `/patient-document-simplifier` · "explain this glosa to my patient" / "simplify this discharge summary" |
+
+---
+
+### 🧠 Model training (2 skills)
+
+End-to-end methodologies for training **calibrated, production-grade ML models** distilled from real Arkangel projects. Both skills are siblings — they share the same operating modes (🟢 autónomo / 🟡 propose-N / 🔴 pause-and-ask), one-hypothesis-per-iteration discipline, hard rules, pause-points, and minimum reportable metrics (AUROC + AUPRC + Brier + slope/intercept + ≥4 operating points) — but the domain, costs, and rules differ.
+
+```
+                       shared methodology
+                               │
+               ┌───────────────┴───────────────┐
+               ▼                               ▼
+   attrition-model-trainer            screening-model-trainer
+       (HR / SST tabular)              (clinical EHR, TRIPOD+AI)
+       multiclass + ICL +              foundation models +
+       hybrid ML + rules               multi-score benchmark
+```
+
+**Both skills package only the methodology** (`SKILL.md` + `references/` + `templates/`) — the project-specific Python implementation lives outside this repo. Drop them into a new `model_training/` folder of the target project, copy the markdown templates to `docs/`, and follow the phases.
+
+| Skill | When to use | How to invoke |
+|---|---|---|
+| [`attrition-model-trainer`](./skills/attrition-model-trainer/) | Train/refresh an employee **attrition / retention / turnover** model on tabular HR + SST data; need threshold + business-value analysis (E1/E2 cost scenarios), multiclass reformulation, ICL noise handling, or a hybrid ML+rules scorer. Distilled from the Comfama project (AUC 0.732 → 0.800, deployed). | `/attrition-model-trainer` · "entrena un modelo de retiro" / "predice qué empleados van a renunciar" / "refresca el modelo de attrition de Comfama" |
+| [`screening-model-trainer`](./skills/screening-model-trainer/) | Train/refresh a binary **clinical-screening** model (CKD/ERC, EPOC, DM2, HTA, etc.) on Hippocrates EHR data, conformante con **TRIPOD+AI**, with foundation models (TabPFN), transfer learning (NHANES/MIMIC), multi-score literature benchmark (KFRE/PUMA/FINDRISC), feature audit, LOIO + bootstrap CI, decision-curve analysis, and cliente-facing materials. Distilled from `BI/ERC_detection` (diabéticos) and `AZ_exps/oculus` (EPOC). | `/screening-model-trainer` · "entrena un modelo de tamizaje para CKD" / "refresca el modelo de ERC en diabéticos" |
 
 ---
 
