@@ -5,13 +5,13 @@
 [![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
-[![Skills Count](https://img.shields.io/badge/Skills-37-brightgreen?style=for-the-badge)](./skills)
+[![Skills Count](https://img.shields.io/badge/Skills-43-brightgreen?style=for-the-badge)](./skills)
 [![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
 **The Arkangel skill library — battle-tested agent procedures for healthcare, grants, and operations in Colombia.**
 
-*37 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Sales pipeline · Model training · Clinical reference · Document tooling*
+*43 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Sales pipeline · Model training · Clinical reference · Document tooling*
 
 [Catalog](#-skill-catalog) · [Quickstart](#-quickstart) · [Create a skill](#-create-a-skill-in-5-steps) · [Contributing](./CONTRIBUTING.md)
 
@@ -143,9 +143,9 @@ albuquerque-v3/
   <td>Working on a grant proposal — discovery → scoping → drafting → review → submission.</td>
 </tr>
 <tr>
-  <td>🤝 <a href="#-sales-pipeline-6-skills">Sales pipeline</a></td>
-  <td align="center"><b>6</b></td>
-  <td>Running enterprise healthtech sales — preparing meetings, recapping calls, auditing deal health against the Arkangel submarine.</td>
+  <td>🤝 <a href="#-sales-pipeline-12-skills">Sales pipeline</a></td>
+  <td align="center"><b>12</b></td>
+  <td>Running enterprise healthtech sales — preparing meetings, recapping calls, auditing deal health, and closing each compartment of the Arkangel submarine end-to-end.</td>
 </tr>
 <tr>
   <td>🔎 <a href="#-medical-reference-2-skills">Medical reference</a></td>
@@ -195,27 +195,29 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
 
 ---
 
-### 🤝 Sales pipeline (6 skills)
+### 🤝 Sales pipeline (12 skills)
 
 Reference: [`sales-pipeline`](./skills/sales-pipeline/) — the meta-skill that explains the methodology and tells you which skill to invoke at each compartment.
 
-Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-compartment **submarine** — one meeting closes one compartment. The 4 transversal/orchestration skills (`sales-pipeline`, `precall-brief`, `postcall-recap`, `deal-health`) plus the per-compartment skills for compartments 1 and 2 (`qualify-dolor`, `diagnose-dolor`) are shipped. Compartments 3–7 (`champion-kit`, `decision-maker-kit`, `procurement-kit`, `legal-kit`, `security-kit`) come in following PRs.
+Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-compartment **submarine** — one meeting closes one compartment. Four transversal skills run at any compartment (`sales-pipeline`, `precall-brief`, `postcall-recap`, `deal-health`), one practice skill runs offline (`sales-roleplay`), and seven per-compartment skills handle each stage's specific logic.
 
 **Workflow**
 
 ```
-   ┌──────────────────────────────────────────────────────────────────────┐
-   │  7-compartment submarine (see sales-pipeline for full per-compartment│
-   │  guidance and which skill to invoke at each step)                    │
-   │  1.qualify ▶ 2.diagnose ▶ 3.champion ▶ 4.dm ▶ 5.proc ▶ 6.legal ▶ 7.sec│
-   └──────────────────────────────────────────────────────────────────────┘
+   ┌──────────────────────────────────────────────────────────────────────────┐
+   │  7-compartment submarine (see sales-pipeline for full per-compartment    │
+   │  guidance and which skill to invoke at each step)                        │
+   │                                                                          │
+   │  1.qualify-dolor ▶ 2.diagnose-dolor ▶ 3.champion-kit ▶ 4.decision-maker-kit▶│
+   │  5.procurement-kit ▶ 6.legal-kit ▶ 7.security-kit                        │
+   └──────────────────────────────────────────────────────────────────────────┘
             ▲                     │                      ▲
             │                     ▼                      │
    precall-brief ────▶ (the meeting) ────▶ postcall-recap
-                                                         │
-                                                         ▼
-                                                   deal-health
-                                            (audit anytime)
+            ▲                                            │
+            │                                            ▼
+       sales-roleplay                              deal-health
+       (practice offline)                          (audit anytime)
 ```
 
 | # | Skill | When to use | How to invoke |
@@ -224,8 +226,14 @@ Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-co
 | 2 | [`precall-brief`](./skills/precall-brief/) | Before any sales meeting — produces brief + Up-Front Contract calibrated to the open compartment | `/precall-brief` · "prepara la reunión con X" / "qué tengo que lograr con Y" |
 | 3 | [`postcall-recap`](./skills/postcall-recap/) | After any sales meeting with a transcript — recap, Attio update, follow-up email with next UFC | `/postcall-recap` · "qué quedó de la reunión" / "actualiza el deal" |
 | 4 | [`deal-health`](./skills/deal-health/) | Auditing a deal or the whole pipeline — what's closed, what's open, stall risk | `/deal-health` · "cómo va el deal con X" / "qué deals están en riesgo" |
-| 5 | [`qualify-dolor`](./skills/qualify-dolor/) | Compartment 1 — first meeting qualification: dolor match + presupuesto + DMs | `/qualify-dolor` · "califica este lead" / "vale la pena <empresa>" |
-| 6 | [`diagnose-dolor`](./skills/diagnose-dolor/) | Compartment 2 — pain funnel, cuantificación en plata, línea de compra, ROI, champion commit | `/diagnose-dolor` · "corre el pain funnel con <empresa>" / "cuantifica el dolor" |
+| 5 | [`sales-roleplay`](./skills/sales-roleplay/) | Practice a hard meeting (CFO escéptico, CISO paranoico, comité hostil) before doing it live | `/sales-roleplay` · "simulemos al CFO de X" / "practiquemos la reunión" |
+| 6 | [`qualify-dolor`](./skills/qualify-dolor/) | Compartment 1 — first meeting qualification: dolor match + presupuesto + DMs | `/qualify-dolor` · "califica este lead" / "vale la pena <empresa>" |
+| 7 | [`diagnose-dolor`](./skills/diagnose-dolor/) | Compartment 2 — pain funnel, cuantificación en plata, línea de compra, ROI, champion commit | `/diagnose-dolor` · "corre el pain funnel con <empresa>" / "cuantifica el dolor" |
+| 8 | [`champion-kit`](./skills/champion-kit/) | Compartment 3 — deck + one-pager + email vende-por-ti + FAQ for the champion to sell internally | `/champion-kit` · "arma kit para el champion de <empresa>" |
+| 9 | [`decision-maker-kit`](./skills/decision-maker-kit/) | Compartment 4 — adapt the kit per role (CFO/CMO/CIO/CISO/COO) + price-bracket Good/Better/Best | `/decision-maker-kit` · "adapta kit para CFO de <empresa>" |
+| 10 | [`procurement-kit`](./skills/procurement-kit/) | Compartment 5 — vendor form pre-filled, supports legales/financieros, términos comerciales | `/procurement-kit` · "responde vendor form de <empresa>" |
+| 11 | [`legal-kit`](./skills/legal-kit/) | Compartment 6 — MSA + DPA / Hab. Datos / GDPR / HIPAA BAA + SLA annex + redline map | `/legal-kit` · "prepara contrato + DPA para <empresa>" |
+| 12 | [`security-kit`](./skills/security-kit/) | Compartment 7 — security questionnaire respondido + arquitectura + pentest evidence + remediation plan | `/security-kit` · "responde cuestionario de seguridad de <empresa>" |
 
 ---
 

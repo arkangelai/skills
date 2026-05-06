@@ -67,7 +67,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before sending materials | [`precall-brief`](../precall-brief/) | `/precall-brief` · "qué le mando al champion de <empresa>" | UFC con outcomes "vuelve con DMs y fecha" |
-| Build the kit | `champion-kit` *(PR #3)* | `/champion-kit` · "arma kit para <champion>" | Deck + propuesta one-pager + email vende-por-ti |
+| Build the kit | [`champion-kit`](../champion-kit/) | `/champion-kit` · "arma kit para <champion>" | Deck + propuesta one-pager + email vende-por-ti |
 | Right after handoff | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` (incluye email/llamada) | Attio: kit enviado, fecha próxima con DMs |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si compartimento 3 abierto > 14 días: alerta de stall |
 
@@ -79,7 +79,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before meeting con DMs | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara reunión con CFO/CMO/CIO de <empresa>" | Brief por rol + UFC con outcomes "validan price-bracket" |
-| Build the kit por rol | `decision-maker-kit` *(PR #3)* | `/decision-maker-kit` · "adapta kit para CFO de <empresa>" | Deck + price bracket Good/Better/Best, lenguaje por rol |
+| Build the kit por rol | [`decision-maker-kit`](../decision-maker-kit/) | `/decision-maker-kit` · "adapta kit para CFO de <empresa>" | Deck + price bracket Good/Better/Best, lenguaje por rol |
 | Right after meeting | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` con transcript | Attio: DMs en `decision_makers`, stage 5 |
 | Stakeholder coverage check | `stakeholder-map` *(repo privado)* | — | Mapa champion / influencer / DM / blocker |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si DM crítico no validó: marca como blocker |
@@ -92,7 +92,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before procurement call | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara reunión con compras" | Brief + UFC con outcomes "salimos con vendor form lleno" |
-| Build the kit | `procurement-kit` *(PR #4)* | `/procurement-kit` · "responde vendor form de <empresa>" | Vendor form pre-llenado, NIT, SLAs, condiciones |
+| Build the kit | [`procurement-kit`](../procurement-kit/) | `/procurement-kit` · "responde vendor form de <empresa>" | Vendor form pre-llenado, NIT, SLAs, condiciones |
 | Right after | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` | Attio: nota "procurement done", stage 6 |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si > 21 días sin movimiento: escalar via champion |
 
@@ -104,7 +104,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before legal call | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara reunión legal de <empresa>" | Brief + UFC con outcomes "salimos con redlines o firma" |
-| Build the kit | `legal-kit` *(PR #4)* | `/legal-kit` · "prepara contrato + DPA para <empresa>" | Contrato marco, DPA, BAA, anexo Hab. Datos / GDPR / HIPAA |
+| Build the kit | [`legal-kit`](../legal-kit/) | `/legal-kit` · "prepara contrato + DPA para <empresa>" | Contrato marco, DPA, BAA, anexo Hab. Datos / GDPR / HIPAA |
 | Right after | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` | Attio: nota "legal signed", stage 7 |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Bloqueos legales históricamente más largos: alerta a 30 días |
 
@@ -116,7 +116,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before security call | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara reunión con CISO de <empresa>" | Brief + UFC con outcomes "salimos con sign-off o action items" |
-| Build the kit | `security-kit` *(PR #4)* | `/security-kit` · "responde cuestionario seguridad de <empresa>" | SOC2 / ISO27001 / HIPAA pre-llenado + arquitectura, RLS, encriptación, evidencia pentest |
+| Build the kit | [`security-kit`](../security-kit/) | `/security-kit` · "responde cuestionario seguridad de <empresa>" | SOC2 / ISO27001 / HIPAA pre-llenado + arquitectura, RLS, encriptación, evidencia pentest |
 | Right after | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` | Attio: nota "security cleared", stage `won` |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si security se traba: usualmente requiere AppSec, no solo comercial |
 
@@ -126,11 +126,12 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 - [`precall-brief`](../precall-brief/) — antes de cualquier reunión
 - [`postcall-recap`](../postcall-recap/) — después de cualquier reunión
 - [`deal-health`](../deal-health/) — auditoría en cualquier momento
+- [`sales-roleplay`](../sales-roleplay/) — practicar reuniones difíciles antes de hacerlas
 
 **Por compartimento:**
 - [`qualify-dolor`](../qualify-dolor/) · [`diagnose-dolor`](../diagnose-dolor/)
-- `champion-kit` (PR #3) · `decision-maker-kit` (PR #3)
-- `procurement-kit` (PR #4) · `legal-kit` (PR #4) · `security-kit` (PR #4)
+- [`champion-kit`](../champion-kit/) · [`decision-maker-kit`](../decision-maker-kit/)
+- [`procurement-kit`](../procurement-kit/) · [`legal-kit`](../legal-kit/) · [`security-kit`](../security-kit/)
 
 **Soporte (repo privado, contienen pricing/ICP):**
 - `icp-match`, `pain-quantifier`, `stakeholder-map`, `proposal-pricer`, `competitive-intel`
