@@ -51,7 +51,7 @@
 
 ### D-011 · Synthetic augmentation: ¿se usa?
 
-**Decisión:** <!-- TODO. Por defecto, no — Comfama mostró ganancia marginal +0.002. -->
+**Decisión:** <!-- TODO. Por defecto, no — implementaciones de referencia muestran ganancia marginal <0.005 AUC. -->
 **Razón:** ganancias <0.005 AUC son ruido de bootstrap.
 **Aplicación:** documentar el experimento en `05_modeling_log.md § E9` aunque no se use.
 

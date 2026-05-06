@@ -2,7 +2,7 @@
 
 Estos son los puntos del workflow donde Claude **DEBE** parar y preguntar antes de avanzar, aunque la siguiente acción técnica sea obvia. La razón: la decisión depende de información clínica, de negocio o regulatoria que no está en los datos.
 
-Si Laura agrega pause-points específicos al proyecto, van en `docs/08_decisions_log.md` como `D-NNN: pause-point — <descripción>`.
+Si the project owner agrega pause-points específicos al proyecto, van en `docs/08_decisions_log.md` como `D-NNN: pause-point — <descripción>`.
 
 ---
 
@@ -24,9 +24,9 @@ Drop de menores de 18, drop de embarazadas, drop de ECC < 1 año, etc. — cada 
 
 ## 3. Drop de features sospechosas de leakage
 
-Phase 1.5 scanner flaguea features con correlación sospechosa al target. Antes de drop, Claude muestra lista, Laura confirma cuáles drop (algunas pueden ser legítimas con high signal-to-noise).
+Phase 1.5 scanner flaguea features con correlación sospechosa al target. Antes de drop, Claude muestra lista, the project owner confirma cuáles drop (algunas pueden ser legítimas con high signal-to-noise).
 
-**Para resolver necesitas:** lista de features flagueadas + correlación + explicación de origen, decisión de Laura.
+**Para resolver necesitas:** lista de features flagueadas + correlación + explicación de origen, decisión de the project owner.
 
 ---
 
@@ -40,7 +40,7 @@ Isotonic regression con n_pos<200 puede sobreajustar. Sigmoid (Platt) es más es
 
 ## 5. Promover v0.3 sobre v0.2 cuando delta AUROC en zona de bootstrap noise (<0.005)
 
-Hard rule: ganancia <0.005 AUROC es ruido. Si Laura quiere igual promover v0.3 por otras razones (parsimonia, mejor calibración, mejor en subgrupo crítico), confirmar.
+Hard rule: ganancia <0.005 AUROC es ruido. Si the project owner quiere igual promover v0.3 por otras razones (parsimonia, mejor calibración, mejor en subgrupo crítico), confirmar.
 
 **Para resolver necesitas:** delta AUROC con bootstrap CI, métricas adicionales (Brier, slope, subgroup), justificación no-AUROC para la promoción.
 
@@ -72,7 +72,7 @@ Cohort effects (cambios de protocolo, COVID, política institucional) pueden req
 
 ## 9. Elegir scoring system literario para baseline (Phase 3)
 
-Cuando ≥2 candidatos razonables existen (KFRE vs CKD-EPI vs FIB-4 para CKD; Framingham vs ACC/AHA para HTA; PUMA vs LFQ vs SQ-COPD para EPOC). **Phase 4.5 Track C benchmarkea TODOS sistemáticamente** y elige el más complementario.
+Cuando ≥2 candidatos razonables existen (KFRE vs CKD-EPI vs FIB-4 para CKD; Framingham vs ACC/AHA para HTA; PUMA vs LFQ vs SQ-COPD para COPD). **Phase 4.5 Track C benchmarkea TODOS sistemáticamente** y elige el más complementario.
 
 **Para resolver necesitas:** lista de scores aplicables a la condición, datos para calcular cada uno (algunos requieren features que el dataset puede no tener).
 
@@ -117,7 +117,7 @@ Cliente declara Sens=85% / Spec=50% pero honest CV da números diferentes. Defau
 - Documentar discrepancia SOLO en `RESULTS.md` y `08_decisions_log.md` (interno).
 - La reunión cliente NO es el lugar para surfear errores de modelado del vendor que no son nuestros.
 
-**Para resolver necesitas:** Laura confirma qué números van externos vs internos.
+**Para resolver necesitas:** the project owner confirma qué números van externos vs internos.
 
 ---
 

@@ -135,7 +135,7 @@ albuquerque-v3/
 <tr>
   <td>🧠 <a href="#-model-training-2-skills">Model training</a></td>
   <td align="center"><b>2</b></td>
-  <td>Training calibrated, production-grade ML models — employee attrition (HR/SST) or clinical screening (Hippocrates EHR, TRIPOD+AI).</td>
+  <td>Training calibrated, production-grade ML models — employee attrition (HR/SST) or clinical screening (tabular EHR, TRIPOD+AI).</td>
 </tr>
 <tr>
   <td>💰 <a href="#-grants-pipeline-8-skills">Grants pipeline</a></td>
@@ -280,8 +280,8 @@ End-to-end methodologies for training **calibrated, production-grade ML models**
 
 | Skill | When to use | How to invoke |
 |---|---|---|
-| [`attrition-model-trainer`](./skills/attrition-model-trainer/) | Train/refresh an employee **attrition / retention / turnover** model on tabular HR + SST data; need threshold + business-value analysis (E1/E2 cost scenarios), multiclass reformulation, ICL noise handling, or a hybrid ML+rules scorer. Distilled from the Comfama project (AUC 0.732 → 0.800, deployed). | `/attrition-model-trainer` · "entrena un modelo de retiro" / "predice qué empleados van a renunciar" / "refresca el modelo de attrition de Comfama" |
-| [`screening-model-trainer`](./skills/screening-model-trainer/) | Train/refresh a binary **clinical-screening** model (CKD/ERC, EPOC, DM2, HTA, etc.) on Hippocrates EHR data, conformante con **TRIPOD+AI**, with foundation models (TabPFN), transfer learning (NHANES/MIMIC), multi-score literature benchmark (KFRE/PUMA/FINDRISC), feature audit, LOIO + bootstrap CI, decision-curve analysis, and cliente-facing materials. Distilled from `BI/ERC_detection` (diabéticos) and `AZ_exps/oculus` (EPOC). | `/screening-model-trainer` · "entrena un modelo de tamizaje para CKD" / "refresca el modelo de ERC en diabéticos" |
+| [`attrition-model-trainer`](./skills/attrition-model-trainer/) | Train/refresh an employee **attrition / retention / turnover** model on tabular HR + SST data; need foundation-model benchmark (TabPFN), sliding-window OOT validation, calibration audit, threshold + business-value analysis (E1/E2 cost scenarios), multiclass reformulation, ICL noise handling, or a hybrid ML+rules scorer. | `/attrition-model-trainer` · "entrena un modelo de retiro" / "predice qué empleados van a renunciar" / "refresca el modelo de attrition" |
+| [`screening-model-trainer`](./skills/screening-model-trainer/) | Train/refresh a binary **clinical-screening** model (CKD/ERC, COPD/EPOC, DM2, HTA, etc.) on tabular EHR data, conformante con **TRIPOD+AI**, with foundation models (TabPFN), transfer learning (NHANES/MIMIC), multi-score literature benchmark (KFRE/PUMA/FINDRISC), feature audit, LOIO + bootstrap CI, decision-curve analysis, and cliente-facing materials. | `/screening-model-trainer` · "entrena un modelo de tamizaje para CKD" / "refresca el modelo de ERC en diabéticos" |
 
 ---
 

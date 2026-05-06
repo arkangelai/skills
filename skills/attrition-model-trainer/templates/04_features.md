@@ -18,8 +18,8 @@
 ## Feature engineering
 
 <!-- TODO: interacciones, agrupaciones, encodings. Documentar cuáles ayudaron y cuáles no.
-Reference: Comfama Phase 2 (153 pairwise interactions, KNN distance) — ninguna superó al baseline.
-Lección: feature engineering empírico, no por moda. -->
+Patrón típico: pairwise interactions + KNN distance suelen no aportar sobre baseline en datasets HR/SST de N~1000.
+Lección: feature engineering empírico, no por moda — registrar negativos también. -->
 
 ## Tratamiento de missing
 

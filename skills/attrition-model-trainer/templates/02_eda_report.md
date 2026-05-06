@@ -22,7 +22,7 @@
 ## Arquetipos de empleado / agrupación de cargos
 
 <!-- TODO: si los cargos son heterogéneos, definir grupos antes de modelar.
-Reference: Comfama/scripts/cargo_grouping.py — operativo / ejecutivo / comercial. -->
+Patrón típico: agrupar por nivel jerárquico (operativo / ejecutivo / comercial) o por área funcional. -->
 
 ## Hallazgos relevantes para modelado
 
