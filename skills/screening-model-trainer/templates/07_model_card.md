@@ -12,7 +12,7 @@
 | **Datos** | <!-- TODO: dataset path, n, prevalencia --> |
 | **Artefacto** | <!-- TODO: artifacts/<modelo>.pkl --> |
 | **Hiperparámetros** | <!-- TODO --> |
-| **Equipo** | Arkangel AI |
+| **Equipo** | <!-- TODO --> |
 | **Contacto** | <!-- TODO --> |
 | **Reproducibilidad** | seed=42 en todo el pipeline |
 

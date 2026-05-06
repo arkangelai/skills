@@ -6,7 +6,7 @@
 
 - `docs/cliente/team_presentation/index.html` — un único archivo HTML self-contained con CSS inline y deck navegable (←/→).
 - Sin assets externos excepto Google Fonts (Archivo + JetBrains Mono).
-- Sin imágenes PNG salvo logos del cliente / Arkangel.
+- Sin imágenes PNG salvo logos del cliente y de la organización emisora del deck.
 
 ## Scaffold mínimo
 
@@ -35,9 +35,9 @@ docs/cliente/team_presentation/
 
 ## Brand kit
 
-| Variable CSS | Default Arkangel | Cliente custom |
+| Variable CSS | Default skill | Cliente custom |
 |---|---|---|
-| `--orange` | `#ff5924` | <!-- TODO: si cliente tiene primario, override --> |
+| `--accent` | `#ff5924` (orange) | <!-- TODO: si cliente tiene primario, override --> |
 | `--ink` | `#0A0A0A` | mantener |
 | `--bg` | `#FAFAF7` | mantener |
 | `--prod` | `#6B7280` | mantener (modelo actual = gris) |

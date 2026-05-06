@@ -12,7 +12,7 @@
 | **Datos** | <!-- TODO: dataset path, n, tasa de retiro --> |
 | **Artefacto** | <!-- TODO: artifacts/vN_full_cohort.pkl --> |
 | **Hiperparámetros** | <!-- TODO --> |
-| **Equipo** | Arkangel AI |
+| **Equipo** | <!-- TODO --> |
 | **Contacto** | <!-- TODO --> |
 | **Reproducibilidad** | seed=42 en todo el pipeline |
 

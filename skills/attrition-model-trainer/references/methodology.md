@@ -327,8 +327,8 @@ Documentación cliente-facing en `docs/cliente/` con scaffolds dedicados (templa
 
 - **Todas las métricas en %**, no en escala 0-1. AUC 0.78 → 78%. Brier 0.055 → 5.5%. Diferencias en "puntos porcentuales (pp)".
 - **AUC se traduce** a "de cada 100 retiros reales, cuántos detecta el modelo" (sensitivity at deployed threshold). Es lo único que el negocio puede accionar.
-- **SHAP / feature importance en HTML/CSS** (`.shap-grid` / `.shap-row` patrón oculus), **no como imagen PNG** — texto siempre nítido a cualquier zoom.
-- **Tablas de comparación en HTML** (`table.cmp` patrón oculus), no como imagen.
+- **SHAP / feature importance en HTML/CSS** (`.shap-grid` / `.shap-row` componentes), **no como imagen PNG** — texto siempre nítido a cualquier zoom.
+- **Tablas de comparación en HTML** (`table.cmp` componente), no como imagen.
 - **Sin email / contacto en slide de cierre** por default — se agrega solo si the project owner/cliente lo piden explícitamente.
 - **Variables traducidas a etiquetas plain-Spanish** (`Tipo_examen` → "Momento de evaluación (preingreso vs control)", `Antiguedad_dias` → "Antigüedad en el cargo actual").
 - **Sin terminología técnica:** no foundation model, no ensemble, no calibration slope, no Brier, no ECE — usar "modelo nuevo", "más exacto", "probabilidades confiables".

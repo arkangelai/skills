@@ -1,6 +1,6 @@
 # 12 — Slides outline (Phase 13)
 
-> Outline de 10-12 slides para el deck cliente. Estructura del **patrón oculus** validada en proyectos previos. **Vinculante:** todas las métricas en %; SHAP / tablas en HTML/CSS no PNG.
+> Outline de 10-12 slides para el deck cliente. Estructura validada en proyectos previos. **Vinculante:** todas las métricas en %; SHAP / tablas en HTML/CSS no PNG.
 
 ## Estructura
 
@@ -27,7 +27,7 @@
 - **Variables** en plain-Spanish: `Tipo_examen` → "Momento de evaluación". Mapping debe estar en un dict reutilizable.
 - **Sin jargon:** prohibidos en slides cliente — `foundation model`, `ensemble`, `Optuna`, `Brier`, `ECE`, `slope`, `intercept`, `walk-forward`, `bootstrap`, `AUC` (traducir a "de cada 100 retiros, cuántos detecta").
 - **Sin email / contacto** en slide de cierre por default. Solo agregar si project owner/cliente lo piden explícitamente.
-- **Brand kit** del cliente (no usar Arkangel orange si el cliente tiene otro color primario; preguntar).
+- **Brand kit** del cliente (preguntar al project owner por el color primario y los logos antes de elegir defaults).
 
 ## Patrones HTML CSS de referencia
 
