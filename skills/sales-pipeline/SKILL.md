@@ -56,7 +56,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | Before meeting #2 | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara la reunión de diagnóstico" | Brief + UFC con outcomes "salimos con número y champion" |
 | During #2 | [`diagnose-dolor`](../diagnose-dolor/) | `/diagnose-dolor` · "corre el pain funnel con <empresa>" | Pain funnel completo + ROI + Dx doc para champion |
 | Right after #2 | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` con transcript | Attio: `pain_quantified_cop`, `champion_email`, stage 3 |
-| If pricing needed | `pain-quantifier` *(repo privado)* | — | Cuantificación detallada con tarifas internas |
+| If pricing needed | [`pain-quantifier`](../pain-quantifier/) | `/pain-quantifier` · "cuantifica el dolor de <empresa>" | Cuantificación detallada con fórmulas por sector |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si compartimento 2 abierto: número faltante o champion ausente |
 
 ### Compartment 3 — Champion kit
@@ -81,7 +81,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | Before meeting con DMs | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara reunión con CFO/CMO/CIO de <empresa>" | Brief por rol + UFC con outcomes "validan price-bracket" |
 | Build the kit por rol | [`decision-maker-kit`](../decision-maker-kit/) | `/decision-maker-kit` · "adapta kit para CFO de <empresa>" | Deck + price bracket Good/Better/Best, lenguaje por rol |
 | Right after meeting | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` con transcript | Attio: DMs en `decision_makers`, stage 5 |
-| Stakeholder coverage check | `stakeholder-map` *(repo privado)* | — | Mapa champion / influencer / DM / blocker |
+| Stakeholder coverage check | [`stakeholder-map`](../stakeholder-map/) | `/stakeholder-map` · "mapea stakeholders de <empresa>" | Mapa 2x2 influencia × support con plan por persona |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si DM crítico no validó: marca como blocker |
 
 ### Compartment 5 — Procurement
@@ -133,8 +133,12 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 - [`champion-kit`](../champion-kit/) · [`decision-maker-kit`](../decision-maker-kit/)
 - [`procurement-kit`](../procurement-kit/) · [`legal-kit`](../legal-kit/) · [`security-kit`](../security-kit/)
 
-**Soporte (repo privado, contienen pricing/ICP):**
-- `icp-match`, `pain-quantifier`, `stakeholder-map`, `proposal-pricer`, `competitive-intel`
+**Soporte — frameworks específicos invocables desde otros compartimentos:**
+- [`icp-match`](../icp-match/) — score 0-10 contra ICP antes de qualify
+- [`pain-quantifier`](../pain-quantifier/) — cuantifica el dolor en COP/USD con fórmulas por sector
+- [`stakeholder-map`](../stakeholder-map/) — mapa 2x2 influencia × support con plan por persona
+- [`proposal-pricer`](../proposal-pricer/) — bracket Good/Better/Best con scope distinto por tier (rate-card vive en config privada, no en el skill)
+- [`competitive-intel`](../competitive-intel/) — counter-positioning vs competidores con concesiones honestas
 
 ## Conventions
 

@@ -5,13 +5,13 @@
 [![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
-[![Skills Count](https://img.shields.io/badge/Skills-43-brightgreen?style=for-the-badge)](./skills)
+[![Skills Count](https://img.shields.io/badge/Skills-48-brightgreen?style=for-the-badge)](./skills)
 [![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
 **The Arkangel skill library — battle-tested agent procedures for healthcare, grants, and operations in Colombia.**
 
-*43 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Sales pipeline · Model training · Clinical reference · Document tooling*
+*48 curated skills · Medical insurance audit · Clinical operations · Grants pipeline · Sales pipeline · Model training · Clinical reference · Document tooling*
 
 [Catalog](#-skill-catalog) · [Quickstart](#-quickstart) · [Create a skill](#-create-a-skill-in-5-steps) · [Contributing](./CONTRIBUTING.md)
 
@@ -143,9 +143,9 @@ albuquerque-v3/
   <td>Working on a grant proposal — discovery → scoping → drafting → review → submission.</td>
 </tr>
 <tr>
-  <td>🤝 <a href="#-sales-pipeline-12-skills">Sales pipeline</a></td>
-  <td align="center"><b>12</b></td>
-  <td>Running enterprise healthtech sales — preparing meetings, recapping calls, auditing deal health, and closing each compartment of the Arkangel submarine end-to-end.</td>
+  <td>🤝 <a href="#-sales-pipeline-17-skills">Sales pipeline</a></td>
+  <td align="center"><b>17</b></td>
+  <td>Running enterprise healthtech sales — full submarine: ICP scoring, meeting prep, qualifying, pain quantification, stakeholder mapping, kits per compartment, pricing brackets, competitive intel, and deal-health audits.</td>
 </tr>
 <tr>
   <td>🔎 <a href="#-medical-reference-2-skills">Medical reference</a></td>
@@ -195,11 +195,11 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
 
 ---
 
-### 🤝 Sales pipeline (12 skills)
+### 🤝 Sales pipeline (17 skills)
 
 Reference: [`sales-pipeline`](./skills/sales-pipeline/) — the meta-skill that explains the methodology and tells you which skill to invoke at each compartment.
 
-Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-compartment **submarine** — one meeting closes one compartment. Four transversal skills run at any compartment (`sales-pipeline`, `precall-brief`, `postcall-recap`, `deal-health`), one practice skill runs offline (`sales-roleplay`), and seven per-compartment skills handle each stage's specific logic.
+Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-compartment **submarine** — one meeting closes one compartment. Four transversal skills run at any compartment (`sales-pipeline`, `precall-brief`, `postcall-recap`, `deal-health`), one practice skill runs offline (`sales-roleplay`), seven per-compartment skills handle each stage's specific logic, and five framework skills (`icp-match`, `pain-quantifier`, `stakeholder-map`, `proposal-pricer`, `competitive-intel`) get invoked from inside the others as building blocks.
 
 **Workflow**
 
@@ -234,6 +234,11 @@ Hybrid Sandler + MEDDIC adapted to enterprise healthtech. The pipeline is a 7-co
 | 10 | [`procurement-kit`](./skills/procurement-kit/) | Compartment 5 — vendor form pre-filled, supports legales/financieros, términos comerciales | `/procurement-kit` · "responde vendor form de <empresa>" |
 | 11 | [`legal-kit`](./skills/legal-kit/) | Compartment 6 — MSA + DPA / Hab. Datos / GDPR / HIPAA BAA + SLA annex + redline map | `/legal-kit` · "prepara contrato + DPA para <empresa>" |
 | 12 | [`security-kit`](./skills/security-kit/) | Compartment 7 — security questionnaire respondido + arquitectura + pentest evidence + remediation plan | `/security-kit` · "responde cuestionario de seguridad de <empresa>" |
+| 13 | [`icp-match`](./skills/icp-match/) | Score 0-10 contra el ICP Arkangel before qualifying — pursue / nurture / pass | `/icp-match` · "es ICP <empresa>?" / "rankea esta lista" |
+| 14 | [`pain-quantifier`](./skills/pain-quantifier/) | Convertir dolor a COP/USD con fórmulas por sector + sensitivity analysis | `/pain-quantifier` · "cuantifica el dolor de <empresa>" |
+| 15 | [`stakeholder-map`](./skills/stakeholder-map/) | Mapa 2x2 (influencia × support) con plan por persona — champion, blocker, supporter, noise | `/stakeholder-map` · "mapea stakeholders de <empresa>" |
+| 16 | [`proposal-pricer`](./skills/proposal-pricer/) | Bracket Good/Better/Best con scope distinto por tier, anclado al dolor + payback per tier | `/proposal-pricer` · "arma propuesta para <empresa>" |
+| 17 | [`competitive-intel`](./skills/competitive-intel/) | Brief de competidor + counter-positioning con concesiones honestas + objection handlers | `/competitive-intel` · "qué les digo de <competidor>" |
 
 ---
 
