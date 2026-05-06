@@ -2,7 +2,7 @@
 
 Detalle de cada fase del workflow de `screening-model-trainer`. Cada fase produce un artefacto concreto y se registra en `docs/05_modeling_log.md` con un experimento numerado (`E0`, `E1`, …).
 
-Las funciones referenciadas (`download_from_hippocrates`, `tune_gbms`, `hybrid_search`, `bootstrap_metrics_ci`, `loio_validation`, etc.) viven en la librería interna del proyecto fuente y se reimplementan localmente — la documentación describe la **metodología**, no el package.
+Las funciones referenciadas (`download_dataset`, `tune_gbms`, `hybrid_search`, `bootstrap_metrics_ci`, `loio_validation`, etc.) son nombres convencionales que se reimplementan localmente — la documentación describe la **metodología**, no un package específico.
 
 ---
 
