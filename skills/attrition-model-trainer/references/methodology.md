@@ -273,7 +273,7 @@ Empaquetar para el destino (model registry, serverless platform, API interna, �
 - `model.pkl` con `{label, features, model, threshold}`.
 - `feature_names.json` con el orden exacto de columnas para inferencia.
 - `means.npy` + `stds.npy` si hubo preprocessing manual.
-- `background_set.csv` para SHAP (subset estratificado de ~100 filas del train).
+- `background_shap_set.csv` para SHAP (subset estratificado de ~100 filas del train).
 - README de inferencia (cómo cargar y predecir).
 
 **Verificación de bundle:** ningún feature listado en `feature_names.json` debe estar en la lista de leakage descartada en Phase 1.5.
