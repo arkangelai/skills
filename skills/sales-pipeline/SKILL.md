@@ -42,7 +42,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before meeting #1 | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara la primera reunión con <empresa>" | Brief + UFC con outcomes "califica / no califica / hablamos en 6 meses" |
-| During / right after #1 | `qualify-dolor` *(PR #2)* | `/qualify-dolor` · "evalúa si <empresa> califica" | GO / NO-GO con razón concreta y datos faltantes |
+| During / right after #1 | [`qualify-dolor`](../qualify-dolor/) | `/qualify-dolor` · "evalúa si <empresa> califica" | GO / NO-GO con razón concreta y datos faltantes |
 | Right after #1 | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` con transcript | Attio actualizado a `pipeline_stage = 2.diagnose` si GO |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si compartimento 1 abierto: lista qué falta para califiar |
 
@@ -54,7 +54,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 | When | Skill | How to invoke | Expected output |
 |---|---|---|---|
 | Before meeting #2 | [`precall-brief`](../precall-brief/) | `/precall-brief` · "prepara la reunión de diagnóstico" | Brief + UFC con outcomes "salimos con número y champion" |
-| During #2 | `diagnose-dolor` *(PR #2)* | `/diagnose-dolor` · "corre el pain funnel con <empresa>" | Pain funnel completo + ROI + Dx doc para champion |
+| During #2 | [`diagnose-dolor`](../diagnose-dolor/) | `/diagnose-dolor` · "corre el pain funnel con <empresa>" | Pain funnel completo + ROI + Dx doc para champion |
 | Right after #2 | [`postcall-recap`](../postcall-recap/) | `/postcall-recap` con transcript | Attio: `pain_quantified_cop`, `champion_email`, stage 3 |
 | If pricing needed | `pain-quantifier` *(repo privado)* | — | Cuantificación detallada con tarifas internas |
 | Anytime | [`deal-health`](../deal-health/) | `/deal-health` con deal | Si compartimento 2 abierto: número faltante o champion ausente |
@@ -128,7 +128,7 @@ For every compartment, the playbook is the same shape: **before the meeting → 
 - [`deal-health`](../deal-health/) — auditoría en cualquier momento
 
 **Por compartimento:**
-- `qualify-dolor` (PR #2) · `diagnose-dolor` (PR #2)
+- [`qualify-dolor`](../qualify-dolor/) · [`diagnose-dolor`](../diagnose-dolor/)
 - `champion-kit` (PR #3) · `decision-maker-kit` (PR #3)
 - `procurement-kit` (PR #4) · `legal-kit` (PR #4) · `security-kit` (PR #4)
 
