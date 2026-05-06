@@ -4,7 +4,7 @@
 
 ## Origen
 
-<!-- TODO: bucket Hippocrates, path, fecha de descarga, n filas, n cols, sha256 si aplica. -->
+<!-- TODO: object store / bucket, path, fecha de descarga, n filas, n cols, sha256 si aplica. -->
 
 - **Bucket:**
 - **Path:**

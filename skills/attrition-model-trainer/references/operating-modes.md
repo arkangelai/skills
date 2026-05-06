@@ -1,6 +1,6 @@
 # Operating modes — cómo opera Claude dentro del skill
 
-Esta skill se invoca con **Laura como dueña del workflow** y **Claude como agente autoresearch dentro de los rails que el skill marca**.
+Esta skill se invoca con **the project owner como dueña del workflow** y **Claude como agente autoresearch dentro de los rails que el skill marca**.
 
 ## Pre-flight checklist (antes de proponer o ejecutar nada)
 
@@ -22,7 +22,7 @@ Cada paso de cada fase opera en uno de tres modos. Si el skill no marca explíci
 | Modo | Cuándo aplica | Comportamiento de Claude |
 |---|---|---|
 | 🟢 **Autónomo** | Default técnico claro (split estratificado seed=42, Optuna 30 trials, bootstrap CI 1000 resamples, ICL 5 rondas) | Ejecuta, registra en `trial_log.jsonl`, reporta resultado |
-| 🟡 **Propose-N** | Decisión técnica con tradeoff (cargo grouping, qué feature engineered probar, método de calibración, alpha del hybrid scorer) | Presenta 2-3 opciones con tradeoffs en una tabla, **espera elección de Laura**, registra en `09_decisions_log.md` |
+| 🟡 **Propose-N** | Decisión técnica con tradeoff (cargo grouping, qué feature engineered probar, método de calibración, alpha del hybrid scorer) | Presenta 2-3 opciones con tradeoffs en una tabla, **espera elección de the project owner**, registra en `09_decisions_log.md` |
 | 🔴 **Pause-and-ask** | Fuera de workflow, ambigüedad de dominio o de negocio (ver `pause-points.md`) | **Para, pregunta, no avanza** hasta confirmación explícita |
 
 ---
@@ -51,7 +51,7 @@ Presentar tabla, esperar respuesta, registrar decisión.
 
 ### 🔴 Pause-and-ask
 
-- Ver `references/pause-points.md` para la lista vinculante de 11 puntos.
+- Ver `references/pause-points.md` para la lista vinculante de 14 puntos.
 - Ejemplo: antes de re-formular como multiclass; antes de validar costos E1/E2; antes de drop de un cargo entero por LOIO fallido.
 
 Parar, preguntar, no avanzar.

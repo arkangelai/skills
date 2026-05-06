@@ -7,7 +7,7 @@ Estas reglas no son preferencias estilísticas — son guardrails aprendidos de 
 ## Variable naming
 
 - Usar **clinical Spanish names**, nunca el column name del modelo. `bmi` → `Índice de Masa Corporal`. `tab_yes` → `Hábito tabáquico`. `paquetes_anho` → `Paquetes-año`. `mmrc` → `Disnea (mMRC)`.
-- Para variables binarias en slides: **`existe / no existe`**, NUNCA `sí / no` (matchea convención Hippocrates/EHR).
+- Para variables binarias en slides: **`existe / no existe`**, NUNCA `sí / no` (convención EHR).
 - Para variables con missingness handling: **`existe / no existe / unknown`** (ej. Hábito tabáquico).
 - Para numéricas: incluir **min-max range y units** (`Edad — numérica · 18 – 100 años`).
 - Para categóricas: listar **todas las categorías explícitamente** (`Tipo de tabaco — Activo / Pasivo / Ambos / unknown`).
@@ -39,7 +39,7 @@ Estas reglas no son preferencias estilísticas — son guardrails aprendidos de 
 - Usar el número del cliente **externamente** (slide deck, 1pager, talking points).
 - Documentar la discrepancia SOLO en `RESULTS.md` y `08_decisions_log.md` (interno).
 - La reunión cliente NO es el lugar para surfear errores de modelado del vendor que no son nuestros para fix.
-- **Confirmar con Laura** antes de publicar cualquiera de los dos sets de números.
+- **Confirmar con el project owner** antes de publicar cualquiera de los dos sets de números.
 
 ---
 
@@ -80,4 +80,4 @@ Este framing evita la apariencia de "no improvement" y convierte el matched oper
 10. **Insights** — 3 cards en plain language, una idea por card.
 11. **CTA / next steps** — acciones numeradas + bundle path + audit references.
 
-Referencia canónica del HTML deck: `AZ_exps/oculus/docs/cliente/team_presentation/index.html` (proyecto interno).
+Referencia canónica del HTML deck: copiar el deck más reciente con Phase 12 completa que tenga el equipo.

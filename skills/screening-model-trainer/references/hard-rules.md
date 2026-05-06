@@ -1,11 +1,11 @@
 # Hard rules — 15 reglas no negociables
 
-Estas reglas son vinculantes: Claude no las override aunque el workflow técnico parezca permitirlo. Cada una nace de una lección concreta de `BI/ERC_detection`, `AZ_exps/oculus`, o de prácticas estándar de ML clínico aplicado.
+Estas reglas son vinculantes: Claude no las override aunque el workflow técnico parezca permitirlo. Cada una nace de incidentes reales en producción y de prácticas estándar de ML clínico aplicado.
 
 ---
 
-1. **Never SMOTE the whole cohort en tabular EHR.** Usar `class_weight` / `scale_pos_weight`. Razón: distorsiona calibración, validado empíricamente en `BI/ERC_detection D-007`.
-   **Exception — targeted subgroup SMOTE:** cuando un solo subgrupo tiene informational ceiling (validado por 5+ ablations independientes convergiendo al mismo AUROC) AND ese subgrupo es clínicamente crítico, oversample SOLO ese subgrupo para matchear el positive count del subgrupo dominante, RE-FIT calibración sobre augmented set. Validado en `AZ_exps/oculus` (F+non-fumadora SMOTE, 90/10 PUMA ensemble). **Pause-point 🔴** antes de aplicar — Laura aprueba.
+1. **Never SMOTE the whole cohort en tabular EHR.** Usar `class_weight` / `scale_pos_weight`. Razón: distorsiona calibración, validado empíricamente.
+   **Exception — targeted subgroup SMOTE:** cuando un solo subgrupo tiene informational ceiling (validado por 5+ ablations independientes convergiendo al mismo AUROC) AND ese subgrupo es clínicamente crítico, oversample SOLO ese subgrupo para matchear el positive count del subgrupo dominante, RE-FIT calibración sobre augmented set (caso de referencia: subgrupo demográfico crítico con techo informational + ensemble con score publicado). **Pause-point 🔴** antes de aplicar — el project owner aprueba.
 
 2. **Never train on the holdout.** Si entrenas sobre full cohort, ese es un artefacto SEPARADO (Phase 9), no el que evalúas.
 
@@ -19,7 +19,7 @@ Estas reglas son vinculantes: Claude no las override aunque el workflow técnico
 
 7. **Document en español para IPS/EPS-facing projects, English para code comments.** Match the existing convention in the target repo.
 
-8. **Claude propone N opciones, Laura decide.** Para cada decisión 🟡 propose-N, Claude entrega tabla con 2-3 opciones + tradeoffs y NO ejecuta hasta que Laura elige. La elección queda en `08_decisions_log.md`.
+8. **Claude propone N opciones, the project owner decide.** Para cada decisión 🟡 propose-N, Claude entrega tabla con 2-3 opciones + tradeoffs y NO ejecuta hasta que el project owner elige. La elección queda en `08_decisions_log.md`.
 
 9. **Una hipótesis por iteración.** Cada experimento numerado en `05_modeling_log.md` cambia exactamente una variable. Sweeping changes (modelo + features + threshold a la vez) destruyen atribución.
 
