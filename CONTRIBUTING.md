@@ -1,7 +1,7 @@
 # Cómo contribuir
 
 1. Clona el repo y crea una rama: `git checkout -b add/<nombre-skill>`.
-2. Copia `templates/skill-template/` a `<categoria>/<nombre-skill>/`.
+2. Copia `templates/skill-template/` a `skills/<nombre-skill>/`.
 3. Edita `SKILL.md`. Respeta las secciones: `When to Use`, `Procedure`, `Pitfalls`, `Verification`.
 4. Prueba la skill con el runtime que uses (Claude Code o Hermes). Ver README.
 5. Commit con mensaje claro: `Add <nombre-skill>: <qué hace en una línea>`.
@@ -14,7 +14,7 @@
 - `Pitfalls` captura errores reales, no hipotéticos.
 - `Verification` es objetiva.
 - No hay secretos hardcoded (claves, tokens, URLs internas, PHI, datos de pacientes).
-- Nombre en `kebab-case`, ubicación correcta por categoría.
+- Nombre en `kebab-case`, una sola carpeta por skill bajo `skills/`.
 
 ## Actualizar una skill existente
 
