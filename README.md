@@ -5,7 +5,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/arkangelai/skills?style=for-the-badge&logo=github&color=gold)](https://github.com/arkangelai/skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/arkangelai/skills?style=for-the-badge&logo=github&color=blue)](https://github.com/arkangelai/skills/network/members)
 [![GitHub Issues](https://img.shields.io/github/issues/arkangelai/skills?style=for-the-badge&logo=github)](https://github.com/arkangelai/skills/issues)
-[![Skills Count](https://img.shields.io/badge/Skills-48-brightgreen?style=for-the-badge)](./skills)
+[![Skills Count](https://img.shields.io/badge/Skills-49-brightgreen?style=for-the-badge)](./skills)
 [![License](https://img.shields.io/badge/License-Internal-purple?style=for-the-badge)](#)
 [![Platform](https://img.shields.io/badge/Platform-Claude%20Code%20%7C%20Hermes-orange?style=for-the-badge)](https://skill.sh)
 
@@ -169,7 +169,7 @@ albuquerque-v3/
 
 ---
 
-### 💰 Grants pipeline (8 skills)
+### 💰 Grants pipeline (9 skills)
 
 Reference doc: [`GRANTS.md`](./GRANTS.md).
 
@@ -180,6 +180,9 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
                                                                                               │
                                                                                               ▼
                           8.submit ◀── 7.polish-grant ◀── 6.grant-review ◀───────────────────┘
+                              │
+                              ▼ (NIH/ASSIST only)
+                        9.ASSIST-grant
 ```
 
 | # | Skill | When to use | How to invoke |
@@ -192,6 +195,7 @@ Reference doc: [`GRANTS.md`](./GRANTS.md).
 | 6 | [`grant-review`](./skills/grant-review/) | Draft + timeline + budget exist; need quality gate | `/grant-review` · "review this grant" / "is this ready?" |
 | 7 | [`polish-grant`](./skills/polish-grant/) | PR has review/owner comments to address | `/polish-grant` · "address the review comments" |
 | 8 | [`submit`](./skills/submit/) | Final draft approved; ready to close the cycle | `/submit` · "prepare submission" / "close this grant cycle" |
+| 9 | [`ASSIST-grant`](./skills/ASSIST-grant/) | Funder is NIH and submission is through ASSIST (R01, R21, R03, SBIR/STTR, PAR, RFA) — builds the complete package: Specific Aims, Research Strategy, Human Subjects, budget, DMSP, facilities, timeline, and portal field mapping | `/ASSIST-grant` · "write the NIH application" / "build the ASSIST package" / "draft the R01" |
 
 ---
 
