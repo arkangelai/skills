@@ -1,77 +1,62 @@
 ---
 name: medical-invoice-portal-intake
-description: Logs into the mock-portals medical invoice portal (portal-facturas-ark.vercel.app), finds pending submissions, downloads their files from Supabase Storage, and creates a case task per submission via `ark tasks create`. Use it when you want to process medical invoice submissions that arrived through the web portal instead of Gmail, or when testing the audit pipeline without a real email inbox.
-version: 1.0.0
+description: Uses Playwright to log into the mock-portals medical invoice portal (portal-facturas-ark.vercel.app) as Salmona, reads pending submissions from the submissions table, downloads each file through the browser, and creates a case task per submission via `ark tasks create`. Use it when processing medical invoice submissions that arrived through the web portal, or when testing the audit pipeline end-to-end without a real email inbox.
+version: 1.1.0
 author: fiorella.ramirez@arkangel.ai
 platforms: [macos, linux]
 metadata:
   hermes:
-    tags: [medical, audit, portal, intake, colombia, eps]
+    tags: [medical, audit, portal, intake, playwright, colombia, eps]
     category: medical-insurance-audit
-    requires_toolsets: [terminal]
+    requires_toolsets: [terminal, browser]
 required_environment_variables:
   - name: PORTAL_URL
     prompt: Base URL of the mock portal
     help: "Default: https://portal-facturas-ark.vercel.app"
     required_for: full functionality
   - name: PORTAL_EMAIL
-    prompt: Arkangel email used to log into the portal (must be salmona@arkangel.ai)
-    help: OTP will be sent to this address — gogcli must be authenticated with this account
-    required_for: full functionality
-  - name: SUPABASE_URL
-    prompt: Supabase project URL
-    help: Found in Supabase dashboard > Project Settings > API
-    required_for: file download
-  - name: SUPABASE_SERVICE_ROLE_KEY
-    prompt: Supabase service role key
-    help: Found in Supabase dashboard > Project Settings > API
-    required_for: file download
+    prompt: Arkangel email to log into the portal (salmona@arkangel.ai)
+    help: OTP will be sent here — gogcli must be authenticated with this account
+    required_for: login
+  - name: ARK_API_URL
+    prompt: Salmona API URL
+    help: Used by ark CLI to create tasks
+    required_for: task creation
 ---
 
 # medical-invoice-portal-intake
 
-Alternative intake skill for the medical-invoice audit pipeline. Instead of watching a Gmail inbox, it reads pending submissions from the web portal at `$PORTAL_URL`, downloads the attached files from Supabase Storage, and creates one case task per submission via `ark tasks create`.
+Alternative intake skill for the medical-invoice audit pipeline. Instead of watching a Gmail inbox, this skill uses **Playwright** to interact with the web portal at `$PORTAL_URL` exactly as a human would — no direct API or database access. This mirrors what a real external portal integration would look like.
 
-The portal uses OTP login. This skill reads the OTP from Salmona's Gmail inbox using `gogcli`, completes the login, then scrapes the `/submissions` page for pending rows.
+Full flow:
+1. Open the portal login page in a headless browser
+2. Enter Salmona's email and request an OTP
+3. Read the OTP from Gmail using `gogcli`
+4. Enter the OTP in the browser to complete login
+5. Navigate to `/submissions`, find pending rows
+6. For each pending submission: click to expand files, download each file
+7. Create an `ark` task with the case metadata as context and files as inputs
+8. Mark the submission as processed (update status via portal API)
 
 ## When to Use
 
-- You want to process submissions that arrived via the web portal (not email).
-- You are running the audit pipeline in a test/mock environment.
-- The user says "check the portal for new facturas" or "process pending portal submissions".
+- The user asks to "check the portal for new facturas" or "process pending portal submissions".
+- You want to run the audit pipeline end-to-end using the mock portal as intake.
+- Testing the full Playwright-based intake flow.
 
-**Do not use:** if submissions are arriving via Gmail — use `medical-invoice-gmail-intake` instead. Do not process a submission that already has a `task_id` (already processed).
+**Do not use:** for Gmail-originated invoices (use `medical-invoice-gmail-intake`). Do not process submissions that already have a `task_id`.
 
-## Environment Setup
+## Prerequisites
 
 ```bash
-export PORTAL_URL=https://portal-facturas-ark.vercel.app
-export PORTAL_EMAIL=salmona@arkangel.ai
-export SUPABASE_URL=https://mbbqbbxjcmlxzyqxtzbs.supabase.co
-# SUPABASE_SERVICE_ROLE_KEY must be set in the environment
-```
+# Playwright
+npx playwright install chromium
 
-Verify `gogcli` is authenticated with `$PORTAL_EMAIL`:
-```bash
-gog auth list --check
-```
+# gogcli authenticated with salmona@arkangel.ai
+gog auth list --check | grep "$PORTAL_EMAIL"
 
-## Input Contract
-
-No structured input required. The skill polls the portal's `/submissions` page directly.
-
-## Output Contract
-
-For each processed submission, the skill creates a case task via `ark tasks create` and updates the submission status to `processing`. The output per submission:
-
-```json
-{
-  "submission_id": "<uuid>",
-  "task_id": "<ark-task-id>",
-  "num_factura": "FV-2026-XXXXX",
-  "prestador_nombre": "...",
-  "files_uploaded": ["factura.pdf", "epicrisis.pdf"]
-}
+# ark authenticated
+ark auth status | jq -e '.data.authenticated == true'
 ```
 
 ## Procedure
@@ -79,115 +64,147 @@ For each processed submission, the skill creates a case task via `ark tasks crea
 ### 1. Verify prerequisites
 
 ```bash
+npx playwright --version || { echo "Playwright not found. Run: npm install -g playwright && npx playwright install chromium"; exit 1; }
 gog --version || { echo "gogcli not found"; exit 1; }
-ark version || { echo "ark not found"; exit 1; }
-ark auth status | jq -e '.data.authenticated == true' || { echo "ark not authenticated"; exit 1; }
+ark auth status | jq -e '.data.authenticated == true' || { echo "ark not authenticated. Run: ark config set api-key <key>"; exit 1; }
 ```
 
-### 2. Request OTP
+### 2. Write the Playwright script
 
-Call the portal's send-otp endpoint:
+Write the following to `/tmp/portal-intake.js`:
 
-```bash
-OTP_RESPONSE=$(curl -s -X POST "$PORTAL_URL/api/auth/send-otp" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\": \"$PORTAL_EMAIL\"}")
+```javascript
+const { chromium } = require('playwright');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-echo "$OTP_RESPONSE" | jq -e '.ok == true' || {
-  echo "Failed to send OTP: $OTP_RESPONSE"
-  exit 1
+const PORTAL_URL = process.env.PORTAL_URL || 'https://portal-facturas-ark.vercel.app';
+const PORTAL_EMAIL = process.env.PORTAL_EMAIL || 'salmona@arkangel.ai';
+
+async function getOtpFromGmail() {
+  // Wait up to 60s for the OTP email
+  for (let i = 0; i < 12; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const result = execSync(
+        `gog --account "${PORTAL_EMAIL}" gmail search ` +
+        `'from:noreply@mail.app.supabase.io newer_than:3m' --json --max 1`,
+        { encoding: 'utf8' }
+      );
+      const data = JSON.parse(result);
+      const snippet = data?.messages?.[0]?.snippet || '';
+      const match = snippet.match(/\b(\d{6})\b/);
+      if (match) return match[1];
+    } catch {}
+    console.log(`Waiting for OTP... attempt ${i + 1}`);
+  }
+  throw new Error('OTP not received within 60s');
 }
-echo "OTP sent to $PORTAL_EMAIL"
-```
 
-### 3. Read OTP from Gmail
+async function run() {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
-Wait up to 60 seconds for the OTP email, then extract the 6-digit code:
+  // --- LOGIN ---
+  console.log('Navigating to login page...');
+  await page.goto(`${PORTAL_URL}/login`);
+  await page.fill('input[type="email"]', PORTAL_EMAIL);
+  await page.click('button[type="submit"]');
+  console.log('OTP requested. Reading from Gmail...');
 
-```bash
-OTP_CODE=""
-for i in $(seq 1 12); do
-  sleep 5
-  OTP_EMAIL=$(gog --account "$PORTAL_EMAIL" gmail search \
-    'from:noreply@mail.app.supabase.io newer_than:2m subject:"Your OTP"' \
-    --json --max 1)
+  const otp = await getOtpFromGmail();
+  console.log(`OTP received: ${otp}`);
 
-  OTP_CODE=$(echo "$OTP_EMAIL" | jq -r '
-    .messages[0].snippet // ""
-  ' | grep -oP '\b\d{6}\b' | head -1)
+  await page.fill('input[placeholder="123456"]', otp);
+  await page.click('button[type="submit"]');
+  await page.waitForURL(`${PORTAL_URL}/submissions`, { timeout: 10000 });
+  console.log('Logged in. On submissions page.');
 
-  [ -n "$OTP_CODE" ] && break
-  echo "Waiting for OTP... attempt $i"
-done
+  // --- READ SUBMISSIONS ---
+  await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => {});
 
-[ -z "$OTP_CODE" ] && { echo "OTP not received within 60s"; exit 1; }
-echo "OTP received: $OTP_CODE"
-```
+  // Get all rows with status "pending" and no task_id
+  const rows = await page.$$eval('table tbody tr[data-submission-id]', rows =>
+    rows
+      .filter(r => r.querySelector('.status')?.textContent?.trim() === 'pending')
+      .map(r => ({
+        id: r.dataset.submissionId,
+        numFactura: r.querySelector('.num-factura')?.textContent?.trim(),
+        prestadorNombre: r.querySelector('.prestador-nombre')?.textContent?.trim(),
+        prestadorNit: r.querySelector('.prestador-nit')?.textContent?.trim() || '',
+      }))
+  );
 
-### 4. Verify OTP and get session token
+  console.log(`Found ${rows.length} pending submission(s)`);
+  if (!rows.length) { await browser.close(); return; }
 
-```bash
-SESSION=$(curl -s -X POST "$SUPABASE_URL/auth/v1/verify" \
-  -H "Content-Type: application/json" \
-  -H "apikey: $SUPABASE_ANON_KEY" \
-  -d "{\"type\": \"email\", \"email\": \"$PORTAL_EMAIL\", \"token\": \"$OTP_CODE\"}")
+  const results = [];
 
-ACCESS_TOKEN=$(echo "$SESSION" | jq -r '.access_token')
-[ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ] && {
-  echo "OTP verification failed: $SESSION"
-  exit 1
+  for (const row of rows) {
+    console.log(`\nProcessing submission ${row.id} — ${row.numFactura} (${row.prestadorNombre})`);
+
+    const workDir = `/tmp/portal-intake/${row.id}`;
+    fs.mkdirSync(workDir, { recursive: true });
+
+    // Expand file dropdown
+    await page.click(`tr[data-submission-id="${row.id}"]`);
+    await page.waitForTimeout(300);
+
+    // Download each file
+    const fileNames = await page.$$eval(
+      `tr[data-submission-id="${row.id}"] + tr li .font-mono`,
+      els => els.map(e => e.textContent.trim())
+    );
+
+    const downloadedFiles = [];
+    for (const fileName of fileNames) {
+      const downloadPath = path.join(workDir, fileName);
+      const downloadPromise = context.waitForEvent('download');
+
+      // Click the file link
+      await page.click(
+        `tr[data-submission-id="${row.id}"] + tr li:has-text("${fileName}") a`
+      );
+
+      const download = await downloadPromise;
+      await download.saveAs(downloadPath);
+      downloadedFiles.push(downloadPath);
+      console.log(`  Downloaded: ${fileName}`);
+    }
+
+    results.push({ ...row, downloadedFiles });
+  }
+
+  await browser.close();
+
+  // Write results for next step
+  fs.writeFileSync('/tmp/portal-intake-results.json', JSON.stringify(results, null, 2));
+  console.log('\nBrowser session complete. Results written to /tmp/portal-intake-results.json');
 }
-echo "Authenticated as $PORTAL_EMAIL"
+
+run().catch(e => { console.error(e); process.exit(1); });
 ```
 
-### 5. Fetch pending submissions
+### 3. Run the Playwright script
 
 ```bash
-SUBMISSIONS=$(curl -s "$SUPABASE_URL/rest/v1/submissions?status=eq.pending&select=*" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "apikey: $SUPABASE_ANON_KEY")
-
-COUNT=$(echo "$SUBMISSIONS" | jq 'length')
-echo "Found $COUNT pending submission(s)"
-[ "$COUNT" -eq 0 ] && { echo "Nothing to process"; exit 0; }
+PORTAL_URL="$PORTAL_URL" PORTAL_EMAIL="$PORTAL_EMAIL" node /tmp/portal-intake.js
 ```
 
-### 6. Process each submission
-
-For each pending submission:
+### 4. Create ark tasks from downloaded files
 
 ```bash
-echo "$SUBMISSIONS" | jq -c '.[]' | while read -r submission; do
-  SUBMISSION_ID=$(echo "$submission" | jq -r '.id')
-  NUM_FACTURA=$(echo "$submission" | jq -r '.num_factura')
-  PRESTADOR_NOMBRE=$(echo "$submission" | jq -r '.prestador_nombre')
-  PRESTADOR_NIT=$(echo "$submission" | jq -r '.prestador_nit // ""')
-  FILE_PATHS=$(echo "$submission" | jq -r '.file_paths[]')
-
-  echo "Processing submission $SUBMISSION_ID — $NUM_FACTURA ($PRESTADOR_NOMBRE)"
-
+RESULTS=$(cat /tmp/portal-intake-results.json)
+echo "$RESULTS" | jq -c '.[]' | while read -r item; do
+  SUBMISSION_ID=$(echo "$item" | jq -r '.id')
+  NUM_FACTURA=$(echo "$item" | jq -r '.numFactura')
+  PRESTADOR_NOMBRE=$(echo "$item" | jq -r '.prestadorNombre')
+  PRESTADOR_NIT=$(echo "$item" | jq -r '.prestadorNit')
   WORK_DIR="/tmp/portal-intake/$SUBMISSION_ID"
-  mkdir -p "$WORK_DIR"
 
-  # Download each file from Supabase Storage
-  DOWNLOADED_FILES=()
-  while IFS= read -r file_path; do
-    FILE_NAME=$(basename "$file_path")
-    LOCAL_PATH="$WORK_DIR/$FILE_NAME"
-
-    SIGNED_URL=$(curl -s -X POST \
-      "$SUPABASE_URL/storage/v1/object/sign/submissions/$file_path" \
-      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-      -H "Content-Type: application/json" \
-      -d '{"expiresIn": 300}' | jq -r '.signedURL')
-
-    curl -s -L "$SUPABASE_URL$SIGNED_URL" -o "$LOCAL_PATH"
-    DOWNLOADED_FILES+=("$LOCAL_PATH")
-    echo "  Downloaded: $FILE_NAME"
-  done <<< "$FILE_PATHS"
-
-  # Build caso_id
-  CASO_ID="RAD-$(date +%Y%m%d)-$(echo "$NUM_FACTURA" | tr -d '-' | tail -c 6)"
+  CASO_ID="RAD-$(date +%Y%m%d)-$(echo "$NUM_FACTURA" | grep -oP '\d+$')"
   FECHA_RADICACION=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   CONTEXT=$(jq -n \
@@ -208,7 +225,6 @@ echo "$SUBMISSIONS" | jq -c '.[]' | while read -r submission; do
       portal_submission_id: $submission_id
     }')
 
-  # Create ark task
   TASK_RUN_ID=$(ark gen-uuid)
 
   TASK_RESPONSE=$(ark tasks create \
@@ -218,66 +234,55 @@ echo "$SUBMISSIONS" | jq -c '.[]' | while read -r submission; do
 
   TASK_ID=$(echo "$TASK_RESPONSE" | jq -r '.data.id')
   [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ] && {
-    echo "  Failed to create task: $TASK_RESPONSE"
+    echo "Failed to create task for $SUBMISSION_ID: $TASK_RESPONSE"
     continue
   }
-  echo "  Task created: $TASK_ID"
+  echo "Task created: $TASK_ID"
 
-  # Upload files as task inputs
-  for local_file in "${DOWNLOADED_FILES[@]}"; do
-    FILE_NAME=$(basename "$local_file")
-    STORAGE_PATH="tasks/$TASK_ID/inputs/$FILE_NAME"
-
-    curl -s -X POST \
-      "$SUPABASE_URL/storage/v1/object/task-documents/$STORAGE_PATH" \
-      -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-      -H "Content-Type: application/pdf" \
-      --data-binary "@$local_file" > /dev/null
-
-    export ARK_IDEMPOTENCY_KEY="${TASK_RUN_ID}:input:$FILE_NAME"
-    ark tasks inputs add "$TASK_ID" \
-      --path "storage://task-documents/$STORAGE_PATH" \
-      --type storage \
-      --description "$FILE_NAME"
-
-    echo "  Uploaded input: $FILE_NAME"
+  # Upload each downloaded file as a task input
+  for FILE_PATH in "$WORK_DIR"/*; do
+    FILE_NAME=$(basename "$FILE_PATH")
+    export ARK_IDEMPOTENCY_KEY="${TASK_RUN_ID}:input:${FILE_NAME}"
+    ark tasks outputs upload "$TASK_ID" "$FILE_PATH" --type file --label input
+    echo "  Uploaded: $FILE_NAME"
   done
 
-  # Mark submission as processing + store task_id
+  # Mark submission as processing via portal API
   curl -s -X PATCH "$PORTAL_URL/api/submissions/$SUBMISSION_ID" \
     -H "Content-Type: application/json" \
     -d "{\"status\": \"processing\", \"task_id\": \"$TASK_ID\"}" > /dev/null
 
   echo "  Submission $SUBMISSION_ID → processing (task: $TASK_ID)"
-
-  # Cleanup
   rm -rf "$WORK_DIR"
 done
 ```
 
-### 7. Done
+### 5. Done
 
 ```bash
 echo "Portal intake complete."
+ark tasks list --status queued
 ```
 
 ## Pitfalls
 
-- **OTP email subject varies** -- Supabase OTP emails may say "Your OTP" or "Confirm your signup". If `gog gmail search` returns nothing, try a broader query: `from:noreply@mail.app.supabase.io newer_than:5m`.
-- **Submission already has a task_id** -- always filter `status=eq.pending` to avoid double-processing. If a submission shows `processing` or `done`, skip it.
-- **File download fails** -- signed URLs expire in 5 minutes. Generate and use them immediately. If a download fails, log it as a blocker and continue with other files.
-- **`ark tasks create` context too large** -- if the context JSON exceeds shell limits, write it to a temp file and pipe it: `ark tasks create --context "$(cat /tmp/context.json)"`.
+- **OTP email subject varies** -- if `gog gmail search` finds nothing, broaden the query: `from:noreply@mail.app.supabase.io newer_than:5m`. The subject line from Supabase can vary.
+- **File links not rendered as `<a>` tags** -- the portal file dropdown shows filenames as text, not links. If downloads fail, the portal may need a signed download URL route. Check `portal-facturas-ark.vercel.app` for a `/api/submissions/:id/files/:name` endpoint, or add one.
+- **Playwright selector drift** -- if the portal UI changes, selectors like `tr[data-submission-id]` may break. Verify selectors against the live portal before running at scale.
+- **`data-submission-id` attribute missing** -- the submissions table rows must have this attribute for selection to work. Verify the portal renders it correctly.
+- **Double-processing** -- always filter by `status = pending` in the Playwright script. If a submission has already been processed (task_id not null), skip it.
 
 ## Verification
 
-- Each processed submission has `status = processing` and a non-null `task_id` in the portal.
-- `ark tasks list --status queued` shows the new tasks.
-- Each task has inputs registered matching the submission's file list.
-- No submission with an existing `task_id` was processed twice.
+- `ark tasks list --status queued` shows one new task per processed submission.
+- Each task has the correct `context` (caso_id, num_factura, prestador_nombre).
+- Portal `/submissions` shows `processing` status + task_id for each processed row.
+- No submission with an existing `task_id` was processed again.
 
 ## References
 
 - Portal: https://portal-facturas-ark.vercel.app
-- Supabase project: Ark staging (`mbbqbbxjcmlxzyqxtzbs`)
-- Related skill: `medical-invoice-gmail-intake` (same pipeline, different intake source)
-- `ark` CLI docs: `ark --help`
+- Portal repo: https://github.com/arkangelai/mock-portals
+- Related skill: `medical-invoice-gmail-intake` (same pipeline, Gmail intake)
+- `ark` CLI: `ark --help`
+- Playwright docs: https://playwright.dev/docs/api/class-page
