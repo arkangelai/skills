@@ -1,7 +1,7 @@
 ---
 name: screening-model-trainer
 description: Train a calibrated binary clinical-screening ML model end-to-end on tabular EHR data, following TRIPOD+AI, with foundation-model + transfer-learning + multi-score literature benchmarks, feature audit, parsimonious bundle, bootstrap CI, LOIO validation, and cliente-facing materials. Use when the user asks to build/train/refresh a screening model for a clinical condition (CKD/ERC, diabetes, hypertension, COPD/EPOC, etc.) on a tabular EHR dataset.
-version: 1.1.0
+version: 1.2.0
 author: laura.bellon@arkangel.ai
 platforms: [macos, linux]
 metadata:
@@ -29,11 +29,11 @@ Es la contraparte de `attrition-model-trainer` (rotación de personal sobre HR/S
 
 ## Procedure
 
-El workflow son **11 fases principales + 5 sub-fases (1b, 4.5, 5.5, 5.6, 5.7, 6.5, 6.6, 7.5)** mapeadas a 9 deliverables markdown TRIPOD+AI en `templates/`. Cada fase produce artefactos concretos y se registra en `docs/05_modeling_log.md`. Detalle completo en `references/methodology.md`.
+El workflow son **11 fases principales + 10 sub-fases (1b, 1c, 4.5, 5.5, 5.6, 5.7, 6.5, 6.6, 7.5, 8.5)** mapeadas a 9 deliverables markdown TRIPOD+AI en `templates/`. Cada fase produce artefactos concretos y se registra en `docs/05_modeling_log.md`. Detalle completo en `references/methodology.md`.
 
 1. **Phase 0 — Project scaffolding.** Crear `<project>/model_training/{docs,src,data,artifacts,results,tests}` y copiar los 9 templates a `docs/`.
 
-2. **Phase 1 — Data ingestion.** Bajar zip / CSV del EHR data store, normalizar a CSV en `data/interim/`. Documentar cada columna en `docs/01_data_dictionary.md`. **Phase 1.5 — Leakage gate** obligatorio antes de modelar. **Phase 1b**: si hay modelo desplegado, intentar bajar `train.csv`/`val.csv`/`test.csv` upstream — son el holdout honesto vs deployed (nuestro re-split puede contaminarse).
+2. **Phase 1 — Data ingestion.** Bajar zip / CSV del EHR data store, normalizar a CSV en `data/interim/`. Documentar cada columna en `docs/01_data_dictionary.md`. **Phase 1.5 — Leakage gate** obligatorio antes de modelar. **Phase 1b**: si hay modelo desplegado, intentar bajar `train.csv`/`val.csv`/`test.csv` upstream — son el holdout honesto vs deployed. **Phase 1c — Upstream drop-chain audit** mandatorio cuando se hereda un `build_features` previo: listar columnas del raw vs columnas que llegan al modelo, recuperar las clínicamente útiles silenciosamente descartadas via MICE.
 
 3. **Phase 2 — EDA + cohort.** Generar las 5 figuras estándar. Definir inclusión/exclusión, target encoding, baseline window en `docs/03_cohort_and_outcome.md`. **Pause-point 🔴** cuando hay >1 interpretación clínica del target o cuando inclusión/exclusión reduce cohorte >10%.
 
@@ -62,7 +62,7 @@ El workflow son **11 fases principales + 5 sub-fases (1b, 4.5, 5.5, 5.6, 5.7, 6.
 
 14. **Phase 7 — Validation: LOIO + subgroups + DCA.** Leave-One-Institution-Out, subgroup tables (sex, age_bin, etc.), Decision Curve Analysis. **Phase 7.5 — Nested CV (opcional)** cuando `n<2000` y bootstrap CI half-width >0.05.
 
-15. **Phase 8 — Comparison vs deployed (si existe).** Bajar artefactos de Modal/Supabase, replicate inference, leakage check, honest CV replicando arquitectura desplegada. **Hard rule:** nunca aceptar AUROC del deployed at face value. Preferir `test.csv` upstream de Phase 1b.
+15. **Phase 8 — Comparison vs deployed (si existe).** Bajar artefactos de Modal/Supabase, replicate inference, leakage check, honest CV replicando arquitectura desplegada. **Hard rule:** nunca aceptar AUROC del deployed at face value. Preferir `test.csv` upstream de Phase 1b. **Phase 8.5 — Combined-cohort vs specialized decision (condicional)**: cuando el cliente opera 2+ modelos especializados sobre cohortes relacionadas, evaluar modelo unificado con apples-to-apples por cohorte + tabla por subgrupo + decision rule (mantener especializados si la pérdida está concentrada en subgrupos críticos).
 
 16. **Phase 9 — Re-fit winner on full cohort.** `vN_full_cohort.pkl` con `{label, features, model}`. Este es el artefacto que despliegas; el holdout fue solo para evaluación honesta.
 
@@ -72,7 +72,7 @@ El workflow son **11 fases principales + 5 sub-fases (1b, 4.5, 5.5, 5.6, 5.7, 6.
 
 19. **Phase 12 — Cliente-facing materials.** En `docs/cliente/`: 1pager, talking_points, slides_outline, deploy_spec, y deck HTML 11-slide (Cover → Problem → Headline → Features comparison → Variables dictionary → Metrics → Subgroups → SHAP → Architecture → Insights → CTA). Convenciones obligatorias en `references/cliente-communication.md`.
 
-**Operación entre fases:** Claude opera en uno de tres modos por paso (🟢 Autónomo / 🟡 Propose-N / 🔴 Pause-and-ask) con 17 pause-points obligatorios y 15 hard rules no negociables. Ver `references/operating-modes.md`, `references/pause-points.md`, `references/hard-rules.md`.
+**Operación entre fases:** Claude opera en uno de tres modos por paso (🟢 Autónomo / 🟡 Propose-N / 🔴 Pause-and-ask) con 18 pause-points obligatorios y 16 hard rules no negociables. Ver `references/operating-modes.md`, `references/pause-points.md`, `references/hard-rules.md`.
 
 **Una hipótesis por iteración.** Cada experimento numerado (`E0`, `E1`, …) en `05_modeling_log.md` cambia exactamente una variable. Cada métrica producida se escribe a `artifacts/trial_log.jsonl`.
 
@@ -91,6 +91,12 @@ El workflow son **11 fases principales + 5 sub-fases (1b, 4.5, 5.5, 5.6, 5.7, 6.
 - **Síntoma:** se publica deck cliente con "modelo calibrado, Brier=0.13" y el cliente clínico no lo entiende. **Causa:** el equipo ML usó jargon. **Fix:** usar la tabla de traducción de `references/cliente-communication.md`. "calibrado" → "probabilidad clínica validada"; "Brier" → "validamos que cuando dice 70%, son 70 de cada 100"; nunca "AUROC" sin acompañar de "qué tan bien separa enfermos de sanos". Variables clínicas en español (`bmi` → `Índice de Masa Corporal`); binarias `existe / no existe`, no `sí / no`.
 
 - **Síntoma:** el project owner pregunta "¿por qué PUMA y no LFQ?" en revisión y no hay datos para responder. **Causa:** Phase 4.5 Track C se saltó — solo se benchmarkeó el primer score que apareció en literatura. **Fix:** cuando ≥2 scores publicados existen, benchmark sistemático de TODOS antes de elegir cuál integrar (mandatorio para Phase 5.7). Documentar también los descartados — regulators y cliente preguntan.
+
+- **Síntoma:** `cross_val_score(catboost_model, X, y, cv=5, n_jobs=-1)` retorna AUROC ≈ 0.5 silenciosamente — el feature search produce winners aleatorios. **Causa:** `sklearn.clone()` (que `cross_val_score` invoca con `n_jobs=-1`) no clona estimadores CatBoost correctamente; el modelo en cada fold queda sin entrenar. **Fix:** escribir loops de CV manuales con instanciación explícita por fold (`CatBoostClassifier(**params)` dentro del loop, no `clone()`). Aplica también a `cross_val_predict`, `GridSearchCV`, `Pipeline` con CatBoost embedded. **No usar `n_jobs=-1` con CatBoost via sklearn cross-validation utilities.**
+
+- **Síntoma:** stacking pipeline con LogisticRegression como meta-learner falla con `ValueError: Input contains NaN`. **Causa:** los base models (CatBoost, LightGBM, XGBoost) toleran NaN nativamente, así que el feature matrix entra al meta-learner con NaNs en columnas que los base models predijeron sin imputación. LR no acepta NaN. **Fix:** agregar `SimpleImputer(strategy="median")` al pipeline del meta-learner antes del scaler. Los base models siguen sin imputación; solo el meta-learner la requiere.
+
+- **Síntoma:** se entrena modelo combinado multi-cohorte con cohort flags explícitos (`is_<cohorte_A>`, `is_<cohorte_B>`) y SHAP los muestra con <1% de importancia, lo que parece bug. **Causa:** una variable continua redundante ya codifica el cohorte (e.g., una distribución bimodal de un biomarcador clínico que separa las cohortes naturalmente). Los GBMs encuentran el split en esa variable continua y los flags binarios quedan redundantes. **Fix:** confirmar via análisis por subgrupo que el modelo igual respeta la pertenencia al cohorte (tabla AUROC por cohorte). No es bug; es comportamiento esperado de árboles. **Implicación operacional:** la lógica cohort-aware vive en una sola feature continua, no en los flags — fragilidad para casos atípicos donde esa variable está fuera de su distribución típica. Ver Phase 8.5 + pause-point #18.
 
 ## Verification
 

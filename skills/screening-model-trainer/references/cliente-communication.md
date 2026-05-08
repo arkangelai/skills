@@ -56,6 +56,18 @@ Función helper: `feature_audit.aggregate_shap_by_clinical_variable()` con un ma
 
 ---
 
+## Framing del modelo nuevo: PPV / selectividad antes que ataque al desplegado
+
+Cuando el modelo desplegado tiende a sobre-flagging (alta sensibilidad a costa de muchos falsos positivos), la value proposition del nuevo modelo es **selectividad** — no "es mejor". Reglas de framing para la presentación cliente:
+
+- **Liderar con PPV / selectividad.** Frases que funcionan: "no le dice a todo que sí", "filtra mejor los falsos positivos", "concentra la atención clínica en los pacientes con más probabilidad real". El cliente clínico entiende inmediatamente la diferencia con un modelo que sobre-flaguea.
+- **Nunca atacar las métricas del modelo desplegado en el deck.** Aún si las métricas son débiles (AUROC 0.55, calibración fuera de rango), no las haga el headline. La tabla comparativa side-by-side (slide 6) habla sola; el cliente lee los números. Tu trabajo es resaltar el lado positivo del nuevo, no degradar el actual — los stakeholders que aprobaron el desplegado están en la sala.
+- **Frame aditivo, no sustitutivo.** El nuevo modelo agrega valor: mejor selectividad, mejor calibración, menos workload de seguimiento, cobertura de subgrupos donde el actual no llega. Esto preserva la relación con quienes lideraron el deploy actual.
+- **Subgrupos donde el nuevo brilla más** (slide 7 dedicado). Identificar 2-3 subgrupos donde la ganancia AUROC es más alta (e.g., adultos mayores, comorbilidad alta, enfermedad sub-controlada o silente). Estos son los lugares donde el cliente clínico ve el aporte concreto.
+- **Si vas a contrastar:** hazlo con métricas operativas, no con AUROC del desplegado. "El modelo actual marca X% como riesgo alto; el nuevo marca Y% al mismo Sens" comunica selectividad sin parecer ataque.
+
+---
+
 ## "Por qué la spec se mantiene igual" — explicit framing
 
 Cuando las métricas muestran Sens & Spec idénticas a producción con AUROC up, el cliente típicamente pregunta "¿por qué no subió la spec si el modelo es mejor?". **Responder en el slide directamente:**

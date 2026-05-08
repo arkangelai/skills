@@ -1,4 +1,4 @@
-# Hard rules — 15 reglas no negociables
+# Hard rules — 16 reglas no negociables
 
 Estas reglas son vinculantes: Claude no las override aunque el workflow técnico parezca permitirlo. Cada una nace de incidentes reales en producción y de prácticas estándar de ML clínico aplicado.
 
@@ -35,6 +35,9 @@ Estas reglas son vinculantes: Claude no las override aunque el workflow técnico
    **Cuando ≥2 scores publicados existen para la condición:** Phase 4.5 Track C hace benchmark sistemático de TODOS antes de elegir uno para Phase 5.7 ensemble. Documentar también los scores descartados — regulators y cliente preguntan "¿por qué este y no aquel?".
 
 15. **Foundation model exploration mandatory para n<5,000.** Phase 4.5 Track A corre TabPFN (o equivalente) ANTES de Phase 5 feature search. Si el foundation model no se prueba, no se puede afirmar que el GBM tuneado es la mejor arquitectura — queda como hipótesis no validada.
+
+16. **Nunca recomendar una variante en base al delta promedio cuando existe tabla por subgrupo.** Si dos variantes (e.g., modelo nuevo vs desplegado, full vs parsimonious, combined vs specialized) tienen ΔAUROC promedio pequeño pero la tabla por subgrupo está disponible, leer la distribución completa antes de proponer. Una pérdida concentrada ≥0.05 AUROC en un subgrupo clínicamente crítico (enfermedad controlada, comorbilidad, edad avanzada) override el promedio. El project owner ve la distribución por subgrupo antes de aprobar; el headline NO es el promedio si la varianza por subgrupo es alta.
+   **Caso de referencia:** modelo combinado multi-cohorte (Phase 8.5) con −0.024 AUROC promedio se rechazó al inspeccionar subgrupos: pérdida concentrada de −0.10 en pacientes con condición controlada y −0.06 en obesidad. La cohorte hermana se preservó uniformemente, pero la concentración en subgrupos críticos fue deal-breaker.
 
 ---
 

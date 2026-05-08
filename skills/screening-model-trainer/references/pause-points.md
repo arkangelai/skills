@@ -1,4 +1,4 @@
-# Pause-points — 17 puntos donde Claude debe parar y preguntar
+# Pause-points — 18 puntos donde Claude debe parar y preguntar
 
 Estos son los puntos del workflow donde Claude **DEBE** parar y preguntar antes de avanzar, aunque la siguiente acción técnica sea obvia. La razón: la decisión depende de información clínica, de negocio o regulatoria que no está en los datos.
 
@@ -145,3 +145,19 @@ Antes de reemplazar GBM tuneado por arquitectura de fundación, validar:
 Cuando harmonizar features de NHANES/MIMIC/etc. requiere imputaciones o equivalencias clínicas no triviales (ej. NHANES "smoking_status" categórico vs nuestro `paquetes_anho` numérico), pause obligatorio para validar el mapping con clinical lead.
 
 **Para resolver necesitas:** mapping propuesto feature-by-feature, validación clínica del mapping, alternativa de no usar la feature problemática.
+
+---
+
+## 18. Adoptar modelo combinado en lugar de modelos especializados (Phase 8.5)
+
+Cuando el cliente opera 2+ modelos especializados sobre cohortes clínicamente relacionadas (e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) y se ha entrenado un modelo unificado que está dentro de ±0.01 AUROC del promedio de los especializados.
+
+Antes de proponer adopción del combinado:
+- (a) Inspeccionar tabla apples-to-apples por cohorte (combinado restringido al split del especializado vs especializado en su propio split).
+- (b) Inspeccionar tabla por subgrupo en cada cohorte (sex, age_bin, control de la condición, IMC, etc.).
+- (c) Si algún subgrupo clínicamente crítico pierde ≥0.05 AUROC en el combinado → **NO proponer adopción**, mantener especializados, documentar como `D-NNN` con la tabla de pérdidas por subgrupo.
+- (d) Si las pérdidas son uniformes (todos los subgrupos en ±0.011 vs especializado), discutir con el project owner el tradeoff (un modelo en producción vs pérdida promedio pequeña).
+
+**Por qué es pause-point:** una pérdida promedio de −0.024 AUROC puede esconder una pérdida de −0.10 en el subgrupo donde el cribado más ayuda (e.g., pacientes con la condición de base controlada — donde la señal es sutil y el modelo especializado fue construido específicamente para detectarla).
+
+**Para resolver necesitas:** apples-to-apples per-cohort table + tabla por subgrupo en ambos cohortes + costo operacional estimado de mantener 2 modelos vs 1 + decisión del project owner con la distribución por subgrupo visible.
