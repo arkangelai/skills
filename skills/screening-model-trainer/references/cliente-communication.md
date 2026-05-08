@@ -34,7 +34,7 @@ Estas reglas no son preferencias estilísticas — son guardrails aprendidos de 
 
 ## When cliente-declared metrics differ from honest re-evaluation
 
-🔴 **Pause-point #14.** Si tu honest 80/20 holdout da Spec=42% pero el cliente fue informado Spec=50.5% por el deployed-team, **default conservador**:
+🔴 **Pause-point PP-14** (ver `references/governance.md`). Si tu honest 80/20 holdout da Spec=42% pero el cliente fue informado Spec=50.5% por el deployed-team, **default conservador**:
 
 - Usar el número del cliente **externamente** (slide deck, 1pager, talking points).
 - Documentar la discrepancia SOLO en `RESULTS.md` y `08_decisions_log.md` (interno).
@@ -53,6 +53,18 @@ Los SHAP posters de producción típicamente muestran "Edad: 41.5", "Tabaco: 49.
 4. Mostrar top-9 (matchea typical poster count de producción) para que el side-by-side tenga el mismo row count.
 
 Función helper: `feature_audit.aggregate_shap_by_clinical_variable()` con un mapping project-defined.
+
+---
+
+## Framing del modelo nuevo: PPV / selectividad antes que ataque al desplegado
+
+Cuando el modelo desplegado tiende a sobre-flagging (alta sensibilidad a costa de muchos falsos positivos), la value proposition del nuevo modelo es **selectividad** — no "es mejor". Reglas de framing para la presentación cliente:
+
+- **Liderar con PPV / selectividad.** Frases que funcionan: "no le dice a todo que sí", "filtra mejor los falsos positivos", "concentra la atención clínica en los pacientes con más probabilidad real". El cliente clínico entiende inmediatamente la diferencia con un modelo que sobre-flaguea.
+- **Nunca atacar las métricas del modelo desplegado en el deck.** Aún si las métricas son débiles (AUROC 0.55, calibración fuera de rango), no las haga el headline. La tabla comparativa side-by-side (slide 6) habla sola; el cliente lee los números. Tu trabajo es resaltar el lado positivo del nuevo, no degradar el actual — los stakeholders que aprobaron el desplegado están en la sala.
+- **Frame aditivo, no sustitutivo.** El nuevo modelo agrega valor: mejor selectividad, mejor calibración, menos workload de seguimiento, cobertura de subgrupos donde el actual no llega. Esto preserva la relación con quienes lideraron el deploy actual.
+- **Subgrupos donde el nuevo brilla más** (slide 7 dedicado). Identificar 2-3 subgrupos donde la ganancia AUROC es más alta (e.g., adultos mayores, comorbilidad alta, enfermedad sub-controlada o silente). Estos son los lugares donde el cliente clínico ve el aporte concreto.
+- **Si vas a contrastar:** hazlo con métricas operativas, no con AUROC del desplegado. "El modelo actual marca X% como riesgo alto; el nuevo marca Y% al mismo Sens" comunica selectividad sin parecer ataque.
 
 ---
 
