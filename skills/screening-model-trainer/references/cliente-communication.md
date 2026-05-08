@@ -34,7 +34,7 @@ Estas reglas no son preferencias estilísticas — son guardrails aprendidos de 
 
 ## When cliente-declared metrics differ from honest re-evaluation
 
-🔴 **Pause-point #14.** Si tu honest 80/20 holdout da Spec=42% pero el cliente fue informado Spec=50.5% por el deployed-team, **default conservador**:
+🔴 **Pause-point PP-14** (ver `references/governance.md`). Si tu honest 80/20 holdout da Spec=42% pero el cliente fue informado Spec=50.5% por el deployed-team, **default conservador**:
 
 - Usar el número del cliente **externamente** (slide deck, 1pager, talking points).
 - Documentar la discrepancia SOLO en `RESULTS.md` y `08_decisions_log.md` (interno).

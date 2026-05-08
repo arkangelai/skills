@@ -1,4 +1,4 @@
-# Methodology — 14 phases
+# Methodology — 14 phases (linear sub-numbering N.1, N.2, …)
 
 Detalle de cada fase del workflow de `attrition-model-trainer`. Cada fase produce un artefacto concreto y se registra en `docs/05_modeling_log.md` con un experimento numerado (`E0`, `E1`, …).
 
@@ -33,7 +33,7 @@ Attrition data llega típicamente como **múltiples CSVs** (encuestas SST, datos
 
 **Document in `docs/01_data_dictionary.md`:** cada columna, dtype, units, missing-rate, value range, source. Usar `df.describe()`, `df.isna().sum()`, `df[col].value_counts()`.
 
-### Phase 1.5 — Leakage gate (mandatory)
+### Phase 1.1 — Leakage gate (mandatory)
 
 Entre Phase 1 y Phase 2, antes de cualquier fit, correr un scanner estadístico de leakage. Cualquier feature que construyó el target (ej. fecha de retiro derivada en antigüedad calculada al cierre, salario final post-retiro) se descarta.
 
@@ -110,7 +110,7 @@ En implementaciones de referencia esto suele mover AUC del orden de +0.05-0.07 s
 
 ---
 
-## Phase 5.5 — Foundation model benchmark (TabPFN, opcional)
+## Phase 5.1 — Foundation model benchmark (TabPFN, opcional)
 
 Cuando `Hard rule 17` (cohort indicator en top-5) **o** binary AUC se estanca después de Phase 5 multiclass, **TabPFN entra como benchmark obligatorio antes de Phase 6** — no como alternativa, sino como sanity check del ensemble.
 
@@ -120,9 +120,9 @@ Cuando `Hard rule 17` (cohort indicator en top-5) **o** binary AUC se estanca de
 1. Instalar `tabpfn>=2.0` (CPU OK para n<1000).
 2. Fit en train completo (sin holdout interno — TabPFN no entrena).
 3. Predict probabilidades sobre el mismo split de evaluación que usaron Phase 5/6.
-4. Comparar AUC binario en CV + (especialmente) en sliding-window OOT (Phase 6.5).
+4. Comparar AUC binario en CV + (especialmente) en sliding-window OOT (Phase 6.1).
 
-**Criterio de adopción:** si TabPFN **gana** ≥0.02 AUC en OOT preingreso o subpob de uso real, entra como ganador candidato y se valida en Phase 6.5. Si pierde o empata, sigue ensemble Phase 6 — pero se reporta el benchmark en `06_results.md` como sanity check.
+**Criterio de adopción:** si TabPFN **gana** ≥0.02 AUC en OOT preingreso o subpob de uso real, entra como ganador candidato y se valida en Phase 6.1. Si pierde o empata, sigue ensemble Phase 6 — pero se reporta el benchmark en `06_results.md` como sanity check.
 
 **Limitaciones operacionales que hay que confirmar antes:**
 - Latencia: 1-2 segundos por candidato vs ~50ms del ensemble. Aceptable para screening, **no** para tiempo real.
@@ -151,7 +151,7 @@ En implementaciones de referencia, los pesos suelen concentrarse en 4-5 modelos 
 
 ---
 
-## Phase 6.5 — Sliding-window OOT validation (mandatory si hay timestamp)
+## Phase 6.1 — Sliding-window OOT validation (mandatory si hay timestamp)
 
 **Hard rule 18:** si el dataset tiene `Fecha_registro` / `Fecha_ingreso` o equivalente, sliding-window OOT es **obligatorio** antes de declarar un winner. Random CV solo no se acepta en `model_card.md`.
 
@@ -276,7 +276,7 @@ Empaquetar para el destino (model registry, serverless platform, API interna, �
 - `background_shap_set.csv` para SHAP (subset estratificado de ~100 filas del train).
 - README de inferencia (cómo cargar y predecir).
 
-**Verificación de bundle:** ningún feature listado en `feature_names.json` debe estar en la lista de leakage descartada en Phase 1.5.
+**Verificación de bundle:** ningún feature listado en `feature_names.json` debe estar en la lista de leakage descartada en Phase 1.1.
 
 ### Phase 12.1 — Model-registry packaging spec (cuando deploy es a un object-store + serverless)
 

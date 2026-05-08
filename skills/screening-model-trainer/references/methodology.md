@@ -1,4 +1,4 @@
-# Methodology — 11 phases + sub-phases
+# Methodology — 13 phases (linear sub-numbering N.1, N.2, …)
 
 Detalle de cada fase del workflow de `screening-model-trainer`. Cada fase produce un artefacto concreto y se registra en `docs/05_modeling_log.md` con un experimento numerado (`E0`, `E1`, …).
 
@@ -31,7 +31,7 @@ Las funciones referenciadas (`download_dataset`, `tune_gbms`, `hybrid_search`, `
 2. **Decompress + normalize** al CSV de trabajo.
 3. **Document** cada columna en `docs/01_data_dictionary.md`: dtype, units, missing-rate, value range, source.
 
-### Phase 1b — Probe upstream pre-existing splits (mandatory cuando hay deployed)
+### Phase 1.1 — Probe upstream pre-existing splits (mandatory cuando hay deployed)
 
 Cuando el pipeline upstream persiste `train.csv`/`val.csv`/`test.csv` + `background_shap_set.csv` junto al `.pkl` desplegado en `<bucket>/<userId>/<projectId>/<expId>/`, intentar bajarlos.
 
@@ -39,7 +39,7 @@ Cuando el pipeline upstream persiste `train.csv`/`val.csv`/`test.csv` + `backgro
 
 **Si `test.csv` upstream existe:** queda como face-value test set en Phase 8. **NO usar para training ni feature search.**
 
-### Phase 1c — Upstream drop-chain audit (mandatorio cuando se hereda un pipeline existente)
+### Phase 1.2 — Upstream drop-chain audit (mandatorio cuando se hereda un pipeline existente)
 
 Cuando el proyecto hereda un `build_features.py` previo (refresh de un modelo desplegado, segunda iteración del cliente, integración de un dataset previamente procesado por otro equipo), el pipeline upstream puede estar descartando silenciosamente columnas clínicamente útiles del raw del cliente.
 
@@ -52,9 +52,9 @@ Cuando el proyecto hereda un `build_features.py` previo (refresh de un modelo de
 
 **Por qué importa:** en proyectos previos esta auditoría fue el primer uplift real de la fase (>+0.04 AUROC random) cuando todos los demás experimentos (focal loss, calibración Beta, sample weights, augmentation) fueron neutros. Drop-chains existen porque pipelines heredados se construyeron para una versión más estricta del schema.
 
-**Antitesis con Phase 1.5 leakage gate:** Phase 1.5 quita features que predicen el target *demasiado bien* (leakage); Phase 1c recupera features que predicen el target *suficientemente bien* y se cayeron sin razón documentada. Ambas son auditorías de columnas pero en direcciones opuestas.
+**Antitesis con Phase 1.3 leakage gate:** Phase 1.3 quita features que predicen el target *demasiado bien* (leakage); Phase 1.2 recupera features que predicen el target *suficientemente bien* y se cayeron sin razón documentada. Ambas son auditorías de columnas pero en direcciones opuestas.
 
-### Phase 1.5 — Leakage gate (mandatory)
+### Phase 1.3 — Leakage gate (mandatory)
 
 Entre Phase 1 y Phase 2, antes de cualquier fit, scanner estadístico de leakage. Toda feature que construyó el target (ej. ERC computado de creatinina/eGFR/ACR upstream → esas son leakage) se descarta. Documentar en `docs/04_features.md` § "Removed for leakage".
 
@@ -111,11 +111,9 @@ Log en `05_modeling_log.md` (`E0`, `E1`, `E2`, …).
 
 ---
 
-## Phase 4.5 — Alternative architectures + multi-score literature benchmark (mandatory)
+> **Antes de Phase 5** (feature search expensive), validar que el GBM baseline es la arquitectura correcta y que todos los scores publicados relevantes fueron benchmarkeados. Phases 4.1, 4.2, 4.3 son tres tracks independientes — correr todos los que apliquen.
 
-Antes de Phase 5 (feature search expensive), validar que el GBM baseline es la arquitectura correcta y que todos los scores publicados relevantes fueron benchmarkeados. Tres tracks independientes — correr todos los que apliquen.
-
-### Track A — Foundation tabular models (TabPFN, etc.)
+## Phase 4.1 — Foundation tabular models (TabPFN, etc.)
 
 Foundation models a veces matchean o superan GBMs tuneados out-of-the-box, especialmente en cohortes pequeñas (n<5,000). Vale 30 minutos antes de invertir días en feature engineering.
 
@@ -126,7 +124,9 @@ Foundation models a veces matchean o superan GBMs tuneados out-of-the-box, espec
 
 **Mandatorio para n<5,000.** Si no se prueba, no se puede afirmar que el GBM tuneado es la mejor arquitectura.
 
-### Track B — Transfer learning desde datasets públicos
+---
+
+## Phase 4.2 — Transfer learning desde datasets públicos
 
 Cuando un dataset público mayor existe para tarea relacionada (NHANES respiratorio/renal/cardio, MIMIC ICU, eICU sepsis), transfer learning puede romper el techo del cohort size.
 
@@ -137,15 +137,17 @@ Cuando un dataset público mayor existe para tarea relacionada (NHANES respirato
 - Stacking que añade ≥0.01 AUROC → propose-N como v0.3 candidate.
 - Sin lift → documentar el negativo (importante para conversación cliente: "probamos data pública, no ayuda porque nuestra población difiere en X").
 
-### Track C — Multi-score literature benchmark (cuando ≥2 scores publicados existen)
+---
 
-Phase 3 ya requiere 1 baseline literario. Cuando existen múltiples (COPD: PUMA, LFQ, SQ-COPD, COPD-PS, CDQ; CVD: Framingham, ASCVD, QRisk; renal: KFRE, MDRD, CKD-EPI), benchmarkear TODOS standalone antes de elegir cuál combinar en Phase 5.7.
+## Phase 4.3 — Multi-score literature benchmark (cuando ≥2 scores publicados existen)
 
-**Decision rule:** elegir el score con **mayor AUROC standalone Y menor correlación de Pearson con la proba del modelo** — es el más complementario. Si ningún score tiene corr <0.85, ensemble no ayudará (Phase 5.7 retornará pure-model winner).
+Phase 3 ya requiere 1 baseline literario. Cuando existen múltiples (COPD: PUMA, LFQ, SQ-COPD, COPD-PS, CDQ; CVD: Framingham, ASCVD, QRisk; renal: KFRE, MDRD, CKD-EPI), benchmarkear TODOS standalone antes de elegir cuál combinar en Phase 5.3.
+
+**Decision rule:** elegir el score con **mayor AUROC standalone Y menor correlación de Pearson con la proba del modelo** — es el más complementario. Si ningún score tiene corr <0.85, ensemble no ayudará (Phase 5.3 retornará pure-model winner).
 
 **Documentar TODOS los scores benchmarkeados** aunque solo se use uno — cliente y regulators preguntan "¿por qué este y no aquel?".
 
-Caso de referencia (COPD): PUMA ganó (AUROC ~0.65, lowest corr con proba) → adoptado en 90/10 ensemble (Phase 5.7).
+Caso de referencia (COPD): PUMA ganó (AUROC ~0.65, lowest corr con proba) → adoptado en 90/10 ensemble (Phase 5.3).
 
 ---
 
@@ -161,7 +163,7 @@ Comparar contra v0.2_base sobre el holdout. Adoptar v0.3 solo si domina en AUROC
 
 ---
 
-## Phase 5.5 — Feature-selection audit (mandatorio si winner set >30 columnas)
+## Phase 5.1 — Feature-selection audit (mandatorio si winner set >30 columnas)
 
 Audita el winner contra multicollinearity y over-engineering.
 
@@ -172,16 +174,16 @@ Audita el winner contra multicollinearity y over-engineering.
 **Decision rules:**
 - Structural collinearity (OHE complementary pairs, VIF=∞) NO es problema — flag pero no actuar.
 - Polynomial collinearity (`age` vs `age_sq` Pearson >0.95) la maneja ElasticNet L1 si efectivamente zero redundantes. Confirmar con sparsity.
-- Si `no_engineered` está dentro del bootstrap CI de `full` (Δ AUROC <0.01) → **build parsimonious bundle (Phase 5.6)**.
+- Si `no_engineered` está dentro del bootstrap CI de `full` (Δ AUROC <0.01) → **build parsimonious bundle (Phase 5.2)**.
 - Si L1 zero <5% de features al `C` elegido, modelo no está seleccionando — aumentar regularización o documentar que engineered features genuinamente añaden valor.
 
 Output: `results/feature_selection_audit.{md,json}`.
 
 ---
 
-## Phase 5.6 — Parsimonious alternative bundle (`v_next_candidate`, condicional)
+## Phase 5.2 — Parsimonious alternative bundle (`v_next_candidate`, condicional)
 
-🔴 **Pause-point.** Cuando Phase 5.5 ablation muestra `no_engineered` estadísticamente equivalente (Δ AUROC <0.01, dentro del bootstrap CI), producir bundle alternativo como **off-ramp documentation** — NO reemplaza el deploy sin aprobación explícita.
+🔴 **Pause-point.** Cuando Phase 5.1 ablation muestra `no_engineered` estadísticamente equivalente (Δ AUROC <0.01, dentro del bootstrap CI), producir bundle alternativo como **off-ramp documentation** — NO reemplaza el deploy sin aprobación explícita.
 
 Bundle artifacts: `.pkl` + `comparison_full_vs_parsimonious.json` + `model_card.md` con banner **"STATUS: v_next_candidate — NOT FOR DEPLOY"**.
 
@@ -191,7 +193,7 @@ Bundle artifacts: `.pkl` + `comparison_full_vs_parsimonious.json` + `model_card.
 
 ---
 
-## Phase 5.7 — External scoring ensemble (condicional)
+## Phase 5.3 — External scoring ensemble (condicional)
 
 Si la baseline literaria de Phase 3 (KFRE, FINDRISC, PUMA, etc.) tiene discriminación comparable o complementaria sobre el test (dentro de 0.05 AUROC del modelo), evaluar weighted ensemble (linear blend) antes de lockear deploy.
 
@@ -226,7 +228,7 @@ Si la baseline literaria de Phase 3 (KFRE, FINDRISC, PUMA, etc.) tiene discrimin
 
 ---
 
-## Phase 6.5 — Bootstrap CI on test set (mandatory)
+## Phase 6.1 — Bootstrap CI on test set (mandatory)
 
 Point estimate de AUROC en un único 80/20 holdout es sample-size-dependent. Reportar 95% CI desde stratified bootstrap.
 
@@ -235,7 +237,7 @@ Point estimate de AUROC en un único 80/20 holdout es sample-size-dependent. Rep
 Stratified por clase para preservar prevalencia. Resamples que fallan (e.g., AUROC undefined cuando una clase falta) se dropean silenciosamente; flag si `n_valid<950` (>5% drop).
 
 **Decision rules:**
-- Lower bound AUROC <0.55 → modelo estadísticamente indistinguible de random; reconsiderar deployment o correr nested CV (Phase 7.5).
+- Lower bound AUROC <0.55 → modelo estadísticamente indistinguible de random; reconsiderar deployment o correr nested CV (Phase 7.1).
 - CI half-width >0.05 → test set es muy chico para defender un point estimate; reportar CI en model card.
 - Bootstrap CI captura variance del test set, NO del estimator (eso es nested CV).
 
@@ -243,7 +245,7 @@ Save CI table para CADA variant comparado en Phase 4-5 (logreg, GBMs tuned, v0.3
 
 ---
 
-## Phase 6.6 — Per-1.000-patients clinical impact (mandatory antes de cualquier cambio de operating point)
+## Phase 6.2 — Per-1.000-patients clinical impact (mandatory antes de cualquier cambio de operating point)
 
 Operating points son abstractos. Equipo clínico entiende "casos perdidos por mil tamizados" o "exámenes confirmatorios innecesarios por mil"; no entiende "Spec 50.5% vs 42.2%". Toda comparación entre bundles o threshold candidatos DEBE incluir esta traducción.
 
@@ -275,7 +277,7 @@ Si LOIO AUROC drops >0.05 vs stratified holdout, documentar como deployment-scop
 
 ---
 
-## Phase 7.5 — Nested CV (opcional, condicional)
+## Phase 7.1 — Nested CV (opcional, condicional)
 
 Single 80/20 + bootstrap captura *sampling* variance, no *estimator* variance. Cuando test set chico o bootstrap CI ancho, nested CV escala.
 
@@ -297,12 +299,12 @@ Single 80/20 + bootstrap captura *sampling* variance, no *estimator* variance. C
 
 1. Bajar artefactos del bucket: `.pkl`, `means.npy`, `stds.npy`, `background_shap_set.csv`.
 2. **(a) Face-value en NUESTRO re-split holdout** — conveniente pero puede contaminarse.
-3. **(b) Face-value en UPSTREAM `test.csv`** (preferred si Phase 1b lo encontró) — leakage-free 1:1.
+3. **(b) Face-value en UPSTREAM `test.csv`** (preferred si Phase 1.1 lo encontró) — leakage-free 1:1.
 4. **(c) Leakage check** entre `background_shap_set` upstream y nuestro train/test (sanity).
 5. **(d) Honest CV replicating la arquitectura desplegada** sobre full cohort.
 
 **Critical lesson:** AUROC del deployed sobre tu holdout puede estar inflado por contamination. SIEMPRE:
-1. Preferir upstream `test.csv` de Phase 1b.
+1. Preferir upstream `test.csv` de Phase 1.1.
 2. Replicar honestamente la arquitectura.
 3. Comparar honest CV vs deployed-on-holdout. Gap >0.05 = leakage red flag.
 
@@ -310,7 +312,7 @@ Documentar en `docs/06_results.md § N` y `D-NNN` en `08_decisions_log.md`. Repo
 
 ---
 
-## Phase 8.5 — Combined-cohort vs specialized decision (condicional)
+## Phase 8.1 — Combined-cohort vs specialized decision (condicional)
 
 **Cuándo aplica:** el cliente opera 2+ modelos especializados sobre cohortes clínicamente relacionadas (e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) y se evalúa migrar a un modelo único unificado para reducir overhead operacional (un solo monitoreo, una sola recalibración, un solo SHAP poster).
 

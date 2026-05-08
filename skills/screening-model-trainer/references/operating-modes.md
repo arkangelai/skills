@@ -23,7 +23,7 @@ Cada paso de cada fase opera en uno de tres modos. Si el skill no marca explíci
 |---|---|---|
 | 🟢 **Autónomo** | Default técnico claro (split estratificado seed=42, Optuna 30 trials, bootstrap CI 1000 resamples, isotonic CV=5) | Ejecuta, registra en `trial_log.jsonl`, reporta resultado |
 | 🟡 **Propose-N** | Decisión técnica con tradeoff (calibración isotónica vs beta vs Platt, qué feature engineered probar, modelo a prefrontear, peso del ensemble) | Presenta 2-3 opciones con tradeoffs en una tabla, **espera elección de the project owner**, registra en `08_decisions_log.md` |
-| 🔴 **Pause-and-ask** | Fuera de workflow, ambigüedad clínica, de negocio o regulatoria (ver `pause-points.md`) | **Para, pregunta, no avanza** hasta confirmación explícita |
+| 🔴 **Pause-and-ask** | Fuera de workflow, ambigüedad clínica, de negocio o regulatoria (ver `governance.md` § Pause-points) | **Para, pregunta, no avanza** hasta confirmación explícita |
 
 ---
 
@@ -45,14 +45,14 @@ Ejecutar y reportar; no parar a preguntar.
 ### 🟡 Propose-N
 
 - **Calibración cuando N_pos>200:** "isotónica vs sigmoid (Platt). Isotónica es no-paramétrica y suele ganar; sigmoid asume relación logística pero estabiliza con menos datos. Con N_pos=350 recomiendo isotónica. ¿OK?"
-- **Modelo para Phase 4.5 Track B:** "transfer learning desde (A) NHANES, (B) MIMIC respiratorio, (C) eICU. Tradeoffs: NHANES tiene mejor cobertura demográfica pero menos datapoints clínicos; MIMIC tiene más datapoints pero población ICU; eICU es más cercano a primary care. Para outcomes respiratorios recomiendo NHANES. ¿Confirmas?"
-- **Peso del ensemble Phase 5.7:** "grid search dio óptimo en 0.9 model + 0.1 PUMA, pero 0.85/0.15 da +0.001 AUROC y +0.04 spec_at_sens85. Recomiendo 0.9/0.1 por simplicidad regulatoria. ¿OK?"
+- **Modelo para Phase 4.2:** "transfer learning desde (A) NHANES, (B) MIMIC respiratorio, (C) eICU. Tradeoffs: NHANES tiene mejor cobertura demográfica pero menos datapoints clínicos; MIMIC tiene más datapoints pero población ICU; eICU es más cercano a primary care. Para outcomes respiratorios recomiendo NHANES. ¿Confirmas?"
+- **Peso del ensemble Phase 5.3:** "grid search dio óptimo en 0.9 model + 0.1 PUMA, pero 0.85/0.15 da +0.001 AUROC y +0.04 spec_at_sens85. Recomiendo 0.9/0.1 por simplicidad regulatoria. ¿OK?"
 
 Presentar tabla, esperar respuesta, registrar decisión.
 
 ### 🔴 Pause-and-ask
 
-- Ver `references/pause-points.md` para la lista vinculante de 17 puntos.
+- Ver `references/governance.md` § Pause-points para la lista vinculante de 18 puntos (PP-1 a PP-18).
 - Ejemplos: target encoding cuando hay >1 interpretación clínica; aceptar deployment con LOIO drop >0.05; aplicar SMOTE dirigido a subgrupo; bundle parsimonioso vs full; discrepancia métricas declaradas vs honest re-eval.
 
 Parar, preguntar, no avanzar.
