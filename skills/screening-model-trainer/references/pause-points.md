@@ -150,14 +150,17 @@ Cuando harmonizar features de NHANES/MIMIC/etc. requiere imputaciones o equivale
 
 ## 18. Adoptar modelo combinado en lugar de modelos especializados (Phase 8.5)
 
-Cuando el cliente opera 2+ modelos especializados sobre cohortes clínicamente relacionadas (e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) y se ha entrenado un modelo unificado que está dentro de ±0.01 AUROC del promedio de los especializados.
+**Trigger:** SIEMPRE que se considere reemplazar 2+ modelos especializados (sobre cohortes clínicamente relacionadas — e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) por un único modelo combinado, **independiente del delta promedio**. Aplica tanto si el combinado parece ganar (`+ΔAUROC`), empatar (`±0.01`), o perder (`−ΔAUROC`).
 
-Antes de proponer adopción del combinado:
+**Por qué el trigger es universal y no condicionado a un delta específico:** hard rule #16 establece que el delta promedio puede esconder pérdidas concentradas. El caso de referencia que motiva este pause-point tuvo `−0.024` AUROC promedio (claramente fuera de cualquier banda `±0.01`) y aún así la decisión binding vino del análisis por subgrupo (`−0.10` en pacientes con la condición controlada). Un trigger condicionado a magnitud de delta excluiría exactamente el escenario donde el pause-point más se necesita.
+
+Antes de proponer adopción del combinado (sin importar el delta promedio):
 - (a) Inspeccionar tabla apples-to-apples por cohorte (combinado restringido al split del especializado vs especializado en su propio split).
 - (b) Inspeccionar tabla por subgrupo en cada cohorte (sex, age_bin, control de la condición, IMC, etc.).
 - (c) Si algún subgrupo clínicamente crítico pierde ≥0.05 AUROC en el combinado → **NO proponer adopción**, mantener especializados, documentar como `D-NNN` con la tabla de pérdidas por subgrupo.
 - (d) Si las pérdidas son uniformes (todos los subgrupos en ±0.011 vs especializado), discutir con el project owner el tradeoff (un modelo en producción vs pérdida promedio pequeña).
+- (e) Si el combinado parece ganar en promedio: aplica igual el chequeo por subgrupo — un `+0.01` global puede esconder `−0.05` en el subgrupo donde más importa.
 
-**Por qué es pause-point:** una pérdida promedio de −0.024 AUROC puede esconder una pérdida de −0.10 en el subgrupo donde el cribado más ayuda (e.g., pacientes con la condición de base controlada — donde la señal es sutil y el modelo especializado fue construido específicamente para detectarla).
+**Caso ilustrativo:** combined model con `−0.024 AUROC` promedio (fuera de cualquier banda estrecha de empate) y aparentemente "aceptable" a primera vista. Tabla por subgrupo reveló pérdida concentrada en pacientes con condición controlada (`−0.10`) y obesidad (`−0.06`) — la cohorte donde el cribado más agrega valor. Decisión: mantener especializados.
 
 **Para resolver necesitas:** apples-to-apples per-cohort table + tabla por subgrupo en ambos cohortes + costo operacional estimado de mantener 2 modelos vs 1 + decisión del project owner con la distribución por subgrupo visible.
