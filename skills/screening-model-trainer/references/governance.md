@@ -21,9 +21,9 @@ Numeración estable: cada item se referencia por su número (`#6`, `PP-3`). Nada
 | Phase 2 — EDA + cohort | — | PP-1, PP-2 |
 | Phase 3 — Feature engineering | #14 | PP-9 |
 | Phase 4 — Baseline + Optuna tuning | #1 | — |
-| Phase 4.1 — Foundation models (TabPFN) | #15 | PP-16 |
-| Phase 4.2 — Transfer learning | — | PP-17 |
-| Phase 4.3 — Multi-score literature benchmark | #14 | PP-9 |
+| Phase 4.1 — Foundation models (TabPFN) † | #15 | PP-16 |
+| Phase 4.2 — Transfer learning † | — | PP-17 |
+| Phase 4.3 — Multi-score literature benchmark † | #14 | PP-9 |
 | Phase 5 — Feature search | #4 | PP-5, PP-11 |
 | Phase 5.1 — Feature audit | — | — |
 | Phase 5.2 — Parsimonious bundle | #16 | PP-12 |
@@ -35,10 +35,12 @@ Numeración estable: cada item se referencia por su número (`#6`, `PP-3`). Nada
 | Phase 7.1 — Nested CV | — | — |
 | Phase 8 — Comparison vs deployed | #2, #5 | PP-14 |
 | Phase 8.1 — Combined-vs-specialized cohort | #16 | PP-18 |
-| Phase 9 — Re-train on full cohort | #2 | — |
+| Phase 9 — Re-train on full cohort | #2 (excepción explícita: este es el artefacto separado que #2 permite) | — |
 | Phase 10 — Model card + decisions log | #7 | — |
 | Phase 11 — Model-registry packaging | — | — |
-| Phase 12 — Cliente-facing materials | #7 | — |
+| Phase 12 — Cliente-facing materials | #7 + reglas en `cliente-communication.md` (jargon, SHAP, framing, 11-slide deck) | — |
+
+† **Phases 4.1 / 4.2 / 4.3** son tracks paralelos e independientes (no secuenciales) — correr los que apliquen al proyecto en cualquier orden.
 
 **Universal rules** (aplican en todo el workflow, no específicos a una fase): **#7** (español/inglés convention), **#8** (propose-N decision pattern), **#9** (one hypothesis per iteration), **#10** (trial log), **#11** (stop-at-pause-points).
 
@@ -245,9 +247,7 @@ Cuando harmonizar features de NHANES/MIMIC/etc. requiere imputaciones o equivale
 
 ## PP-18. Adoptar modelo combinado en lugar de modelos especializados (Phase 8.1)
 
-**Trigger:** SIEMPRE que se considere reemplazar 2+ modelos especializados (sobre cohortes clínicamente relacionadas — e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) por un único modelo combinado, **independiente del delta promedio**. Aplica tanto si el combinado parece ganar (`+ΔAUROC`), empatar (`±0.01`), o perder (`−ΔAUROC`).
-
-**Por qué el trigger es universal y no condicionado a un delta específico:** hard rule #16 establece que el delta promedio puede esconder pérdidas concentradas. El caso de referencia que motiva este pause-point tuvo `−0.024` AUROC promedio (claramente fuera de cualquier banda `±0.01`) y aún así la decisión binding vino del análisis por subgrupo (`−0.10` en pacientes con la condición controlada). Un trigger condicionado a magnitud de delta excluiría exactamente el escenario donde el pause-point más se necesita.
+**Trigger:** SIEMPRE que se considere reemplazar 2+ modelos especializados (sobre cohortes clínicamente relacionadas — e.g., cohorte con patología metabólica + cohorte con patología cardiovascular, ambas con un mismo desenlace renal) por un único modelo combinado, **independiente del delta promedio** (ganar, empatar o perder en promedio). Aplicación directa de hard rule #16 — ver allí el caso de referencia.
 
 Antes de proponer adopción del combinado (sin importar el delta promedio):
 - (a) Inspeccionar tabla apples-to-apples por cohorte (combinado restringido al split del especializado vs especializado en su propio split).
@@ -255,7 +255,5 @@ Antes de proponer adopción del combinado (sin importar el delta promedio):
 - (c) Si algún subgrupo clínicamente crítico pierde ≥0.05 AUROC en el combinado → **NO proponer adopción**, mantener especializados, documentar como `D-NNN` con la tabla de pérdidas por subgrupo.
 - (d) Si las pérdidas son uniformes (todos los subgrupos en ±0.011 vs especializado), discutir con el project owner el tradeoff (un modelo en producción vs pérdida promedio pequeña).
 - (e) Si el combinado parece ganar en promedio: aplica igual el chequeo por subgrupo — un `+0.01` global puede esconder `−0.05` en el subgrupo donde más importa.
-
-**Caso ilustrativo:** combined model con `−0.024 AUROC` promedio (fuera de cualquier banda estrecha de empate) y aparentemente "aceptable" a primera vista. Tabla por subgrupo reveló pérdida concentrada en pacientes con condición controlada (`−0.10`) y obesidad (`−0.06`) — la cohorte donde el cribado más agrega valor. Decisión: mantener especializados.
 
 **Para resolver necesitas:** apples-to-apples per-cohort table + tabla por subgrupo en ambos cohortes + costo operacional estimado de mantener 2 modelos vs 1 + decisión del project owner con la distribución por subgrupo visible.
