@@ -29,7 +29,7 @@ Numeración estable: cada item se referencia por su número (`#17`, `PP-12`). Na
 | Phase 10 — Re-train winner on full cohort | — | — |
 | Phase 11 — Model card + decisions log + calibration audit | #4, #20 | PP-11 |
 | Phase 12 — Deployment packaging | — | — |
-| Phase 13 — Client deliverables | #9 | — |
+| Phase 13 — Client deliverables | #9 + reglas embebidas en `SKILL.md § Phase 13` (todas las métricas en %, SHAP en HTML/CSS, sin jargon, sin email en CTA) | — |
 
 **Universal rules** (aplican en todo el workflow, no específicos a una fase): **#9** (español/inglés convention), **#10** (propose-N decision pattern), **#11** (one hypothesis per iteration), **#12** (trial log), **#13** (stop-at-pause-points).
 

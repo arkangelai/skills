@@ -47,7 +47,7 @@ Cuando el proyecto hereda un `build_features.py` previo (refresh de un modelo de
 1. Listar todas las columnas del raw del cliente (`data/raw/`) — incluyendo las que el `build_features` actual ignora.
 2. Listar las columnas que sobreviven a `build_features` y llegan al modelo.
 3. **Diferencia = drop-chain.** Marcar las clínicamente útiles que se cayeron silenciosamente (signos vitales, biomarcadores secundarios, mediciones físicas de baja fiabilidad pero alta señal — e.g., densidad urinaria, hemoglobina, pulso, presión).
-4. Recuperar las que valen la pena via MICE / IterativeImputer (si missing-rate <60%) o flag binario `*_unknown` (si la ausencia es informativa por sí misma).
+4. Recuperar las que valen la pena via MICE / IterativeImputer **si la feature aún tiene signal residual** (típicamente missing-rate ≤50–60% como heurística empírica; valores mayores requieren más evidencia). Alternativa: flag binario `*_unknown` cuando la ausencia es informativa por sí misma. **Validar el uplift en Phase 4 baseline con bootstrap CI antes de adoptar la recuperación** — si la ganancia está dentro del CI, descartar (hard rule #4).
 5. Re-evaluar AUROC con las features recuperadas en Phase 4 baseline antes de avanzar.
 
 **Por qué importa:** en proyectos previos esta auditoría fue el primer uplift real de la fase (>+0.04 AUROC random) cuando todos los demás experimentos (focal loss, calibración Beta, sample weights, augmentation) fueron neutros. Drop-chains existen porque pipelines heredados se construyeron para una versión más estricta del schema.
@@ -111,7 +111,7 @@ Log en `05_modeling_log.md` (`E0`, `E1`, `E2`, …).
 
 ---
 
-> **Antes de Phase 5** (feature search expensive), validar que el GBM baseline es la arquitectura correcta y que todos los scores publicados relevantes fueron benchmarkeados. Phases 4.1, 4.2, 4.3 son tres tracks independientes — correr todos los que apliquen.
+> **Antes de Phase 5** (feature search expensive), validar que el GBM baseline es la arquitectura correcta y que todos los scores publicados relevantes fueron benchmarkeados. **Phases 4.1, 4.2, 4.3 son tres tracks paralelos e independientes — NO secuenciales.** Correr todos los que apliquen al proyecto, en cualquier orden; cada uno produce su propio artefacto independiente. La sub-numeración linear (4.1/4.2/4.3) es solo organizativa, no implica dependencia.
 
 ## Phase 4.1 — Foundation tabular models (TabPFN, etc.)
 
@@ -326,7 +326,7 @@ Documentar en `docs/06_results.md § N` y `D-NNN` en `08_decisions_log.md`. Repo
    - **Cohort flags explícitos**: `is_<cohorte_A>`, `is_<cohorte_B>`, `is_both`. Documentar que pueden tener importancia <1% si una variable continua redundante codifica el cohorte (ver pitfall en SKILL.md).
    - Features derivadas (interacciones, polinomios) calculadas sobre el schema unificado.
 
-2. **Subsamplear el cohorte de mayor prevalencia** del positivo para evitar imbalance artificial entre cohortes. La meta es que el modelo combinado vea proporciones realistas de cada cohorte, no la distribución de los datos crudos.
+2. **Subsamplear el cohorte de mayor prevalencia** del positivo para evitar imbalance artificial entre cohortes. **Target operacional:** matchear la prevalencia positiva del cohorte con menor prevalencia (e.g., si cohorte A tiene 30% positivos y cohorte B tiene 14%, subsamplear los positivos de A hasta 14%). Esto preserva la señal de cada cohorte sin que el modelo se especialice en detectar la mayoritaria. Documentar la prevalencia target elegida y el seed de subsampleo en `08_decisions_log.md` como `D-NNN`.
 
 3. **Entrenar el modelo combinado** con el mismo random_state que cada modelo especializado (`random_state=42` por convención del skill).
 
@@ -350,13 +350,13 @@ Documentar en `docs/06_results.md § N` y `D-NNN` en `08_decisions_log.md`. Repo
 | Combined **descarta cohort flags** (<1% SHAP) porque hay signal continuo redundante | Confirmar que el modelo igual respeta la pertenencia al cohorte vía análisis por subgrupo. No es bug; es comportamiento esperado de árboles. Pero significa que la lógica cohort-aware vive en una sola feature continua, no en los flags — fragilidad para casos atípicos. |
 | Combined gana en alguna cohorte y pierde en otra | NUNCA promediar las dos. La cohorte que pierde es el constraint binding. |
 
-**Caso de referencia:** combined model −0.024 AUROC promedio en una cohorte (vs especializado), aceptable a primera vista. Tabla por subgrupo reveló: pacientes con la condición de base controlada perdieron −0.10, obesidad perdió −0.06, edad 65+ perdió −0.05. La cohorte hermana se preservó uniformemente (todos los subgrupos en ±0.011). Decisión: mantener especializados, documentar D-NNN. La pérdida concentrada en pacientes con la condición controlada — justo el subgrupo donde el cribado más agrega valor — fue deal-breaker.
+**Caso de referencia:** ver hard rule #16 en `governance.md` — la aplicación del rule #16 sobre el escenario combined-vs-specialized es exactamente el motivo de Phase 8.1 + PP-18.
 
 ### Output
 
 - `results/combined_vs_specialized_apples_to_apples.{md,csv}` — tabla (b).
 - `results/combined_subgroups_per_cohort.{md,csv}` — tabla (c).
-- `results/combined_shap_aggregated.{md,csv}` — SHAP del combinado agregado por variable clínica (Phase 6, regla cliente-communication.md).
+- `results/combined_shap_aggregated.{md,csv}` — SHAP del combinado agregado por variable clínica (regla "SHAP for cliente: aggregate by clinical variable" en `references/cliente-communication.md`).
 - `D-NNN` en `08_decisions_log.md` con la decisión + justificación + tabla de subgrupos.
 
 ---
