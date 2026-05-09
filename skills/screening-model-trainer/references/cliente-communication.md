@@ -41,6 +41,41 @@ Estas reglas no son preferencias estilísticas — son guardrails aprendidos de 
 - La reunión cliente NO es el lugar para surfear errores de modelado del vendor que no son nuestros para fix.
 - **Confirmar con el project owner** antes de publicar cualquiera de los dos sets de números.
 
+### Sub-caso: producción reportada sobre test balanceado (SMOTE / oversampling)
+
+Patrón frecuente: el equipo del modelo desplegado entrenó con SMOTE u oversampling y reporta métricas sobre un test balanceado (~50% prev artificial), no sobre prevalencia clínica natural. Los números del deployed se ven inflados (Sens 91%, Acc 90%, F1 0.91 simultáneamente — combinación matemáticamente improbable a prevalencia natural). El modelo nuevo, evaluado correctamente sobre prevalencia natural, parece "peor" en Sens/F1/Acc cuando en realidad es mejor en discriminación.
+
+**Framing en la slide cliente:**
+
+1. **Liderar con AUC** (invariante a prevalencia) como la métrica fair de comparación. AUC sube +X pp = el modelo nuevo discrimina mejor independientemente del threshold o prevalencia.
+2. **Mostrar las métricas oficiales del cliente** en la columna Producción (no re-evaluar; respetar lo que el cliente publicó).
+3. **Para Sens / F1 / Accuracy: poner "ver nota ↓" en el delta** — no calcular un delta numérico. El delta numérico (`91% → 51%`) es matemáticamente correcto pero comunicacionalmente desastroso.
+4. **Caja metodológica naranja al pie de la tabla**, una sola vez:
+   > Las métricas del modelo de producción se reportan sobre un conjunto de prueba balanceado (~50% prev artificial). El modelo nuevo se reporta sobre la prevalencia clínica natural (X%), que refleja el flujo real en consulta primaria. Cuando la prevalencia baja, sensibilidad y F1 caen aritméticamente — no es un cambio en la capacidad de discriminar. El AUC, invariante a la prevalencia, sube +X pp.
+5. **Lectura adicional en el header de la tabla:** "Producción (reportada por la red, n=X balanceado) vs Modelo nuevo (n=Y prev natural Z%)". Ese header es el contrato de comparación honest.
+
+**No es necesario** el pause-point PP-14 cuando el deployed-team confirma que reportó sobre balanced test — la discrepancia es metodológica conocida, no error. Documentar el patrón en `08_decisions_log.md`.
+
+---
+
+## Documentar alternativas testadas en el deck cliente (transparencia metodológica)
+
+Cuando se exploran capas alternativas que NO entran al deploy final (ensemble con score externo descartado, hibridación con reglas clínicas duras descartada, modelo combinado multi-cohorte descartado, calibración alternativa descartada), **agregar una slide-anexo (A5+) con el experimento y la decisión**.
+
+**Por qué:**
+- El cliente clínico aprecia ver que la pregunta obvia (e.g., "¿por qué no agregamos las reglas KDIGO?") se respondió empíricamente, no con argumentos.
+- Builds trust: el modelo no es "lo primero que probamos", es la conclusión de un benchmarking sistemático.
+- Pre-empta preguntas de stakeholders/regulators que llegan a la reunión con la misma idea — la slide responde antes de que la pregunta se haga.
+
+**Estructura típica de la slide-anexo:**
+1. **Pregunta clínica** explícita (1 línea).
+2. **Tabla** con la estrategia testada vs el modelo elegido en las cohortes relevantes (Sens / PPV / FN / "rescatados").
+3. **Conclusión metodológica** en una caja: "El modelo [...] ya incorpora [...] estadísticamente vía features ingeniadas (`feature_a`, `feature_b`, `composite_c`). Las reglas duras como capa adicional no aportan señal incremental porque ya están aprendidas."
+4. **Recomendación** redirecciona al cliente al kit operativo: "Si quiere mayor sensibilidad, usar punto Captura amplia, no agregar reglas duras."
+5. **Footer técnico**: referencia al script (`scripts/<eval_script>.py`) y CSV (`results/<output>.csv`) para auditabilidad.
+
+**Anti-patrón:** discutir la alternativa solo en `RESULTS.md` interno. El cliente no lee `RESULTS.md`; lee el deck. Si la pregunta puede llegar a la reunión, la respuesta tiene que estar en el deck.
+
 ---
 
 ## SHAP for cliente: aggregate by clinical variable, never by OHE column
