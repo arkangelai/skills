@@ -31,6 +31,7 @@ Numeración estable: cada item se referencia por su número (`#6`, `PP-3`). Nada
 | Phase 6 — Calibration + thresholds | #3, Bonus | PP-4, PP-6, PP-13 |
 | Phase 6.1 — Bootstrap CI | Bonus | — |
 | Phase 6.2 — Per-1000 patients | — | PP-13 |
+| Phase 6.3 — Hybrid rules safety-net check (condicional) | — | — |
 | Phase 7 — Validation: LOIO + subgroups + DCA | #13, #16 | PP-7, PP-8, PP-10 |
 | Phase 7.1 — Nested CV | — | — |
 | Phase 8 — Comparison vs deployed | #2, #5 | PP-14 |

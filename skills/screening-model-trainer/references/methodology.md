@@ -94,6 +94,22 @@ Documentar cada feature con racional clínico en `docs/04_features.md`.
 
 **Literature baseline obligatorio:** Phase 3 incluye comparación contra ≥1 scoring system publicado (KFRE, FINDRISC, Framingham, FIB-4, etc.). Sin ese baseline, la "ganancia" del modelo no es clínicamente interpretable.
 
+### Engineered feature catalog — patrón validado para condiciones clínicas crónicas
+
+Cuando el `extended` set se construye, estas familias dan lift consistente en condiciones crónicas (CKD, HTA, COPD, metabólicas) a través de proyectos. Cada engineered feature debe documentar el racional clínico que la motiva.
+
+1. **Polinomios** sobre numéricas con efecto no-lineal documentado: `tas_sq`, `duracion_condicion_sq`, `biomarcador_sq`. Útil cuando un GBM tiene difícultad fittear curvatura con pocos splits.
+2. **Step flags clínicos** correspondientes a cutoffs de guías (KDIGO, ADA, ACC/AHA, GOLD): `age_ge_65`, `age_ge_75`, `tas_ge_140`, `tas_ge_160`, `tad_ge_90`, `bmi_ge_30`, `duracion_condicion_ge_10`, `duracion_condicion_ge_15`. Codifica el conocimiento clínico estándar como features binarios; el modelo puede confirmar o refinar los cutoffs estadísticamente.
+3. **Cutoffs sex-stratified** cuando el biomarcador tiene rangos clínicos distintos por sexo: `anemia_F` (Hb<12 en mujer), `anemia_M` (Hb<13 en hombre), `anemia_severe` (Hb<10 universal). El modelo lo aprendería igual con `Hb × sex`, pero las flags binarias suelen mejorar splits cerca de los thresholds clínicos.
+4. **Composites de riesgo clínico** que suman flags relacionados: `htn_severity` = (HTN binario) + (TAS≥140) + (TAD≥90); `cardio_metabolic_risk` = age_ge_65 + DM + HTN + obesidad; `condition_risk_proxy` = factores de riesgo conocidos para el outcome. Equivalentes a "scores clínicos pequeños" — interpretables para SHAP comunicación cliente.
+5. **Interacciones 3-way** entre las top variables del modelo desplegado: `age × duracion_condicion × hipertension`. Útil cuando los pares (`age × duracion`, `age × HTN`) ya están en el extended set y la interacción 3-way captura riesgo multifactorial que las pares no.
+6. **Discrepancy from expected** — observación menos esperada por edad/sexo: `tas_minus_expected_age = TAS - (110 + 0.4·edad)`. Captura "presión inusualmente alta para la edad", que un modelo con TAS y edad por separado puede aprender pero menos directamente.
+
+**Cuándo NO añadir engineered features:**
+- Cuando el extended set ya tiene >50 features y `feature_audit` Phase 5.1 muestra L1 sparsity >50% (modelo no las usa).
+- Cuando la engineered feature es deterministically reconstruible de la base por el GBM (e.g., `bmi_ge_30` cuando ya está `bmi` y `bmi²`) y el lift es <0.002 AUROC.
+- Cuando la feature requiere variables que solo existen en un subconjunto de la cohorte (Phase 5 las dropea por defendibilidad — ver "Defendible feature criterion" en Phase 5).
+
 ---
 
 ## Phase 4 — Baseline + Optuna tuning (v0.1 → v0.2)
@@ -161,6 +177,22 @@ Comparar contra v0.2_base sobre el holdout. Adoptar v0.3 solo si domina en AUROC
 
 **Honest reporting:** ganancia <0.005 AUROC = bootstrap noise, no se vende como mejora.
 
+### Defendible feature criterion — coverage × clinical relevance
+
+Cuando el feature search produce un winner set, además del AUROC test cada feature debe pasar dos filtros antes de promoverse al deploy:
+
+1. **Cobertura mínima de la cohorte de entrenamiento** ≥ project-defined threshold (típicamente ≥50%). Una feature que viene de un solo subconjunto (e.g., una institución / sub-cohorte que la captura) gana AUROC sobre ese subconjunto pero no es defendible al cliente como feature universal — porque para el resto de pacientes el modelo opera sin ella.
+2. **Relevancia clínica defendible para el outcome**: la feature debe poder justificarse con literatura o guía clínica al cliente. Features con cobertura alta pero relevancia clínica débil (administrativas, marcadores de programa, scores derivados de fuentes inciertas) se dropean también.
+
+**Procedimiento al final de feature search:**
+- Marcar cada feature del winner set con `coverage_pct` y `clinical_relevance` (high / medium / low + 1 línea de justificación).
+- Drop si `coverage < 0.50` AND `clinical_relevance != high`.
+- Drop si `clinical_relevance == low` (independiente de coverage) — feature administrativa o reverse-causality posible.
+- Si el lean set (post-filtro) pierde ≥0.005 AUROC vs el full set, documentar el trade-off como `D-NNN`. **Empíricamente, lean dominados por features de alta cobertura + relevancia clínica fuerte recuperan el AUROC dentro del bootstrap CI** — porque el modelo igual encontró la señal vía features correlacionadas que sí cumplen ambos criterios.
+- Si el lean set mantiene AUROC dentro del CI del full, `lean` es el winner para deploy — más defendible al cliente y al regulador.
+
+**Por qué importa:** features de baja cobertura + relevancia clínica débil pueden dar lift en validación honest pero generan dos riesgos: (a) presentación cliente queda comprometida cuando el cliente pregunta "¿cómo capturas esta variable en mis IPS que no la tienen?"; (b) auditoría regulatoria cuestiona el racional clínico de variables administrativas. El refresh del modelo se vuelve insostenible.
+
 ---
 
 ## Phase 5.1 — Feature-selection audit (mandatorio si winner set >30 columnas)
@@ -226,6 +258,20 @@ Si la baseline literaria de Phase 3 (KFRE, FINDRISC, PUMA, etc.) tiene discrimin
 
 **Por qué 4, no 1:** el operating point correcto depende del costo FN:FP, que depende del use case clínico. ML elige arquitectura; clínico elige threshold. Documentar explícito en `07_model_card.md`.
 
+### Recomendar UN default operativo en materiales cliente
+
+Aunque Phase 6 reporta 4 thresholds en el model card (decisión clínica del cliente), **el deck cliente debe recomendar UNO explícitamente** — el "sweet spot" del kit. Sin recomendación clara, el cliente queda con una tabla y sin guidance, y la conversación se atasca.
+
+**Cómo elegir el default a recomendar:**
+1. Sobre el holdout interno + cohortes externas: identificar el threshold donde el modelo nuevo **vence simultáneamente al desplegado en sensibilidad y especificidad** en al menos una cohorte (típicamente la externa de prevalencia más alta). Ese threshold es el "sweet spot": single-axis improvement no convence, dual-axis improvement sí.
+2. Si ningún threshold logra dual-axis improvement, recomendar el threshold donde la sens es ≥ la sens reportada por el desplegado (no cede sensibilidad) y la spec es la máxima posible — preserva el equivalente operativo del modelo desplegado y agrega valor por el lado de PPV/specificity.
+3. Documentar el threshold recomendado en `07_model_card.md` con: (a) razón clínica, (b) tabla side-by-side vs deployed en este punto, (c) impacto per-1000 (Phase 6.2).
+
+**En el deck cliente:**
+- El kit completo de thresholds queda en una slide de detalle/anexo.
+- El threshold recomendado tiene su propia tarjeta destacada (e.g., borde naranja, ⭐), con la métrica triple Sens/Spec/PPV en grande.
+- Mantener Conservador y Captura amplia (Youden) como puntos alternativos documentados, no como sub-recomendaciones — "el cliente puede elegir, recomendamos X".
+
 ---
 
 ## Phase 6.1 — Bootstrap CI on test set (mandatory)
@@ -256,6 +302,33 @@ Operating points son abstractos. Equipo clínico entiende "casos perdidos por mi
 - Comparar cost ratio (1 missed case vs 1 unnecessary confirmatory test) a literatura clínica.
 
 Para condiciones subdiagnosticadas (COPD LATAM ~60-70%, CKD ~80-90%), costo de FN domina y "save tests" raramente justifica.
+
+---
+
+## Phase 6.3 — Hybrid rules safety-net check (condicional)
+
+**Cuándo aplica:** cuando el cliente o stakeholder clínico sugiere "agregar reglas KDIGO/ADA/GOLD/etc. duras como safety net post-inferencia para no perder pacientes obvios". La sugerencia es razonable y debe responderse con evidencia, no con argumentos.
+
+**Pregunta empírica:** `flag = (model_proba ≥ thr_recomendado) OR (regla_clinica_score ≥ K)` — ¿recupera FN del modelo sin destruir PPV?
+
+**Procedimiento:**
+1. Definir `regla_clinica_score` con 3-6 red flags universales (presentes en interno + cohortes externas) usando cutoffs de la guía clínica (e.g., edad ≥75, condición ≥15a, biomarcador severo, comorbilidad doble). Un ejemplo de pseudocódigo: `score = (age≥75) + (duracion_cond≥15) + (TAS≥160 OR TAD≥100) + (BMI≥30) + (DM AND HTN)`.
+2. Evaluar 3 estrategias en interno + cada cohorte externa:
+   - **(a) Modelo solo** en threshold recomendado (Phase 6).
+   - **(b) Modelo OR reglas≥K** para K = 2, 3, 4 — recupera FN cuando reglas disparan aunque modelo no lo flague.
+   - **(c) Modelo solo en Captura amplia** (Youden por cohorte) — máximo de sensibilidad sin reglas externas.
+3. Reportar Sens / Spec / PPV / TP / FN / "casos rescatados" para cada estrategia × cohorte.
+
+**Decision rule (validada empíricamente):**
+- Si **Captura amplia (modelo solo) ≥ Modelo+Reglas≥2 en sensibilidad** → las reglas no aportan señal incremental porque los engineered features ya las codifican. **No agregar reglas** al deploy. Documentar como `D-NNN`.
+- Si **Modelo+Reglas≥3 rescata ≥30 casos adicionales en cohorte externa con caída de PPV ≤2 pp** → considerar agregar reglas como capa OPCIONAL (4° punto operativo "Balanceado + safety net"), pause-point con el project owner.
+- Si las reglas solo disparan en <5% de la cohorte (cohorte sin perfil de red flags) → safety net es inerte; documentar el negativo y mover el cliente al kit de operating points.
+
+**Por qué casi siempre el modelo gana sin reglas:** el `extended` set de Phase 3 ya incluye step flags clínicos (`age_ge_75`, `tas_ge_160`, etc.) y composites (`condition_risk_proxy`, `htn_severity`) que son las mismas reglas KDIGO/ADA/GOLD codificadas estadísticamente. El modelo aprende los pesos óptimos en lugar de imponer cutoffs binarios. Captura amplia (Youden) es el equivalente data-driven del safety net y suele dominarlo.
+
+**Comunicación al cliente:** documentar el experimento en una slide-anexo del deck (transparencia metodológica). El cliente clínico aprecia ver que la pregunta se respondió empíricamente; el modelo gana credibilidad por la rigorosidad del benchmarking. Ver `references/cliente-communication.md` § "Documentar alternativas testadas".
+
+**Output:** `results/hybrid_rules_safety_net.csv` con todas las combinaciones × cohortes.
 
 ---
 
