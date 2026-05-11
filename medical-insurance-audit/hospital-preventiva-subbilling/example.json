@@ -1,0 +1,112 @@
+{
+  "meta": {
+    "caso_id": "RAD-20260504-TEST03",
+    "num_factura": "FV-2026-10289",
+    "prestador": "Hospital San José",
+    "prestador_nit": "899.999.017-4",
+    "pagador": "Sura EPS",
+    "paciente": "MEJÍA RÍOS CARLOS EDUARDO",
+    "fecha_analisis": "2026-05-11",
+    "agente": "hospital-preventiva-subbilling-v1"
+  },
+  "hallazgos": [
+    {
+      "id": "SB-01",
+      "categoria": "Insumos quirúrgicos laparoscópicos",
+      "nivel_certeza": "alto",
+      "descripcion": "La nota quirúrgica documenta el uso de 4 trocares, clips de titanio para sección de conducto cístico y arteria cística, y bolsa de extracción laparoscópica. Ninguno de estos insumos aparece en la factura.",
+      "evidencia_documental": "nota_quirurgica.pdf — 'Neumoperitoneo a 12 mmHg, 4 trocares. [...] clipaje y sección de cístico y arteria cística. Extracción en bolsa sin incidentes.'",
+      "accion": "Solicitar al hospital el kardex de insumos de sala de cirugía para este caso. Si se usaron y no se facturaron, incluirlos en factura corregida con los códigos del catálogo de insumos pactado con Sura EPS.",
+      "cups_sugeridos": [
+        {
+          "codigo": "Material médico-quirúrgico",
+          "descripcion": "Trocar laparoscópico 5/10/12 mm × 4 — desechable"
+        },
+        {
+          "codigo": "Material médico-quirúrgico",
+          "descripcion": "Clips de titanio para cirugía laparoscópica (set)"
+        },
+        {
+          "codigo": "Material médico-quirúrgico",
+          "descripcion": "Bolsa de extracción laparoscópica (endobag)"
+        }
+      ],
+      "monto_estimado": null
+    },
+    {
+      "id": "SB-02",
+      "categoria": "Agente anestésico inhalatorio",
+      "nivel_certeza": "medio",
+      "descripcion": "La nota quirúrgica documenta anestesia general balanceada. Por definición, este tipo de anestesia combina un opioide IV (remifentanilo — sí facturado) con un agente hipnótico inhalatorio (sevoflurano o desflurano). El kardex solo registra remifentanilo y no hay código de agente inhalatorio en la factura.",
+      "evidencia_documental": "nota_quirurgica.pdf — 'Bajo anestesia general balanceada'. kardex_medicamentos.pdf — solo registra M00102 (remifentanilo 1mg polvo). factura.pdf — ítem 2 solo incluye M00102.",
+      "accion": "Solicitar al Dr. Hernán Cano (anestesiólogo) el reporte de consumo de gases anestésicos para esta cirugía. Si se utilizó sevoflurano, incluir en factura corregida con el CUM correspondiente.",
+      "cups_sugeridos": [
+        {
+          "codigo": "CUM-sevoflurano",
+          "descripcion": "Sevoflurano solución para inhalación 250 mL — agente anestésico inhalatorio"
+        }
+      ],
+      "monto_estimado": 350000
+    },
+    {
+      "id": "SB-03",
+      "categoria": "Estudio anatomopatológico de pieza quirúrgica",
+      "nivel_certeza": "medio",
+      "descripcion": "La epicrisis no menciona envío de la pieza quirúrgica (vesícula extirpada) a anatomía patológica, pero la Res. 2003/2014 MinSalud exige el estudio anatomopatológico de toda pieza quirúrgica. No hay código de patología en la factura.",
+      "evidencia_documental": "epicrisis.pdf — no menciona destino de la pieza quirúrgica. factura.pdf — no contiene código P01006 ni equivalente. nota_quirurgica.pdf — 'extracción de la vesícula en bolsa sin incidentes' sin referencia a envío a patología.",
+      "accion": "Confirmar con el servicio de patología del Hospital San José si existe resultado histopatológico para el paciente MEJÍA RÍOS (HC 2026). Si existe, incluir el servicio en factura corregida.",
+      "cups_sugeridos": [
+        {
+          "codigo": "P01006",
+          "descripcion": "Estudio anatomopatológico de pieza quirúrgica — vesícula biliar (colecistectomía)"
+        }
+      ],
+      "monto_estimado": 180000
+    },
+    {
+      "id": "SB-04",
+      "categoria": "Medicación postoperatoria",
+      "nivel_certeza": "medio",
+      "descripcion": "El kardex solo cubre el período intraoperatorio. El paciente tuvo alta 24 horas después de la cirugía. La epicrisis menciona 'analgesia oral' en el plan al alta, lo que implica que se administró medicación durante la hospitalización postoperatoria. No hay registro de analgésico, antiemético ni tromboprofilaxis en el kardex ni en la factura.",
+      "evidencia_documental": "kardex_medicamentos.pdf — cubre únicamente 09:05–10:05 del 01/04/2026. epicrisis.pdf — 'Plan al alta: Analgesia oral, dieta blanda, control en 8 días.' Alta: 02/04/2026 10:00.",
+      "accion": "Solicitar el kardex postoperatorio completo del 01/04 tarde al 02/04 mañana. Si hay medicamentos administrados no incluidos en la factura, incorporarlos.",
+      "cups_sugeridos": [
+        {
+          "codigo": "CUM-acetaminofen-1g-iv",
+          "descripcion": "Acetaminofén 1g solución inyectable IV — analgesia postoperatoria"
+        },
+        {
+          "codigo": "CUM-ondansetron-4mg-iv",
+          "descripcion": "Ondansetrón 4mg solución inyectable IV — antiemético postoperatorio"
+        },
+        {
+          "codigo": "CUM-enoxaparina-40mg",
+          "descripcion": "Enoxaparina 40mg solución inyectable SC — tromboprofilaxis"
+        }
+      ],
+      "monto_estimado": 85000
+    },
+    {
+      "id": "SB-05",
+      "categoria": "Exámenes preoperatorios adicionales",
+      "nivel_certeza": "bajo",
+      "descripcion": "Solo se aporta y factura D08001 (hemograma completo). Para cirugía electiva en hombre de 53 años, el protocolo estándar incluye glicemia, creatinina, TP/TPT y electrocardiograma. Si se realizaron y no están en los soportes aportados, son servicios subfacturados.",
+      "evidencia_documental": "resultados_laboratorio.pdf — solo contiene hemograma completo (D08001). factura.pdf — único examen de laboratorio es D08001. No se aportaron otros resultados ni EKG.",
+      "accion": "Verificar con el hospital si se realizaron exámenes preoperatorios adicionales para este paciente. Si existen resultados no aportados como soporte, solicitar y facturar.",
+      "cups_sugeridos": [
+        { "codigo": "D03001", "descripcion": "Glicemia en ayunas" },
+        { "codigo": "D03007", "descripcion": "Creatinina sérica" },
+        { "codigo": "D07001", "descripcion": "Tiempo de protrombina (TP)" },
+        { "codigo": "D07002", "descripcion": "Tiempo de tromboplastina parcial activada (TTPa)" },
+        { "codigo": "D14001", "descripcion": "Electrocardiograma de 12 derivaciones" }
+      ],
+      "monto_estimado": 220000
+    }
+  ],
+  "resumen": {
+    "diagnostico_principal_facturado": "K80.1 — Cálculo de la vesícula biliar con otra colecistitis",
+    "nota_diagnosticos": "La epicrisis declara explícitamente 'Diagnósticos secundarios: Ninguno'. No se identificaron diagnósticos CIE-10 adicionales facturables."
+  },
+  "monto_total_estimado": 835000,
+  "confianza_global": 0.76
+}

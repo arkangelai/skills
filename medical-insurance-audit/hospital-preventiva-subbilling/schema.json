@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hospital-preventiva-subbilling/output_subbilling",
+  "title": "OutputSubfacturacion",
+  "description": "Output canónico del skill hospital-preventiva-subbilling. Identifica servicios documentados clínicamente que no aparecen en la factura.",
+  "type": "object",
+  "required": ["meta", "hallazgos", "monto_total_estimado", "confianza_global"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["caso_id", "num_factura", "prestador", "prestador_nit", "pagador", "paciente", "fecha_analisis", "agente"],
+      "additionalProperties": false,
+      "properties": {
+        "caso_id":        { "type": "string", "description": "Identificador del caso RAD-YYYYMMDD-XXX" },
+        "num_factura":    { "type": "string", "description": "Número de factura analizada" },
+        "prestador":      { "type": "string" },
+        "prestador_nit":  { "type": "string" },
+        "pagador":        { "type": "string" },
+        "paciente":       { "type": "string" },
+        "fecha_analisis": { "type": "string", "format": "date" },
+        "agente":         { "type": "string", "description": "Identificador de la versión del agente, ej. hospital-preventiva-subbilling-v1" }
+      }
+    },
+    "hallazgos": {
+      "type": "array",
+      "description": "Lista de servicios documentados clínicamente pero no facturados. Vacío si no se detectan brechas.",
+      "items": {
+        "type": "object",
+        "required": ["id", "categoria", "nivel_certeza", "descripcion", "evidencia_documental", "accion", "cups_sugeridos", "monto_estimado"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^SB-\\d{2}$",
+            "description": "Identificador secuencial del hallazgo, ej. SB-01"
+          },
+          "categoria": {
+            "type": "string",
+            "description": "Nombre corto del tipo de servicio subfacturado, ej. 'Insumos quirúrgicos laparoscópicos'"
+          },
+          "nivel_certeza": {
+            "type": "string",
+            "enum": ["alto", "medio", "bajo"],
+            "description": "alto: documentado en ≥2 fuentes. medio: documentado en 1 fuente o inferencia fuerte. bajo: estándar de procedimiento sin evidencia directa."
+          },
+          "descripcion": {
+            "type": "string",
+            "description": "Qué está subfacturado, qué documentos lo evidencian y por qué no aparece en la factura."
+          },
+          "evidencia_documental": {
+            "type": "string",
+            "description": "Cita literal del documento fuente. Formato: 'nombre_archivo.pdf — sección o cita textual entre comillas'"
+          },
+          "accion": {
+            "type": "string",
+            "description": "Qué debe hacer el hospital para corregir el hallazgo antes de radicar o en factura corregida."
+          },
+          "cups_sugeridos": {
+            "type": "array",
+            "description": "Códigos CUPS, CUM o de insumo aplicables. Vacío si el código depende del catálogo interno del hospital.",
+            "items": {
+              "type": "object",
+              "required": ["codigo", "descripcion"],
+              "additionalProperties": false,
+              "properties": {
+                "codigo":      { "type": "string", "description": "Código CUPS, CUM u otro identificador tarifario" },
+                "descripcion": { "type": "string", "description": "Nombre del servicio, medicamento o insumo" }
+              }
+            }
+          },
+          "monto_estimado": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "description": "Estimación en COP según manual tarifario del caso. null si no hay referencia tarifaria suficiente."
+          }
+        }
+      }
+    },
+    "resumen": {
+      "type": "object",
+      "description": "Campos opcionales de resumen diagnóstico. No incluir si no hay información relevante.",
+      "additionalProperties": false,
+      "properties": {
+        "diagnostico_principal_facturado": {
+          "type": "string",
+          "description": "CIE-10 + nombre del diagnóstico principal según la factura"
+        },
+        "nota_diagnosticos": {
+          "type": "string",
+          "description": "Observación sobre diagnósticos secundarios documentados vs facturados. Solo incluir si hay discrepancia o algo relevante."
+        }
+      }
+    },
+    "monto_total_estimado": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Suma de todos los monto_estimado no-null de hallazgos[]. null solo si todos son null."
+    },
+    "confianza_global": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confianza promedio del análisis. Refleja la calidad y completitud del expediente aportado."
+    }
+  }
+}
