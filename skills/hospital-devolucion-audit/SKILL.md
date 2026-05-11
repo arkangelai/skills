@@ -113,9 +113,9 @@ Schema: `hospitals/devolucion/progress-respuesta`.
 
 | Causales | Capa | Instrumento |
 |---|---|---|
-| 1, 2 | `medico` | PERT-CLIN (reglas M01–M29) |
-| 3, 4 | `administrativo` | DAMA-UK (reglas A01–A27) |
-| 5, 6, 7 | `financiero` | FIN-CTR (reglas F01–F42) |
+| 2 (Tarifas) | `financiero` | FIN-CTR (reglas F01–F42) |
+| 5 (Cobertura/no-PBS), 6 (Pertinencia) | `medico` | PERT-CLIN (reglas M01–M29) |
+| 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones) | `administrativo` | DAMA-UK (reglas A01–A27) |
 
 **Reglas de `resultado` en `reglas_aplicadas`:**
 - `pass` — la regla aporta evidencia que soporta la posición defensiva de la IPS.
