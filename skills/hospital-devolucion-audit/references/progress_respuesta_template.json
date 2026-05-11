@@ -12,7 +12,7 @@
       "linea_id": "L-02",
       "descripcion": "Kit de laparoscopia avanzada",
       "valor_glosado": 370000,
-      "causal_num": "3",
+      "causal_num": "2",
       "causal_nombre": "Tarifas por fuera del contrato",
       "capa": "financiero",
       "reglas_aplicadas": [
@@ -34,7 +34,7 @@
       "linea_id": "L-03",
       "descripcion": "Estancia UCI adulto",
       "valor_glosado": 1160000,
-      "causal_num": "2",
+      "causal_num": "6",
       "causal_nombre": "Falta de pertinencia del servicio",
       "capa": "medico",
       "reglas_aplicadas": [

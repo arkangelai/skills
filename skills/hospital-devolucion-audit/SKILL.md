@@ -79,7 +79,7 @@ Schema: `hospitals/devolucion/progress-respuesta`.
       "linea_id": "L-01",
       "descripcion": "...",
       "valor_glosado": 850000,
-      "causal_num": "2",
+      "causal_num": "6",
       "causal_nombre": "Falta de pertinencia médica",
       "capa": "medico",
       "reglas_aplicadas": [
