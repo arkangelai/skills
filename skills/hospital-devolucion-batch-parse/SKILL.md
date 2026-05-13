@@ -85,35 +85,36 @@ Al final, transitar el envelope a `archived`.
    | `paciente_documento_alias` | "CC ***NNNN" (TI/CE/PA según tipo) |
    | `fecha_ingreso` / `fecha_egreso` / `fecha_glosa` / `fecha_vencimiento` | Fechas YYYY-MM-DD |
 
-4. **Crear la task hija** (usar `ark` o `curl` contra la API):
+4. **Crear la task hija como `draft`** (sin status — el agente no la recoge hasta que tenga el input cargado). Capturar el `id` retornado por el API:
 
    ```bash
-   ark task create \
-     --task-type hospital_devolucion \
+   CREATE_RESP=$(ark tasks create \
+     --type hospital_devolucion \
      --title "Glosa ${CODIGO} — ${PAGADOR_NOMBRE}" \
      --description "Run skill hospital-devolucion-audit on the attached context." \
      --priority medium \
-     --context "$GLOSA_CONTEXT_JSON"
+     --context "$GLOSA_CONTEXT_JSON")
+   CHILD_ID=$(echo "$CREATE_RESP" | jq -r '.data.id')
    ```
 
-   El campo `description` es deliberadamente **un puntero corto al skill**, no el prompt completo. El skill canónico vive en `skills/hospital-devolucion-audit/SKILL.md`.
+   El campo `--description` es deliberadamente **un puntero corto al skill**, no el prompt completo. El skill canónico vive en `skills/hospital-devolucion-audit/SKILL.md`.
 
-5. **Adjuntar el Excel original** a la task hija como input:
+5. **Adjuntar el Excel original** como input de la task hija (referencia para el agente de auditoría):
 
    ```bash
-   ark task input upload --task-id $CHILD_ID --file $WORK_DIR/$FILENAME
+   ark tasks inputs upload "$CHILD_ID" "$WORK_DIR/$FILENAME"
    ```
 
-6. **Encolar la task hija** para que el agente de auditoría la recoja:
+6. **Encolar la task hija** ahora que tiene su input cargado:
 
    ```bash
-   ark task status set --task-id $CHILD_ID --status queued
+   ark tasks status "$CHILD_ID" --status queued
    ```
 
 7. **Cerrar el envelope** una vez creadas todas las hijas:
 
    ```bash
-   ark task status set --task-id $ENVELOPE_ID --status archived
+   ark tasks status "$ENVELOPE_ID" --status archived
    ```
 
 ## Pitfalls
