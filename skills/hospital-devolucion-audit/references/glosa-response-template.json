@@ -1,0 +1,34 @@
+{
+  "$comment": "Plantilla de salida GlosaResponse (issue arkangelai/salmona-api#210). El skill emite UN solo archivo glosa-response.json. Schema canónico en salmona-api/lib/hospitales/devolucion/schemas/glosa-response.schema.json.",
+  "instrumento": "RESPUESTA-GLOSA",
+  "meta": {
+    "caso_id": "HOSP-GL-20260513-A1B2C",
+    "fecha_auditoria": "2026-05-13T10:00:00-05:00",
+    "agente": "hospital-devolucion-audit-v2"
+  },
+  "capa": "medico",
+  "reglas_aplicadas": [
+    {
+      "id": "M22",
+      "nombre": "Justificación de estancia en UCI",
+      "resultado": "pass",
+      "evidencia": "HC p.6 \"APACHE II: 14 — ventilación mecánica activa al ingreso\"",
+      "observaciones": "La HC documenta los criterios de severidad que justifican la estancia en UCI durante los 2 días facturados.",
+      "confianza": 0.92
+    },
+    {
+      "id": "M14",
+      "nombre": "Pertinencia de la estancia hospitalaria",
+      "resultado": "pass",
+      "evidencia": "Orden médica de ingreso a UCI emitida por intensivista, folio 20",
+      "observaciones": null,
+      "confianza": 0.88
+    }
+  ],
+  "evidence_status": "sufficient",
+  "decision": "disputar",
+  "argumentacion": "Se disputa la glosa por la estancia en UCI. Los 2 días facturados están clínicamente justificados: el paciente ingresó con APACHE II = 14 y ventilación mecánica activa (HC folio 6), y la orden de ingreso a UCI fue emitida por intensivista (folio 20). Se adjuntan folios 4-8 y 20 de la HC para sustentar la defensa.",
+  "valor_a_defender": 1160000,
+  "valor_a_aceptar": 0,
+  "evidencia_requerida": []
+}

@@ -148,8 +148,11 @@ Intake (Gmail / Portal) → Document Understanding → Admin Audit
 
 ## 3. Auditoría desde el lado del hospital (IPS)
 
+### `hospital-devolucion-batch-parse`
+**Qué hace:** Lee el Excel/CSV de glosas que la EPS envió a la IPS y crea **una task hija por cada fila** (una glosa = un ítem). Sin agrupación por `num_documento`. Encadena con `hospital-devolucion-audit` aguas abajo.
+
 ### `hospital-devolucion-audit`
-**Qué hace:** Agente de respuesta a glosas del lado del prestador. Recibe la glosa de la EPS, evalúa ítem por ítem qué defender (PERT-CLIN), qué es administrativo (DAMA-UK) y qué es financiero (FIN-CTR), genera `progress-respuesta.json` y `devolucion_output.json` con la posición defensiva y el monto recuperable.
+**Qué hace:** Agente de respuesta a UNA glosa (un ítem objetado por la EPS). Aplica el instrumento correspondiente según la causal (DAMA-UK / PERT-CLIN / FIN-CTR) y emite `glosa-response.json` con el veredicto (`disputar` o `aceptar`), las reglas aplicadas, la argumentación y el split de valor (`valor_a_defender` + `valor_a_aceptar`).
 
 **Cuándo usarlo en demo:**
 - Mostrar Salmona trabajando **para el hospital**, no para la EPS
@@ -293,7 +296,8 @@ Intake (Gmail / Portal) → Document Understanding → Admin Audit
 | `medical-invoice-financial-audit` | 42 reglas financieras + antifraude → sobretarifa con cálculo explícito |
 | `medical-invoice-consolidator-audit` | Tres auditorías → dictamen único con causal Res. 3047 y monto a glosar |
 | `medical-invoice-claim-denial-generator` | Dictamen → PDF de glosa formal listo para enviar |
-| `hospital-devolucion-audit` | Glosa recibida → respuesta argumental con monto recuperable |
+| `hospital-devolucion-batch-parse` | Excel de glosas EPS → N tasks hijas (una por glosa = un ítem) |
+| `hospital-devolucion-audit` | Una glosa → respuesta argumental (disputar/aceptar) con valor a defender y a aceptar |
 | `hospital-preventiva-subbilling` | Historia clínica + factura → servicios no cobrados con monto estimado en COP |
 | `prior-authorization-review` | Solicitud de pre-autorización → decisión con fundamento normativo |
 | `clinical-report-writer` | Notas crudas del médico → epicrisis auditable lista para radicar |

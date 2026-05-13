@@ -159,13 +159,11 @@ On failure: `{ "label_aplicado": "hospital-devolucion/error", "motivo": "<string
    BATCH_ID="BATCH-${DATE}-${SUFFIX}"
    ```
 
-   a. **Get the batch description template** from an existing `hospital_devolucion_batch` task:
+   a. **Set the batch description.** Per issue [`arkangelai/salmona-api#210`](https://github.com/arkangelai/salmona-api/issues/210), the skills repo is the canonical home for agent prompts. The task description is a thin pointer to the skill that processes the envelope (`hospital-devolucion-batch-parse`), not an inlined prompt:
       ```bash
-      DESCRIPTION=$(curl -s -H "Authorization: Bearer $SALMONA_API_KEY" \
-        "$SALMONA_API_URL/api/tasks?task_type=hospital_devolucion_batch&limit=1" \
-        | jq -r '.data[0].description // empty')
+      DESCRIPTION="Run skill hospital-devolucion-batch-parse on the attached Excel/CSV. Each row becomes one hospital_devolucion task (one glosa = one item)."
+      DESCRIPTION_JSON=$(jq -n --arg d "$DESCRIPTION" '$d')
       ```
-      If empty (no prior tasks exist), use the hardcoded `BATCH_AGENT_INSTRUCTION` from `lib/hospitales/devolucion/intake.ts` in the salmona-api repo.
 
    b. **Create the batch task** (agent role allows `status: queued` directly):
       ```bash
