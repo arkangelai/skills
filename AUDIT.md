@@ -10,7 +10,7 @@ Domain terms that remain in Spanish are proper nouns from Colombian healthcare r
 |---|---|---|---|---|
 | **1 — EPS audita factura IPS** | `medical_invoice_audit` | EPS / aseguradora | Skills 1–9 | `output.json` |
 | **2 — IPS self-audit** | `medical_invoice_audit` + `audit_perspective = "hospital"` | IPS antes de radicar | Skills 2–6 (sin Phase 3) | `output.json` |
-| **3 — IPS responde una glosa** | `hospital_devolucion_audit` | IPS al recibir glosa de EPS | `hospital-devolucion-audit` | `devolucion_output.json` |
+| **3 — IPS responde una glosa** | `hospital_devolucion` (hijas), `hospital_devolucion_batch` (envelope) | IPS al recibir glosas de EPS | `hospital-devolucion-batch-parse` (fan-out) + `hospital-devolucion-audit` (1 glosa) | `glosa-response.json` |
 
 Los flujos 1 y 2 comparten el mismo conjunto de skills; la diferencia es `audit_perspective` en el contexto de la tarea y si se ejecuta o no Phase 3. El flujo 3 es completamente independiente: skill distinto, input distinto (`context.json` en lugar de `metadata_input.json`), y no produce ni consume ningún archivo de los flujos 1 y 2.
 
@@ -90,19 +90,31 @@ Each audit skill runs **isolated** — it does not see results from the other au
               └───────────────────────────────┘
 ```
 
-## Flujo 3 — hospital-devolucion-audit
+## Flujo 3 — devolución de glosas (IPS responde a la EPS)
 
-> `task_type = hospital_devolucion_audit`
+Dos skills en cadena. **Una glosa = un ítem objetado**; cada task hija procesa exactamente una.
 
-Skill standalone que analiza glosas recibidas de la EPS y construye la respuesta argumental ítem por ítem para que la IPS defienda, acepte o reradique cada cargo.
+### 3a — `hospital-devolucion-batch-parse`
 
-**Input:** `context.json` (schema `hospitals/devolucion/context`) + documentos clínicos en el directorio de trabajo.
+> `task_type = hospital_devolucion_batch`
 
-**Outputs:**
-- `progress-respuesta.json` — análisis detallado por ítem (schema `hospitals/devolucion/progress-respuesta`)
-- `devolucion_output.json` — resumen consolidado para el UI de Salmona (schema `hospitals/devolucion/output`)
+Lee el Excel/CSV que la EPS envió a la IPS y crea **una task hija por cada fila** (`task_type = hospital_devolucion`). Sin agrupación por `num_documento`, sin agregaciones.
 
-**Aislamiento:** ningún archivo de este flujo (`context.json`, `progress-respuesta.json`, `devolucion_output.json`) es producido o consumido por los skills 1–9. El directorio de trabajo de un caso `hospital_devolucion_audit` nunca contiene `metadata_input.json`, `case_evidence.json`, `admin_checklist_output.json`, `medical_checklist_output.json`, `financial_checklist_output.json` ni `output.json`.
+**Input:** la task envelope con el Excel/CSV cargado como input.
+
+**Output:** N tasks hijas creadas; envelope transita a `archived`.
+
+### 3b — `hospital-devolucion-audit`
+
+> `task_type = hospital_devolucion`
+
+Skill que analiza **una sola glosa** y construye la respuesta argumental — disputar o aceptar, con valor a defender y a aceptar.
+
+**Input:** `GlosaContext` en el `context` de la task (schema `hospitals/devolucion/glosa-context`) + documentos clínicos en los inputs.
+
+**Output:** `glosa-response.json` (schema `hospitals/devolucion/glosa-response`) — un solo archivo con el veredicto, las reglas aplicadas, la argumentación y el split de valor.
+
+**Aislamiento:** ningún archivo de este flujo (`GlosaContext`, `glosa-response.json`) es producido o consumido por los skills 1–9.
 
 ## Skills — Flujos 1 y 2
 
@@ -117,7 +129,8 @@ Skill standalone que analiza glosas recibidas de la EPS y construye la respuesta
 | **Claim denial** *(optional)* | 7 | [`medical-invoice-claim-denial-generator`](./medical-invoice-claim-denial-generator) | `output.json` → PDF |
 | | 8 | [`medical-invoice-fix-review`](./medical-invoice-fix-review) | `output.json` → revised `output.json` |
 | | 9 | [`medical-invoice-claim-denial-gmail-sender`](./medical-invoice-claim-denial-gmail-sender) | `output.json` + PDF → sent |
-| **Flujo 3** | — | [`hospital-devolucion-audit`](./hospital-devolucion-audit) | `context.json` + docs → `progress-respuesta.json` + `devolucion_output.json` |
+| **Flujo 3a** | — | [`hospital-devolucion-batch-parse`](./hospital-devolucion-batch-parse) | EPS Excel → N tasks hijas (`hospital_devolucion`) |
+| **Flujo 3b** | — | [`hospital-devolucion-audit`](./hospital-devolucion-audit) | `GlosaContext` + docs → `glosa-response.json` |
 
 ## Reference data
 

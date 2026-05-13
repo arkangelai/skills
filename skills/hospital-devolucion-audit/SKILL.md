@@ -1,7 +1,7 @@
 ---
 name: hospital-devolucion-audit
-description: Analiza glosas o devoluciones técnicas recibidas de una EPS y produce una respuesta argumental ítem por ítem para que la IPS pueda defender, aceptar o reradicar cada cargo objetado. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según la causal de cada línea glosada. Emite progress-respuesta.json y devolucion_output.json. Usar cuando la IPS recibe una glosa y necesita construir la respuesta dentro del plazo de 15 días hábiles (Res. 3047/2008).
-version: 1.0.0
+description: Analiza UNA glosa recibida de una EPS (un ítem objetado sobre una factura) y produce la respuesta argumental — disputar o aceptar, con valor a defender y a aceptar, y la justificación clínica/administrativa/financiera. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según la causal. Emite glosa-response.json. Usar cuando la IPS recibe una glosa y necesita construir su respuesta dentro del plazo de 15 días hábiles (Res. 3047/2008).
+version: 2.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
 metadata:
@@ -13,262 +13,190 @@ metadata:
 
 # hospital-devolucion-audit
 
-Agente de respuesta a glosas del lado del prestador (IPS). Recibe los ítems objetados por la EPS y construye, ítem por ítem, la argumentación clínica, administrativa o financiera que fundamenta la defensa, aceptación o reradicación de cada cargo.
+Agente de respuesta a UNA glosa (un ítem objetado por la EPS sobre una factura). Construye la argumentación que fundamenta la postura de la IPS — **disputar** o **aceptar** — sobre ese ítem.
 
-La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a cada cargo glosado, y cuánto del valor objetado es recuperable?**
+La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a este cargo glosado, y cuánto del valor objetado es recuperable?**
+
+> **Nota sobre el modelo (v2):** una glosa = un ítem. Si la EPS objeta varios ítems de la misma factura, cada uno es una task independiente y este skill se ejecuta una vez por cada uno. El skill `hospital-devolucion-batch-parse` se encarga de separar un Excel multi-glosa en tasks individuales.
 
 ## When to Use
 
-- La IPS recibe una glosa o devolución técnica y necesita preparar la respuesta formal dentro del plazo.
-- El orquestador despacha el caso al agente de devolución (estado `queued` con `task_type = hospital_devolucion_audit`).
-- Reprocesamiento de un caso cuyo análisis terminó en error o incompleto.
-- Auditoría preventiva: la IPS quiere anticipar qué ítems son vulnerables antes de radicar la factura.
+- La IPS recibe una glosa y necesita preparar la respuesta formal dentro del plazo.
+- El orquestador despacha un caso al agente con `task_type = hospital_devolucion` y el `context` contiene un único ítem objetado (GlosaContext).
+- Reprocesamiento de un caso cuyo análisis terminó en error o requiere re-evaluación tras adjuntar nuevos documentos.
 
-**No usar:** si el caso no tiene `context.json` en el directorio de trabajo; si el análisis ya está publicado y no se solicitó reanálisis.
-
-**IMPORTANTE — aislamiento de flujo:** Este skill pertenece exclusivamente al flujo `hospital_devolucion_audit`. No usar si `task_type != hospital_devolucion_audit`. No es un paso del pipeline de 9 skills (flujos `aseguradora` / `hospital` self-audit) — su input (`context.json`), sus outputs (`progress-respuesta.json`, `devolucion_output.json`) y su schema de tarea son completamente distintos. Un orquestador que no encuentra `task_type = hospital_devolucion_audit` en la tarea debe ignorar este skill por completo.
-
-## Templates / Examples
-
-Ver `references/` para ejemplos del schema de cada archivo:
-- `references/context_template.json` — input esperado en el directorio de trabajo.
-- `references/progress_respuesta_template.json` — output intermedio.
-- `references/devolucion_output_template.json` — output final.
+**No usar:**
+- Si `task_type != hospital_devolucion`.
+- Si el `context` carga un array `lineas[]` (modelo legacy — debe pasar primero por `hospital-devolucion-batch-parse`).
+- Si la task aún está `archived` o `done` y no se solicitó re-auditoría.
 
 ## Input Contract
 
-`context.json` en el directorio de trabajo — schema `hospitals/devolucion/context` (ver `references/context_template.json`).
+El context de la task (entregado al agente) es un `GlosaContext` — schema `hospitals/devolucion/glosa-context` (ver `references/glosa-context-template.json`).
 
 Campos clave:
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `caso_id` | `string` | Ej: `HOSP-GL-1048` |
-| `tipo_documento` | `"glosa" \| "devolucion_tecnica"` | Tipo de objeción de la EPS |
-| `num_documento` | `string` | Número de la glosa |
-| `num_factura_original` | `string` | Factura que originó la glosa |
-| `prestador_nit` / `pagador_nit` | `string` | Identificadores de IPS y EPS |
-| `fecha_vencimiento` | `date` | Límite de respuesta |
-| `valor_facturado` / `valor_glosado` | `integer` (COP) | Montos clave |
-| `lineas` | `array` | Una entrada por cada ítem objetado |
+| `caso_id` | `string` | Ej: `HOSP-GL-20260513-A1B2C` |
+| `num_factura_original` | `string` | Factura sobre la cual la EPS interpuso esta glosa |
+| `codigo` | `string` | CUPS/SOAT del ítem facturado |
+| `descripcion` | `string` | Descripción del servicio o insumo |
+| `cantidad` | `number` | Unidades facturadas |
+| `valor_facturado` | `integer` (COP) | Lo que la IPS cobró por este ítem |
+| `valor_glosado` | `integer` (COP) | Lo que la EPS objeta. Puede ser ≤ valor_facturado |
+| `causal_num` | `"1"`–`"7"` | Causal según Res. 3047/2008 |
+| `motivo_glosa` | `string` | Texto literal con el que la EPS justifica la objeción |
+| `pagador_*` | — | Datos de la EPS |
+| `prestador_*` | — | Datos de la IPS |
+| `paciente_*` | — | Alias / documento alias del paciente |
+| `fecha_glosa` | `date` | Cuándo la EPS notificó la glosa |
+| `fecha_vencimiento` | `date` | Plazo de respuesta |
 
-Cada `linea` contiene: `id`, `codigo` (CUPS/SOAT), `descripcion`, `fecha_servicio`, `cantidad`, `valor_facturado`, `valor_glosado`, `causal_num` (1–7, Res. 3047/2008), `motivo_glosa` (texto de la EPS), `accion`.
-
-Además de `context.json`, el directorio de trabajo puede contener documentos clínicos y administrativos (HC, autorización, RIPS, factura, soportes adicionales). Leer todos los disponibles antes de evaluar cada línea.
+Además del context, el directorio de trabajo de la task puede contener documentos clínicos y administrativos (HC, autorización, RIPS, factura, soportes adicionales). Leer todos los disponibles antes de evaluar.
 
 ## Output Contract
 
-El skill genera **dos archivos** en el directorio de trabajo.
-
-### 1. `progress-respuesta.json`
-
-Schema: `hospitals/devolucion/progress-respuesta`.
+El skill genera **un solo archivo**: `glosa-response.json`. Schema `hospitals/devolucion/glosa-response` (ver `references/glosa-response-template.json`).
 
 ```json
 {
   "instrumento": "RESPUESTA-GLOSA",
-  "descripcion": "Analisis focalizado de los items glosados por la EPS. Aplica las reglas del instrumento correspondiente (DAMA-UK, PERT-CLIN o FIN-CTR) segun la causal de cada item para construir la respuesta argumental.",
   "meta": {
-    "caso_id": "HOSP-GL-1048",
-    "fecha_auditoria": "2026-04-30T10:00:00Z",
-    "agente": "hospital-devolucion-audit-v1",
-    "causal_principal": "2"
+    "caso_id": "HOSP-GL-20260513-A1B2C",
+    "fecha_auditoria": "2026-05-13T10:00:00-05:00",
+    "agente": "hospital-devolucion-audit-v2"
   },
-  "items_glosados": [
+  "capa": "medico",
+  "reglas_aplicadas": [
     {
-      "linea_id": "L-01",
-      "descripcion": "...",
-      "valor_glosado": 850000,
-      "causal_num": "6",
-      "causal_nombre": "Falta de pertinencia médica",
-      "capa": "medico",
-      "reglas_aplicadas": [
-        {
-          "id": "M22",
-          "nombre": "Justificación de procedimiento en HC",
-          "resultado": "pass",
-          "evidencia": "HC p.4 \"diagnóstico confirmado por patología el 2026-04-03\"",
-          "observaciones": "La HC documenta el diagnóstico y la indicación clínica que justifica el procedimiento.",
-          "confianza": 0.92
-        }
-      ],
-      "decision_item": "disputar",
-      "argumentacion": "...",
-      "valor_a_defender": 850000,
-      "valor_a_aceptar": 0
+      "id": "M22",
+      "nombre": "Justificación de estancia en UCI",
+      "resultado": "pass",
+      "evidencia": "HC p.6 \"APACHE II: 14 — ventilación mecánica activa\"",
+      "observaciones": "La HC documenta los criterios de severidad que justifican la estancia.",
+      "confianza": 0.92
     }
   ],
-  "cierre": {
-    "concepto_final": "DEFENDER",
-    "decision": "responder_glosa",
-    "valor_total_glosado": 850000,
-    "valor_total_defendible": 850000,
-    "valor_total_aceptado": 0,
-    "resumen_ejecutivo": "..."
-  }
+  "evidence_status": "sufficient",
+  "decision": "disputar",
+  "argumentacion": "La estancia en UCI está justificada por los criterios de severidad documentados en la HC del paciente: APACHE II = 14, ventilación mecánica activa al ingreso. Se adjuntan folios 4–8 de la HC.",
+  "valor_a_defender": 1160000,
+  "valor_a_aceptar": 0
 }
 ```
 
-**Instrumento por causal:**
+### Capa por causal
 
-| Causales | Capa | Instrumento |
-|---|---|---|
-| 2 (Tarifas) | `financiero` | FIN-CTR (reglas F01–F42) |
-| 5 (Cobertura/no-PBS), 6 (Pertinencia) | `medico` | PERT-CLIN (reglas M01–M29) |
-| 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones) | `administrativo` | DAMA-UK (reglas A01–A27) |
+| `causal_num` | Nombre | Capa | Instrumento |
+|---|---|---|---|
+| 2 | Tarifas | `financiero` | FIN-CTR (reglas F01–F42) |
+| 5 | Cobertura / no-PBS | `medico` | PERT-CLIN (reglas M01–M29) |
+| 6 | Pertinencia | `medico` | PERT-CLIN (reglas M01–M29) |
+| 1, 3, 4, 7 | Facturación / Soportes / Autorización / Anulaciones | `administrativo` | DAMA-UK (reglas A01–A27) |
 
-**Reglas de `resultado` en `reglas_aplicadas`:**
-- `pass` — la regla aporta evidencia que soporta la posición defensiva de la IPS.
-- `fail` — la regla confirma la objeción de la EPS (hay evidencia positiva de la infracción).
-- `n/a` — la regla no aplica a este tipo de servicio o no hay información disponible para evaluarla.
+### Campos del veredicto
 
-**Reglas de `confianza`:**
-- `≥ 0.95`: cita literal del documento o consulta de sistema verificable.
-- `0.80–0.94`: referencia específica sin cita literal.
-- `< 0.80` en ítem con `decision_item = disputar` → cambiar a `adjuntar_soporte` o escalar a humano.
+**`evidence_status`** (uno de):
+- `sufficient` — la información disponible permite emitir un veredicto firme.
+- `pending` — faltan documentos críticos (HC, autorización, RIPS, etc.) para decidir. En este caso, `decision` debe ser `null` y `evidencia_requerida` debe listar qué documentos se necesitan.
 
-**`decision_item` por ítem:**
-- `disputar` — la IPS tiene argumentos suficientes para revertir la glosa (confianza ≥ 0.80).
-- `aceptar` — la glosa es válida; no hay base para disputar.
-- `adjuntar_soporte` — faltan documentos; la IPS puede subsanar presentando soportes adicionales.
-- `corregir` — hay un error en la factura subsanable (tarifa incorrecta, CUPS erróneo, etc.).
+**`decision`** (postura final de la IPS):
+- `disputar` — la IPS tiene argumentos para revertir total o parcialmente la objeción. `valor_a_defender > 0`. Las disputas parciales (con `valor_a_aceptar > 0`) siguen siendo `disputar`.
+- `aceptar` — la objeción es válida. `valor_a_defender = 0` y `valor_a_aceptar = valor_glosado`.
+- `null` — **solamente** cuando `evidence_status = pending`. No pre-comprometer veredicto si no hay evidencia suficiente.
 
-**Invariante:** `valor_a_defender + valor_a_aceptar == valor_glosado` para cada ítem.
+**Invariantes** (validados en `lib/hospitales/devolucion/validation.ts` del backend):
 
-**`cierre.concepto_final`:**
-- `DEFENDER` si hay al menos un ítem con `decision_item = disputar`.
-- `ACEPTAR` si todos los ítems tienen `decision_item = aceptar`.
+1. `evidence_status === 'pending'` ⇔ `decision === null`
+2. `valor_a_defender + valor_a_aceptar = valor_glosado` (cuando `evidence_status = sufficient`)
+3. `decision = 'aceptar'` ⇔ `valor_a_defender = 0` (cuando `sufficient`)
+4. `decision = 'disputar'` ⇒ `valor_a_defender > 0` (cuando `sufficient`)
+5. `valor_a_defender ≥ 0` y `valor_a_aceptar ≥ 0` siempre
 
----
+### Reglas de `confianza`
 
-### 2. `devolucion_output.json`
+- `≥ 0.95` — cita literal del documento o consulta de sistema verificable.
+- `0.80–0.94` — referencia específica sin cita literal.
+- `< 0.80` en todas las reglas de soporte → `evidence_status = pending` (no comprometer `disputar` sin evidencia firme).
 
-Schema: `hospitals/devolucion/output`.
+### `evidencia_requerida`
 
-Consolida el progress en la estructura que consume el UI de Salmona:
+Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de documentos que el agente necesita para finalizar el veredicto. Ej:
 
 ```json
-{
-  "caso_id": "HOSP-GL-1048",
-  "glosa": {
-    "tipo_documento": "glosa",
-    "num_documento": "GL-004821",
-    "num_factura_original": "FC-982144",
-    "prestador": "Clínica del Country",
-    "prestador_nit": "860.008.600-4",
-    "pagador": "EPS Sura",
-    "pagador_nit": "800.088.702-2",
-    "paciente_alias": "Paciente C-1842",
-    "paciente_documento_alias": "CC ***1842",
-    "fecha_ingreso": "2026-04-03",
-    "fecha_egreso": "2026-04-08",
-    "fecha_vencimiento": "2026-04-30",
-    "diagnostico_principal": "K80.0 - Colelitiasis con colecistitis aguda",
-    "valor_facturado": 18420000,
-    "valor_glosado": 1530000
-  },
-  "hallazgos": [
-    {
-      "linea_id": "L-03",
-      "capa": "medico",
-      "regla_aplicada": "M22",
-      "nombre": "Justificación de estancia en UCI",
-      "severidad": "mayor",
-      "observacion": "EPS glosa 2 días UCI por falta de criterios de severidad. HC p.6 documenta APACHE II = 14 y ventilación mecánica.",
-      "responsable": "cuentas_medicas",
-      "argumentacion": "La estancia en UCI de 2 días está justificada por los criterios de severidad documentados en la HC..."
-    }
-  ],
-  "resumen": {
-    "valor_facturado": 18420000,
-    "valor_glosado": 1530000,
-    "valor_defendible": 1160000,
-    "valor_aceptado": 370000,
-    "num_items_glosados": 2,
-    "num_defendidos": 1,
-    "num_aceptados": 1,
-    "tasa_recuperacion": 0.76,
-    "concepto_final": "DEFENDER",
-    "decision": "responder_glosa",
-    "resumen_ejecutivo": "Se defienden COP 1.160.000 de 1.530.000 glosados (76%). La glosa L-03 por UCI tiene soporte clínico robusto; L-02 se acepta por tarifa contractual."
-  }
-}
+"evidencia_requerida": [
+  "Historia clínica folios 4-12 (evolución pre-UCI)",
+  "Orden médica de ingreso a UCI",
+  "Resultados de gases arteriales del 2026-04-04"
+]
 ```
-
-**`hallazgos`** incluye solo ítems con `decision_item != aceptar`. Los ítems aceptados viven en `progress-respuesta.json`.
-
-**`resumen.tasa_recuperacion`** = `valor_defendible / valor_glosado`.
 
 ## Procedure
 
 1. **Cargar inputs.**
-   - Leer `context.json` del directorio de trabajo.
-   - Leer todos los documentos clínicos y de soporte disponibles (HC, autorización, RIPS, factura, imágenes, resultados de laboratorio). Usar contenido para evaluar cada ítem — no descartar ningún archivo por extensión o nombre.
-   - Verificar `fecha_vencimiento`. Si hoy > `fecha_vencimiento`, documentarlo en el `resumen_ejecutivo` final pero continuar la ejecución.
+   - Leer el `context` de la task (GlosaContext).
+   - Leer todos los documentos del directorio de trabajo (HC, autorización, RIPS, factura, etc.).
+   - Verificar `context.fecha_vencimiento`. Si hoy > vencimiento, documentar en `argumentacion` el número de días de mora pero continuar.
 
-2. **Para cada `linea` en `context.lineas`:**
-   a. Determinar `capa` según `causal_num` (ver tabla de instrumento por causal).
-   b. Identificar el instrumento aplicable (PERT-CLIN, DAMA-UK o FIN-CTR).
-   c. Seleccionar las reglas relevantes del instrumento para el servicio y la objeción específica. No aplicar todas las reglas del instrumento — solo las pertinentes al caso del ítem.
-   d. Para cada regla seleccionada, completar `resultado`, `evidencia`, `observaciones` y `confianza` con base en los documentos del directorio de trabajo.
-   e. Calcular `decision_item`:
-      - Si alguna regla tiene `resultado = pass` y `confianza ≥ 0.80` → `disputar`.
-      - Si `confianza < 0.80` en todas las reglas de soporte → `adjuntar_soporte`.
-      - Si hay evidencia positiva de que la glosa es válida → `aceptar`.
-      - Si el error es subsanable por corrección de la IPS → `corregir`.
-   f. Redactar `argumentacion` — texto de defensa trazable, en español, apto para incluir directamente en la carta respuesta a la EPS.
-   g. Calcular `valor_a_defender` y `valor_a_aceptar`. Verificar invariante: su suma debe igualar `valor_glosado` del ítem.
+2. **Determinar la capa y el instrumento** según `context.causal_num` (ver tabla arriba).
 
-3. **Calcular `cierre` del progress.**
-   - `valor_total_glosado` = Σ `linea.valor_glosado`.
-   - `valor_total_defendible` = Σ `item.valor_a_defender`.
-   - `valor_total_aceptado` = Σ `item.valor_a_aceptar`.
-   - `concepto_final`: `DEFENDER` si algún ítem tiene `decision_item = disputar`; `ACEPTAR` si todos aceptan.
-   - `decision`: `responder_glosa` si hay argumentos; `solicitar_soportes` si el déficit es por falta de documentos; `reradicar` si el caso debe reiniciarse.
-   - `causal_principal`: la causal más frecuente o de mayor impacto económico entre las líneas.
+3. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`.
 
-4. **Generar `progress-respuesta.json`** con el schema exacto. Los campos `instrumento` y `descripcion` son constantes — copiarlos literalmente del schema.
+4. **Determinar `evidence_status`.**
+   - Si todas las reglas de soporte tienen `confianza ≥ 0.80` y la evidencia es citable → `sufficient`.
+   - Si faltan documentos críticos para llegar a una conclusión firme → `pending`. Listar los documentos faltantes en `evidencia_requerida`. **Saltar al paso 7.**
 
-5. **Generar `devolucion_output.json`** consolidando desde el progress:
-   - Completar `glosa` con los campos del `context.json`.
-   - `diagnostico_principal`: extraer de la HC o los documentos clínicos. Si no se encuentra, usar `"Sin diagnóstico documentado"`.
-   - Construir `hallazgos` solo para ítems con `decision_item != aceptar`. Seleccionar la regla principal aplicada (`regla_aplicada`) como la de mayor peso en la decisión.
-   - Calcular `resumen` con los totales y ratios.
+5. **Determinar `decision`** (solo si `sufficient`):
+   - Si alguna regla tiene `resultado = pass` con `confianza ≥ 0.80` y el argumento es completo → `disputar`.
+   - Si la evidencia confirma la objeción → `aceptar`.
 
-6. **Emitir evidencia citable.**
-   Cada `evidencia` debe seguir el formato: `{archivo} [p.{página}] ["{cita literal}"]`. Ejemplos válidos:
-   - `HC p.6 "APACHE II: 14 — criterios de ventilación mecánica presentes"`
-   - `autorizacion.pdf "AUT-2026-04412, vigente 2026-04-01/2026-04-30, cubre 87451"`
-   - `RIPS-AC.xml campo numCups "87451 — coincide con la factura FC-982144"`
+6. **Calcular `valor_a_defender` y `valor_a_aceptar`** (solo si `sufficient`):
+   - `decision = 'aceptar'`: `valor_a_defender = 0`, `valor_a_aceptar = valor_glosado`.
+   - `decision = 'disputar'` total: `valor_a_defender = valor_glosado`, `valor_a_aceptar = 0`.
+   - `decision = 'disputar'` parcial: ambos > 0, suma = `valor_glosado`. Ej: 600k defendidos, 400k aceptados.
 
-   Evidencia inválida: `"se verificó en HC"`, `"pertinencia documentada"` sin cita.
+7. **Redactar `argumentacion`** — texto en español, apto para incluir directamente en la carta respuesta a la EPS. Citar evidencia con formato `{archivo} [p.{página}] ["{cita literal}"]`. Cuando `evidence_status = pending`, `argumentacion` puede ser `null` o un mensaje breve indicando los documentos pendientes.
+
+8. **Emitir `glosa-response.json`** con el schema exacto y subirlo como output con label `report`. La task transita automáticamente:
+   - `evidence_status = pending` → `status = review` (espera subsanación).
+   - `evidence_status = sufficient` → `status = done`.
+
+## Notes for partial disputes
+
+Cuando la IPS solo puede defender parte del valor glosado:
+- `decision` sigue siendo `disputar` (estamos discutiendo algo).
+- `valor_a_defender` y `valor_a_aceptar` ambos > 0 con suma = `valor_glosado`.
+- La `argumentacion` debe explicar **por qué se acepta la porción aceptada** y **por qué se defiende la otra**.
+
+Ej (UCI 3 días glosados, 2 días defendibles):
+> "Se acepta la glosa por 1 día (COP 333.000). Folio 30 de la HC documenta que el día 3 el paciente cumplía criterios de egreso (SOFA = 2, hemodinámicamente estable). Se disputan los 2 días previos (COP 666.000) por inestabilidad documentada en folios 22 y 26."
 
 ## Pitfalls
 
-- **`fecha_vencimiento` vencida:** advertir en `resumen_ejecutivo` con el número de días de mora, pero no bloquear la ejecución — la IPS puede radicar extemporáneamente con justificación.
-- **Ítem con causal mixta:** si el `motivo_glosa` sugiere causales de dos capas (ej: tarifa incorrecta Y falta de pertinencia), elegir la causal dominante por impacto económico y documentar la secundaria en `observaciones` de la regla relevante.
-- **`valor_glosado` parcial:** la EPS puede glosar solo parte del valor de una línea — usar siempre `linea.valor_glosado`, nunca `linea.valor_facturado`, como base de `valor_a_defender + valor_a_aceptar`.
-- **`tipo_documento = devolucion_tecnica`:** no aplica el plazo de 15 días hábiles de Res. 3047; el `fecha_vencimiento` del context es el plazo contractual y debe respetarse tal como viene.
-- **Causal 1 (no POS/PBS):** verificar en el context si el servicio está en el PBS antes de argumentar pertinencia — si no está cubierto, la glosa puede ser válida independientemente de la HC.
-- **`confianza` inflada en reglas financieras:** para F-CTR aplicar confianza ≥ 0.95 solo si se tiene el anexo tarifario del contrato vigente; sin él, máximo 0.80.
+- **Causal mixta:** si el `motivo_glosa` sugiere dos capas (ej: tarifa Y pertinencia), elegir la causal dominante por impacto económico y documentar la secundaria en `observaciones`.
+- **Causal 5 (no PBS):** verificar si el servicio está fuera del PBS antes de argumentar pertinencia. Si está excluido, la glosa puede ser válida independientemente de la HC.
+- **`confianza` inflada en F-CTR:** para reglas de tarifa, máximo `0.80` sin el anexo tarifario del contrato vigente. Con el anexo a la vista, `≥ 0.95` exige cita literal de la fila tarifaria.
+- **`fecha_vencimiento` vencida:** advertir en `argumentacion` con los días de mora pero no bloquear — la IPS puede radicar extemporáneamente con justificación.
 
 ## Verification
 
-- [ ] `progress-respuesta.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/progress-respuesta`.
-- [ ] `devolucion_output.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/output`.
-- [ ] `instrumento == "RESPUESTA-GLOSA"` y `descripcion` es la cadena literal del schema.
-- [ ] `Σ items_glosados[*].valor_glosado == cierre.valor_total_glosado`.
-- [ ] `cierre.valor_total_defendible + cierre.valor_total_aceptado == cierre.valor_total_glosado`.
-- [ ] Para cada ítem: `valor_a_defender + valor_a_aceptar == valor_glosado`.
-- [ ] Ningún ítem con `confianza < 0.80` en todas sus reglas de soporte tiene `decision_item = disputar`.
-- [ ] `hallazgos` en `devolucion_output.json` no contiene ítems con `decision_item = aceptar`.
-- [ ] Cada `evidencia` contiene archivo + sección/página + cita o justificación específica.
+- [ ] `glosa-response.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/glosa-response`.
+- [ ] `instrumento == "RESPUESTA-GLOSA"`.
+- [ ] `capa` coincide con la causal según la tabla.
+- [ ] Si `evidence_status == 'pending'`: `decision == null`, `argumentacion` puede ser null, `evidencia_requerida` no vacío.
+- [ ] Si `evidence_status == 'sufficient'`: `decision` ∈ `{disputar, aceptar}`, `valor_a_defender + valor_a_aceptar == valor_glosado`.
+- [ ] Si `decision == 'aceptar'`: `valor_a_defender == 0` y `valor_a_aceptar == valor_glosado`.
+- [ ] Si `decision == 'disputar'`: `valor_a_defender > 0`.
+- [ ] Cada `evidencia` contiene archivo + página/sección + cita o justificación específica.
+- [ ] No se exporta más de un output por corrida (label `report`).
 
 ## References
 
-- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — instrumento DAMA-UK (causales 3–4), incluyendo `checklist_base.json` y `checklist_base.md`.
-- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — instrumento PERT-CLIN (causales 1–2).
-- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — instrumento FIN-CTR (causales 5–7).
+- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — instrumento DAMA-UK (causales 1, 3, 4, 7).
+- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — instrumento PERT-CLIN (causales 5, 6).
+- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — instrumento FIN-CTR (causal 2).
+- [`../hospital-devolucion-batch-parse/SKILL.md`](../hospital-devolucion-batch-parse/SKILL.md) — separa un Excel multi-glosa en tasks individuales (upstream de este skill).
 - Resolución 3047/2008 Anexo 6 — causales de glosa (1–7) y plazos de respuesta.
 - Resolución 1536/2022 — estructura RIPS.
 - Resolución 1995/1999 — historia clínica mínima.
