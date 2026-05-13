@@ -150,14 +150,14 @@ On failure: `{ "label_aplicado": "hospital-devolucion/error", "motivo": "<string
    - Subject line keywords.
    - If nothing found → `pagador_nombre: null` (acceptable).
 
-7. **Generate `batch_id`.**
+7. **For each Excel/CSV attachment, create a Salmona batch task.**
+
+   Generate a fresh `batch_id` for each file so each task is independently traceable:
    ```bash
    DATE=$(TZ=America/Bogota date +%Y%m%d)
    SUFFIX=$(tr -dc 'A-Z0-9' </dev/urandom | head -c 5)
    BATCH_ID="BATCH-${DATE}-${SUFFIX}"
    ```
-
-8. **For each Excel/CSV attachment, create a Salmona batch task.**
 
    a. **Get the batch description template** from an existing `hospital_devolucion_batch` task:
       ```bash
@@ -169,23 +169,33 @@ On failure: `{ "label_aplicado": "hospital-devolucion/error", "motivo": "<string
 
    b. **Create the batch task** (agent role allows `status: queued` directly):
       ```bash
+      PAYLOAD=$(jq -n \
+        --arg title "Lote glosas — ${PAGADOR_NOMBRE:-Email ${MESSAGE_ID}}" \
+        --argjson description "$DESCRIPTION_JSON" \
+        --arg batch_id "$BATCH_ID" \
+        --arg filename "$FILENAME" \
+        --argjson pagador_nombre "$PAGADOR_JSON" \
+        --arg email_origen "$FROM_ADDRESS" \
+        --arg email_subject "$SUBJECT" \
+        --arg message_id "$MESSAGE_ID" \
+        '{
+          title: $title,
+          description: $description,
+          task_type: "hospital_devolucion_batch",
+          priority: "medium",
+          context: {
+            batch_id: $batch_id,
+            documentos: [$filename],
+            pagador_nombre: $pagador_nombre,
+            email_origen: $email_origen,
+            email_subject: $email_subject,
+            message_id: $message_id
+          }
+        }')
       TASK=$(curl -s -X POST \
         -H "Authorization: Bearer $SALMONA_API_KEY" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"title\": \"Lote glosas — ${PAGADOR_NOMBRE:-Email ${MESSAGE_ID}}\",
-          \"description\": $DESCRIPTION_JSON,
-          \"task_type\": \"hospital_devolucion_batch\",
-          \"priority\": \"medium\",
-          \"context\": {
-            \"batch_id\": \"$BATCH_ID\",
-            \"documentos\": [\"$FILENAME\"],
-            \"pagador_nombre\": ${PAGADOR_JSON},
-            \"email_origen\": \"$FROM_ADDRESS\",
-            \"email_subject\": \"$SUBJECT\",
-            \"message_id\": \"$MESSAGE_ID\"
-          }
-        }" \
+        -d "$PAYLOAD" \
         "$SALMONA_API_URL/api/tasks")
       TASK_ID=$(echo "$TASK" | jq -r '.data.id')
       ```
@@ -209,7 +219,7 @@ On failure: `{ "label_aplicado": "hospital-devolucion/error", "motivo": "<string
         "$SALMONA_API_URL/api/tasks/$TASK_ID/status"
       ```
 
-9. **Label the email and ACK.**
+8. **Label the email and ACK.**
    ```bash
    gogcli messages modify "$MESSAGE_ID" \
      --add-label hospital-devolucion/intake \
@@ -219,12 +229,12 @@ On failure: `{ "label_aplicado": "hospital-devolucion/error", "motivo": "<string
      --body "ACK — Glosas recibidas y registradas. Lote: $BATCH_ID. task_id: $TASK_ID. Procesaremos y responderemos dentro del plazo."
    ```
 
-10. **Clean up temp files.**
+9. **Clean up temp files.**
     ```bash
     rm -rf "$WORK_DIR"
     ```
 
-11. **Return output payload.**
+10. **Return output payload.**
     ```json
     {
       "batch_task_id": "<task-id>",
