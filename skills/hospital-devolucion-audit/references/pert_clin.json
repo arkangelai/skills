@@ -1,0 +1,470 @@
+{
+  "instrumento": "PERT-CLIN",
+  "descripcion": "Auditoría de pertinencia clínica, lado IPS. Sustenta la respuesta a glosas por causales 5 (Cobertura / no-PBS) y 6 (Pertinencia) del Manual Único de Glosas (Res. 3047/2008 + 416/2009). Las reglas referencian aseguradoras.json[pagador_id] para parámetros operativos, $DEVOLUCION_GPCS_PATH para guías de práctica clínica MinSalud (recuperar archivo según CIE-10) y $DEVOLUCION_SOPORTES_PATH para checklists internos del Comité de Auditoría Médica de Clínica Arkangel.",
+  "perspectiva": "ips_defensora",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null,
+    "pagador_id": null,
+    "causal_num": null,
+    "gpc_aplicada": null,
+    "checklist_aplicado": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Diagnóstico y justificación clínica",
+      "reglas": [
+        {
+          "id": "M01",
+          "nombre": "Diagnóstico principal CIE-10 documentado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El diagnóstico principal CIE-10 está documentado en HC y coincide con el motivo facturado. El CIE-10 enruta la guía aplicable vía $DEVOLUCION_GPCS_PATH/INDEX.md.",
+          "evidencia_requerida": "HC con CIE-10 principal, epicrisis, RIPS-AC con diagnóstico.",
+          "dimensiones": ["Exactitud", "Trazabilidad"],
+          "causales_aplicables": ["5", "6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M02",
+          "nombre": "Diagnósticos secundarios relacionados",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Diagnósticos secundarios (CIE-10 relacionados, comorbilidades) están documentados y soportan la complejidad de la atención.",
+          "evidencia_requerida": "HC, hoja de evolución, RIPS-AC.",
+          "dimensiones": ["Completitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M03",
+          "nombre": "Motivo de consulta y anamnesis",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Motivo de consulta y anamnesis claros, soportan el plan terapéutico facturado. Para cefalea (R51) específicamente, debe documentarse al menos un signo de alarma SNOOP4 según GPC-MinSalud-Cefalea-2023 Recomendación 7.2 para justificar neuroimagen.",
+          "evidencia_requerida": "HC con anamnesis completa.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Adherencia a guías de práctica clínica",
+      "reglas": [
+        {
+          "id": "M04",
+          "nombre": "GPC MinSalud vigente aplicada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El manejo se ajusta a la GPC MinSalud vigente correspondiente al CIE-10. Cargar $DEVOLUCION_GPCS_PATH/INDEX.md para resolver el GPC aplicable y citar la recomendación específica (con nivel de evidencia A/B/C) que sustenta el manejo.",
+          "evidencia_requerida": "GPC referenciada por código (ej. GPC-MS-2022-014) y recomendación específica.",
+          "dimensiones": ["Validez"],
+          "causales_aplicables": ["5", "6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M05",
+          "nombre": "Protocolo institucional alineado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Existe checklist interno de Clínica Arkangel en $DEVOLUCION_SOPORTES_PATH que cubre el escenario clínico (ej. Checklist-Pertinencia-UCI-Adulto, Checklist-Soportes-Quirúrgicos). El protocolo institucional debe estar alineado con la GPC.",
+          "evidencia_requerida": "Checklist institucional vigente.",
+          "dimensiones": ["Consistencia"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M06",
+          "nombre": "Desviación de guía justificada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Si el manejo se desvía de la GPC, existe justificación clínica explícita en HC. La desviación no justificada es causal 6 (Pertinencia).",
+          "evidencia_requerida": "Nota médica con justificación de la desviación.",
+          "dimensiones": ["Validez", "Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Orden médica y prescripción",
+      "reglas": [
+        {
+          "id": "M07",
+          "nombre": "Orden médica firmada y trazable",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada servicio facturado tiene una orden médica firmada por el médico tratante con fecha previa o coincidente con la prestación.",
+          "evidencia_requerida": "Orden médica firmada, registro de profesional (RM).",
+          "dimensiones": ["Validez", "Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M08",
+          "nombre": "Profesional con competencia",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El profesional que ordenó el servicio tiene la especialidad y registro vigente requeridos (ej. RM intensivista para órdenes UCI, RM cardiólogo para estudios cardiológicos).",
+          "evidencia_requerida": "Registro de profesional (RM), tarjeta profesional, ReTHUS.",
+          "dimensiones": ["Validez"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M09",
+          "nombre": "Orden legible y específica",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las órdenes médicas son legibles, específicas y vinculan claramente al paciente con el servicio.",
+          "evidencia_requerida": "Órdenes médicas (papel o electrónicas).",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Pertinencia de procedimientos",
+      "reglas": [
+        {
+          "id": "M10",
+          "nombre": "Procedimiento indicado clínicamente",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El procedimiento está indicado para el cuadro clínico documentado, según GPC vigente. Para procedimientos de alta complejidad sin indicación documentada en HC, defender es difícil — preferir evidence_status=pending y solicitar HC ampliada.",
+          "evidencia_requerida": "HC con indicación específica, GPC con criterio de indicación.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "causales_aplicables": ["5", "6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M11",
+          "nombre": "Nota operatoria completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Procedimientos quirúrgicos: nota operatoria firmada con descripción técnica, hallazgos, duración y CUPS facturado. Cumple los ítems B del Checklist-Soportes-Quirúrgicos.",
+          "evidencia_requerida": "Nota operatoria firmada por cirujano.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M12",
+          "nombre": "Consentimiento informado específico del procedimiento",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Consentimiento informado del procedimiento firmado por el paciente (y testigo cuando aplique), fecha previa al acto, con descripción de riesgos. Exigibilidad explícita depende de aseguradoras.json[pagador_id].consentimiento_informado_qx_obligatorio.",
+          "evidencia_requerida": "Consentimiento informado firmado.",
+          "dimensiones": ["Validez"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M13",
+          "nombre": "Cantidad facturada acorde con lo realizado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La cantidad facturada del procedimiento (sesiones, unidades, días) coincide con lo realizado y documentado en HC.",
+          "evidencia_requerida": "HC, hoja de procedimientos, RIPS-AP.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Medicamentos e insumos",
+      "reglas": [
+        {
+          "id": "M14",
+          "nombre": "Medicamento pertinente al diagnóstico",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El medicamento facturado es pertinente para el diagnóstico documentado según GPC y formulario terapéutico vigente.",
+          "evidencia_requerida": "Orden médica, GPC vigente, HC con diagnóstico.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "causales_aplicables": ["5", "6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M15",
+          "nombre": "Dosis, vía y duración adecuadas",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Dosis, vía de administración y duración del tratamiento coinciden con la indicación clínica y la GPC.",
+          "evidencia_requerida": "Orden médica, hoja de administración, GPC.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M16",
+          "nombre": "Registro de administración completo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Hoja de administración de medicamentos con fecha, hora, dosis, vía y firma de enfermería para cada dosis facturada.",
+          "evidencia_requerida": "Hoja de administración de medicamentos.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M17",
+          "nombre": "Insumos proporcionales al procedimiento",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las cantidades de insumos facturados son proporcionales al procedimiento realizado. Anti-unbundling: kits laparoscópicos S55201/S55202 no son acumulables según notas del tarifario.",
+          "evidencia_requerida": "Lista de insumos utilizados (intraoperatorio), tarifario.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M18",
+          "nombre": "Medicamentos no-PBS con autorización vía permitida",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Tecnologías no incluidas en el PBS (Res. 2481/2020) requieren autorización por alguna de aseguradoras.json[pagador_id].pbs_no_cubierto_vias: MIPRES (todas las EPS), CTC interno (excepto Nueva EPS que sólo acepta MIPRES) o sentencia judicial. CTC puede tardar hasta aseguradoras.json[pagador_id].ctc_plazo_decision_dias días.",
+          "evidencia_requerida": "Soporte MIPRES o CTC; sentencia si aplica.",
+          "dimensiones": ["Validez", "Trazabilidad"],
+          "causales_aplicables": ["5"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "Ayudas diagnósticas",
+      "reglas": [
+        {
+          "id": "M19",
+          "nombre": "Ayuda diagnóstica con indicación clínica",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Estudios diagnósticos de alta complejidad (RM, TAC, medicina nuclear, electrofisiología) requieren indicación clínica documentada conforme a GPC. La sola sintomatología (R51 cefalea, R10 dolor abdominal, M54 lumbago) NO constituye indicación según GPC-MinSalud-Cefalea-2023 Recomendación 7.1. Para neuroimagen en cefalea, debe documentarse al menos un signo SNOOP4 (ver M03).",
+          "evidencia_requerida": "Orden médica con justificación clínica, GPC con criterio.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "causales_aplicables": ["5", "6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M20",
+          "nombre": "Resultado incorporado al manejo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El resultado de la ayuda diagnóstica se incorpora al manejo del paciente (nota de evolución que comenta el hallazgo y ajusta el plan).",
+          "evidencia_requerida": "Reporte radiológico/laboratorio, nota de evolución posterior.",
+          "dimensiones": ["Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M21",
+          "nombre": "Sin duplicidad injustificada",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Estudios repetidos en corto plazo (ej. dos RM cerebrales en una semana) están justificados clínicamente (sospecha de progresión, sangrado, etc.).",
+          "evidencia_requerida": "HC con justificación de la repetición.",
+          "dimensiones": ["Unicidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Estancia hospitalaria e interconsultas",
+      "reglas": [
+        {
+          "id": "M22",
+          "nombre": "Criterio de ingreso documentado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Para UCI/UCIN, criterio de ingreso documentado en HC al menos uno de: SOFA ≥ 6, soporte vasoactivo activo, ventilación mecánica, post-operatorio de alto riesgo (ASA III-IV cirugía mayor), GCS ≤ 8, conforme a GPC-MinSalud-Cuidado-Critico-2022 Recomendación 5.3 y a los ítems A del Checklist-Pertinencia-UCI-Adulto. Para hospitalización general, indicación expresa de inpatient (NEWS2 ≥ 5 u otro criterio en Checklist-Pertinencia-Hospitalizacion).",
+          "evidencia_requerida": "Orden de ingreso firmada por especialista, registro de SOFA/APACHE/NEWS2.",
+          "dimensiones": ["Validez", "Completitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M23",
+          "nombre": "Estancia justificada día a día",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Cada día facturado tiene justificación documentada en notas de evolución (mínimo una por día). Para UCI, persistencia de criterio de ingreso O destete monitorizado de soporte (vasoactivo/VM) — la GPC-MinSalud-Cuidado-Critico-2022 Recomendación 5.4.1 contempla expresamente el destete como criterio válido de permanencia.",
+          "evidencia_requerida": "Notas de evolución diarias, SOFA día a día, hoja de infusión de vasoactivos.",
+          "dimensiones": ["Trazabilidad", "Completitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M24",
+          "nombre": "Egreso o traslado con criterio",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El egreso de UCI requiere SOFA ≤ 4 y estabilidad sin soporte vasoactivo/ventilatorio ≥ 12h consecutivas (Recomendación 5.4.2 GPC Cuidado Crítico). El egreso a casa requiere plan ambulatorio factible documentado.",
+          "evidencia_requerida": "Nota de egreso, criterio de estabilidad, plan ambulatorio.",
+          "dimensiones": ["Validez"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M25",
+          "nombre": "Interconsultas pertinentes y respondidas",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las interconsultas a especialistas son pertinentes al caso y están documentadas con solicitud + respuesta del consultor.",
+          "evidencia_requerida": "Orden de interconsulta, nota de evolución del consultor.",
+          "dimensiones": ["Trazabilidad", "Completitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Alta, continuidad y resultado",
+      "reglas": [
+        {
+          "id": "M26",
+          "nombre": "Epicrisis con plan de egreso",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Epicrisis al egreso contiene resumen del manejo, diagnósticos finales, complicaciones, evolución y plan ambulatorio.",
+          "evidencia_requerida": "Epicrisis firmada.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M27",
+          "nombre": "Fórmula de egreso consistente",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Fórmula médica de egreso consistente con la condición tratada y con el plan ambulatorio descrito en epicrisis.",
+          "evidencia_requerida": "Fórmula de egreso, epicrisis.",
+          "dimensiones": ["Consistencia"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M28",
+          "nombre": "Referencia o contrarreferencia trazable",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Cuando aplique remisión, existe trazabilidad de la referencia/contrarreferencia con la IPS receptora.",
+          "evidencia_requerida": "Hoja de referencia/contrarreferencia (Res. 3047/2008 anexos), respuesta de la IPS receptora.",
+          "dimensiones": ["Trazabilidad"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "M29",
+          "nombre": "Desenlace clínico documentado",
+          "severidad": "menor",
+          "peso": 1,
+          "descripcion": "Desenlace clínico final del paciente documentado (resolución, mejoría, fallecimiento, traslado). Útil para defender pertinencia retrospectivamente.",
+          "evidencia_requerida": "Epicrisis, registro de seguimiento.",
+          "dimensiones": ["Completitud"],
+          "causales_aplicables": ["6"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    }
+  ]
+}

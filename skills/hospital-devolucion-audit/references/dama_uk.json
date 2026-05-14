@@ -1,0 +1,398 @@
+{
+  "instrumento": "DAMA-UK",
+  "descripcion": "Auditoría técnica de facturación en salud, lado IPS. Aplica las siete dimensiones DAMA-UK (Exactitud, Completitud, Consistencia, Validez, Unicidad, Oportunidad, Trazabilidad) para sustentar la respuesta a glosas administrativas. Cubre causales 1 (Facturación), 3 (Soportes), 4 (Autorización) y 7 (Anulaciones) del Manual Único de Glosas (Res. 3047/2008 + 416/2009). Cada regla referencia aseguradoras.json[pagador_id] para parámetros operativos por EPS.",
+  "perspectiva": "ips_defensora",
+  "meta": {
+    "caso_id": null,
+    "fecha_auditoria": null,
+    "agente": null,
+    "pagador_id": null,
+    "causal_num": null
+  },
+  "categorias": [
+    {
+      "id": 1,
+      "nombre": "Identificación y unicidad de la factura",
+      "reglas": [
+        {
+          "id": "A01",
+          "nombre": "CUV válido y validación DIAN",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La factura electrónica tiene CUV legible y validación DIAN aceptada. Cuando aseguradoras.json[pagador_id].factura_qr_obligatorio = true (ej. Sanitas, Decreto 358/2020), el QR debe estar presente y legible.",
+          "evidencia_requerida": "Factura electrónica con CUV; XML DIAN; QR cuando aplique.",
+          "dimensiones": ["Validez", "Unicidad"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A02",
+          "nombre": "Número de factura único — no duplicación de ítems",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El número de factura no está duplicado y, dentro de la factura, ningún ítem (CUPS + fecha + paciente) aparece dos veces. Cuando aseguradoras.json[pagador_id].duplicidad_prohibida_explicita = true (Sanitas), la duplicidad es causal automática de glosa 1.3.",
+          "evidencia_requerida": "Detalle de cargos / RIPS-AF.xml; histórico de facturación del prestador.",
+          "dimensiones": ["Unicidad"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A03",
+          "nombre": "Fecha de expedición coherente",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La fecha de expedición de la factura es posterior al egreso y dentro del plazo de aseguradoras.json[pagador_id].plazo_radicacion_dias_calendario.",
+          "evidencia_requerida": "Encabezado de factura, soportes de atención.",
+          "dimensiones": ["Consistencia", "Oportunidad"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nombre": "Usuario y derechos",
+      "reglas": [
+        {
+          "id": "A04",
+          "nombre": "Identificación del usuario completa",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Tipo y número de documento del paciente correctos y coherentes entre factura, HC y autorización. El alias en GlosaContext (Paciente X-NNNN) debe corresponder a un documento real anonimizable según protocolo Ley 1581/2012.",
+          "evidencia_requerida": "Factura, HC, soporte de admisión.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "causales_aplicables": ["1", "3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A05",
+          "nombre": "Derechos vigentes al momento de la atención",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El usuario está activo en BDUA y con cobertura vigente con el pagador a la fecha de atención. Si la EPS objeta por no-vigencia y la BDUA muestra activo, defender.",
+          "evidencia_requerida": "Consulta BDUA, certificado de afiliación, autorización vigente.",
+          "dimensiones": ["Validez", "Exactitud"],
+          "causales_aplicables": ["1", "4"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A06",
+          "nombre": "Régimen y entidad coinciden con lo facturado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Régimen (contributivo, subsidiado, especial) y entidad responsable del afiliado coinciden con el pagador facturado. Para Nueva EPS, ambos regímenes son válidos según aseguradoras.json[pagador_id].modalidad_contratacion.",
+          "evidencia_requerida": "BDUA, contrato.",
+          "dimensiones": ["Consistencia"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "nombre": "Pagador y autorización",
+      "reglas": [
+        {
+          "id": "A07",
+          "nombre": "Pagador correcto",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La entidad facturada corresponde al responsable real del evento (EPS, SOAT, ARL, plan complementario). Verificar que pagador_nit coincida con aseguradoras.json[pagador_id].nit.",
+          "evidencia_requerida": "Contrato, remisión, BDUA, certificado de agotamiento SOAT si aplica.",
+          "dimensiones": ["Validez", "Consistencia"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A08",
+          "nombre": "Autorización vigente al momento de la atención",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "La autorización está vigente, coincide con el usuario, el servicio y la IPS. La vigencia es aseguradoras.json[pagador_id].vigencia_aut_dias desde la emisión (Sura=30d, Nueva EPS=45d, Compensar=30d, Sanitas=60d). El formato debe match aseguradoras.json[pagador_id].aut_format_regex. Urgencias vitales no requieren autorización previa según Art. 67 Ley 1438/2011.",
+          "evidencia_requerida": "Código de autorización, fecha de emisión, soporte físico/electrónico de la autorización.",
+          "dimensiones": ["Validez", "Exactitud", "Oportunidad"],
+          "causales_aplicables": ["4"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A09",
+          "nombre": "Alcance de la autorización vs servicios facturados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los servicios facturados están dentro del alcance autorizado (códigos CUPS, cantidades, fechas). Para Compensar, aseguradoras.json[pagador_id].consultas_postop_estrictas_por_aut = true: las consultas postoperatorias solo cubren las expresamente listadas en el AUT. Si la EPS interpreta restrictivamente cuando la AUT permite más, defender citando el folio de la autorización.",
+          "evidencia_requerida": "Autorización completa (todas las páginas), HC con indicaciones del médico tratante.",
+          "dimensiones": ["Consistencia"],
+          "causales_aplicables": ["4"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "nombre": "Servicios facturados — codificación y consistencia",
+      "reglas": [
+        {
+          "id": "A10",
+          "nombre": "Codificación CUPS correcta",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los códigos CUPS, medicamentos e insumos están codificados correctamente y se relacionan con la atención prestada. Si la EPS glosa por upcoding, defender con la descripción quirúrgica que justifica el CUPS facturado.",
+          "evidencia_requerida": "Factura, RIPS-AC.xml / RIPS-AP.xml, soportes clínicos.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A11",
+          "nombre": "Coherencia clínica del servicio facturado",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los servicios facturados corresponden al diagnóstico (CIE-10), evolución y orden médica documentados en HC.",
+          "evidencia_requerida": "HC, epicrisis, orden médica firmada.",
+          "dimensiones": ["Exactitud", "Consistencia"],
+          "causales_aplicables": ["1", "3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A12",
+          "nombre": "Cantidades y fechas coinciden",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Las cantidades y fechas facturadas coinciden con la prestación real registrada en HC. Diferencias entre días HOSP-DIA facturados y días de estancia en HC son causal de glosa 1.",
+          "evidencia_requerida": "HC, registros de enfermería, hojas de medicamentos.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A13",
+          "nombre": "Procedimientos quirúrgicos soportados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los procedimientos quirúrgicos facturados cuentan con descripción quirúrgica firmada por el cirujano responsable, con fecha, técnica, hallazgos y CUPS. Cuando aseguradoras.json[pagador_id].consentimiento_informado_qx_obligatorio = true (Sura, Nueva EPS, Sanitas), debe adjuntarse consentimiento informado específico del procedimiento; Compensar acepta consentimiento de ingreso general.",
+          "evidencia_requerida": "Descripción quirúrgica firmada, registro de anestesia, consentimiento informado.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A14",
+          "nombre": "Traslado en ambulancia soportado",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "El traslado en ambulancia está soportado y es coherente con lo facturado (fecha, origen, destino, tipo TAB/TAM/TAS).",
+          "evidencia_requerida": "Soporte de ambulancia, resolución de referencia/contrarreferencia.",
+          "dimensiones": ["Completitud", "Consistencia"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A15",
+          "nombre": "Ayudas diagnósticas soportadas",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Resultados de laboratorio, imágenes y ayudas diagnósticas están anexos y coinciden con lo facturado. La sola sintomatología no justifica imágenes de alta complejidad (ver PERT-CLIN para pertinencia clínica).",
+          "evidencia_requerida": "Resultados de ayudas diagnósticas, orden médica.",
+          "dimensiones": ["Completitud", "Exactitud"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "nombre": "Soportes clínicos y administrativos",
+      "reglas": [
+        {
+          "id": "A16",
+          "nombre": "Historia clínica completa y firmada",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "HC completa, legible, firmada y respalda todos los servicios facturados. Es el soporte raíz para defender causales 3 (Soportes) y 6 (Pertinencia).",
+          "evidencia_requerida": "HC completa, epicrisis al egreso, notas de evolución diarias.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A17",
+          "nombre": "Consentimiento informado del usuario",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Consentimiento informado firmado por el paciente (y testigo cuando aplique) con fecha previa al procedimiento. Su exigibilidad explícita por procedimiento depende de aseguradoras.json[pagador_id].consentimiento_informado_qx_obligatorio.",
+          "evidencia_requerida": "Consentimiento informado firmado.",
+          "dimensiones": ["Validez"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A18",
+          "nombre": "Anexo técnico y RIPS según Res. 866/2017",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Anexo Técnico 866 de 2017 cumplido con RIPS completos. Formato según aseguradoras.json[pagador_id].rips_formato (XML/JSON/both) y aseguradoras.json[pagador_id].rips_obligatorio.",
+          "evidencia_requerida": "RIPS-AC, RIPS-AP, RIPS-AF, RIPS-AM, RIPS-AT según aplique.",
+          "dimensiones": ["Trazabilidad", "Completitud"],
+          "causales_aplicables": ["1", "3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A19",
+          "nombre": "Registro de anestesia (si aplica)",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "Si hay procedimientos quirúrgicos con anestesia, existe hoja de anestesia con clasificación ASA, registro de signos vitales, medicamentos administrados y eventos.",
+          "evidencia_requerida": "Hoja de anestesia firmada.",
+          "dimensiones": ["Completitud"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A20",
+          "nombre": "Hoja de administración de medicamentos",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Hoja de medicamentos administrados con fecha, hora, dosis, vía y firma de enfermería. Soporta los medicamentos facturados.",
+          "evidencia_requerida": "Hoja de administración de medicamentos.",
+          "dimensiones": ["Completitud", "Trazabilidad"],
+          "causales_aplicables": ["3"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "nombre": "Cálculos y trazabilidad",
+      "reglas": [
+        {
+          "id": "A21",
+          "nombre": "Cálculos correctos en la factura",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Subtotales, IVA (cuando aplique), descuentos y total coherentes con el detalle de cargos. Diferencias aritméticas son causal 1.",
+          "evidencia_requerida": "Factura con detalle de cargos.",
+          "dimensiones": ["Exactitud"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        },
+        {
+          "id": "A22",
+          "nombre": "Trazabilidad del expediente",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "El expediente completo (factura + soportes + autorización + HC) es trazable y los radicados/folios están referenciados de manera consistente.",
+          "evidencia_requerida": "Índice de soportes (obligatorio para Nueva EPS según aseguradoras.json[nueva-eps].indice_soportes_obligatorio).",
+          "dimensiones": ["Trazabilidad"],
+          "causales_aplicables": ["1", "7"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "nombre": "Servicios anulados y reversiones",
+      "reglas": [
+        {
+          "id": "A23",
+          "nombre": "Trazabilidad de servicios cancelados",
+          "severidad": "critica",
+          "peso": 3,
+          "descripcion": "Los procedimientos cancelados antes de su ejecución (por contraindicación, no asistencia del paciente, fallo de equipos, etc.) NO deben aparecer en la factura. Si la EPS glosa por anulación, el registro del sistema (PACS, módulo de citas, etc.) debe coincidir con la inexistencia del servicio prestado. Si efectivamente se facturó por error, aceptar y emitir nota crédito.",
+          "evidencia_requerida": "Registro del sistema (PACS, módulo citas, etc.); RIPS-AP.xml; documentación de la causa de cancelación.",
+          "dimensiones": ["Unicidad", "Trazabilidad", "Exactitud"],
+          "causales_aplicables": ["7"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "nombre": "Oportunidad y plazos",
+      "reglas": [
+        {
+          "id": "A24",
+          "nombre": "Radicación dentro del plazo",
+          "severidad": "mayor",
+          "peso": 2,
+          "descripcion": "La factura fue radicada dentro de aseguradoras.json[pagador_id].plazo_radicacion_dias_calendario contados desde el egreso. Radicación extemporánea es causal 1 (Facturación) pero puede defenderse con justificación documentada.",
+          "evidencia_requerida": "Comprobante de radicación con fecha sellada por el portal.",
+          "dimensiones": ["Oportunidad"],
+          "causales_aplicables": ["1"],
+          "resultado": null,
+          "evidencia": null,
+          "observaciones": null,
+          "confianza": null
+        }
+      ]
+    }
+  ]
+}

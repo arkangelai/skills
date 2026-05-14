@@ -32,6 +32,38 @@ La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a
 
 ## Input Contract
 
+### Required environment variables
+
+- `LOCAL_DEVOLUCION_REF_PATH` — Ruta absoluta al directorio espejo del knowledge base de devolución en el host del agente. Default si no está definida: `/root/.hermes/ref-data/hospital-devolucion/`. El skill aborta con error claro si la ruta no existe o no contiene los `INDEX.md` esperados.
+
+### Reference data resolution
+
+Antes de aplicar reglas, el skill resuelve tres jerarquías de referencias:
+
+**1. Parámetros operativos por aseguradora** (bundle, no env var):
+- `references/aseguradoras.json` — mapa `pagador_id → { tarifa_base, vigencia_aut_dias, aut_format_regex, portal_radicacion, plazos, soportes_minimos, ... }`. Toda regla con variación per-EPS lee de aquí.
+
+**2. Instrumentos de reglas** (bundle, no env var):
+- `references/dama_uk.json` — 24 reglas A01–A24 para causales 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones).
+- `references/pert_clin.json` — 29 reglas M01–M29 para causales 5 (Cobertura), 6 (Pertinencia).
+- `references/fin_ctr.json` — 42 reglas F01–F42 para causal 2 (Tarifas).
+
+**3. Documentos contractuales y clínicos** (externos, via `$LOCAL_DEVOLUCION_REF_PATH`, enrutados por `INDEX.md` en cada subdirectorio):
+
+```
+$LOCAL_DEVOLUCION_REF_PATH/
+  contratos/INDEX.md          ← pagador_id → Contrato-{EPS}-2026.pdf
+  tarifarios/INDEX.md         ← pagador_id → Tarifario-{EPS}-2026.pdf
+  radicacion/INDEX.md         ← portal → Reglas-Empaquetado-{portal}.pdf
+  soportes_clinicos/INDEX.md  ← escenario (UCI/Qx/Hosp) → Checklist-*.pdf
+  guias_clinicas/INDEX.md     ← rango CIE-10 → GPC-MinSalud-*.pdf
+  plantillas/INDEX.md         ← (evidence_status, decision) → Carta-*.pdf
+```
+
+Cada `INDEX.md` documenta el algoritmo de selección y la tabla de routing. El skill DEBE cargar el `INDEX.md` correspondiente antes de cargar archivos individuales.
+
+### Task context shape
+
 El context de la task (entregado al agente) es un `GlosaContext` — schema `hospitals/devolucion/glosa-context` (ver `references/glosa-context-template.json`).
 
 Campos clave:
@@ -134,31 +166,38 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
 
 ## Procedure
 
-1. **Cargar inputs.**
+1. **Cargar inputs y referencias.**
    - Leer el `context` de la task (GlosaContext).
    - Leer todos los documentos del directorio de trabajo (HC, autorización, RIPS, factura, etc.).
+   - Cargar `references/aseguradoras.json`. Validar que `context.pagador_id` exista como clave. Si no, abortar con `error_unknown_pagador`.
    - Verificar `context.fecha_vencimiento`. Si hoy > vencimiento, documentar en `argumentacion` el número de días de mora pero continuar.
+   - Validar que `$LOCAL_DEVOLUCION_REF_PATH` (o el default `/root/.hermes/ref-data/hospital-devolucion/`) exista y contenga los 6 `INDEX.md`. Si no, abortar con `error_missing_ref_data` y listar las rutas faltantes.
 
-2. **Determinar la capa y el instrumento** según `context.causal_num` (ver tabla arriba).
+2. **Determinar la capa y el instrumento** según `context.causal_num` (ver tabla arriba). Cargar el instrumento JSON correspondiente (`references/dama_uk.json`, `references/pert_clin.json`, o `references/fin_ctr.json`). Filtrar reglas por `causales_aplicables` para considerar solo las relevantes a `context.causal_num`.
 
-3. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`.
+3. **Resolver documentos contractuales y clínicos** según la causal:
+   - **Causal 2 (Tarifas)** → cargar `tarifarios/INDEX.md`, resolver el tarifario por `pagador_id`, abrir el PDF y localizar la fila del CUPS (`context.codigo`). Citar literalmente en evidencia.
+   - **Causales 5/6 (Cobertura/Pertinencia)** → cargar `guias_clinicas/INDEX.md`, resolver la GPC por CIE-10 (extraer del HC o RIPS-AC). Cargar también `soportes_clinicos/INDEX.md` y el checklist del escenario (UCI/Qx/Hosp). Poblar `meta.gpc_aplicada` y `meta.checklist_aplicado`.
+   - **Causales 1/3/4/7 (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
 
-4. **Determinar `evidence_status`.**
+4. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json[pagador_id].field`, sustituir el valor correspondiente al pagador real.
+
+5. **Determinar `evidence_status`.**
    - Si todas las reglas de soporte tienen `confianza ≥ 0.80` y la evidencia es citable → `sufficient`.
-   - Si faltan documentos críticos para llegar a una conclusión firme → `pending`. Listar los documentos faltantes en `evidencia_requerida`. **Saltar al paso 7.**
+   - Si faltan documentos críticos para llegar a una conclusión firme → `pending`. Listar los documentos faltantes en `evidencia_requerida`. **Saltar al paso 8.**
 
-5. **Determinar `decision`** (solo si `sufficient`):
+6. **Determinar `decision`** (solo si `sufficient`):
    - Si alguna regla tiene `resultado = pass` con `confianza ≥ 0.80` y el argumento es completo → `disputar`.
    - Si la evidencia confirma la objeción → `aceptar`.
 
-6. **Calcular `valor_a_defender` y `valor_a_aceptar`** (solo si `sufficient`):
+7. **Calcular `valor_a_defender` y `valor_a_aceptar`** (solo si `sufficient`):
    - `decision = 'aceptar'`: `valor_a_defender = 0`, `valor_a_aceptar = valor_glosado`.
    - `decision = 'disputar'` total: `valor_a_defender = valor_glosado`, `valor_a_aceptar = 0`.
    - `decision = 'disputar'` parcial: ambos > 0, suma = `valor_glosado`. Ej: 600k defendidos, 400k aceptados.
 
-7. **Redactar `argumentacion`** — texto en español, apto para incluir directamente en la carta respuesta a la EPS. Citar evidencia con formato `{archivo} [p.{página}] ["{cita literal}"]`. Cuando `evidence_status = pending`, `argumentacion` puede ser `null` o un mensaje breve indicando los documentos pendientes.
+8. **Redactar `argumentacion`** — texto en español, apto para incluir directamente en la carta respuesta a la EPS. Citar evidencia con formato `{archivo} [p.{página}] ["{cita literal}"]`. Cuando `evidence_status = pending`, `argumentacion` puede ser `null` o un mensaje breve indicando los documentos pendientes. Para citas del tarifario o de cláusulas contractuales, usar el nombre del PDF cargado en el paso 3 (ej: `Tarifario-Sura-Quirurgicos-2026.pdf Sección C fila S55201`).
 
-8. **Emitir `glosa-response.json`** con el schema exacto y subirlo como output con label `report`. La task transita automáticamente:
+9. **Emitir `glosa-response.json`** con el schema exacto y subirlo como output con label `report`. La task transita automáticamente:
    - `evidence_status = pending` → `status = review` (espera subsanación).
    - `evidence_status = sufficient` → `status = done`.
 
@@ -193,10 +232,35 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 ## References
 
-- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — instrumento DAMA-UK (causales 1, 3, 4, 7).
-- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — instrumento PERT-CLIN (causales 5, 6).
-- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — instrumento FIN-CTR (causal 2).
+### Bundled in this skill (`references/`)
+
+- [`references/aseguradoras.json`](references/aseguradoras.json) — parámetros operativos per pagador (tarifa_base, vigencia_aut_dias, plazos, soportes_minimos, etc.). Looked up by `pagador_id`.
+- [`references/dama_uk.json`](references/dama_uk.json) — 24 reglas A01–A24 para causales 1, 3, 4, 7 (administrativo).
+- [`references/pert_clin.json`](references/pert_clin.json) — 29 reglas M01–M29 para causales 5, 6 (médico).
+- [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para causal 2 (financiero).
+- [`references/glosa-context-template.json`](references/glosa-context-template.json) — schema de input.
+- [`references/glosa-response-template.json`](references/glosa-response-template.json) — schema de output.
+
+### External (via `$LOCAL_DEVOLUCION_REF_PATH`)
+
+Documentos contractuales y clínicos en el filesystem del host, organizados por categoría con `INDEX.md` de routing. Para sincronización desde Supabase Storage, ver el issue [`arkangelai/tasks-ark-cli#32`](https://github.com/arkangelai/tasks-ark-cli/issues/32).
+
+### Skills relacionados
+
+- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — versión EPS-side de DAMA-UK (causales 1, 3, 4, 7).
+- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — versión EPS-side de PERT-CLIN (causales 5, 6).
+- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — versión EPS-side de FIN-CTR (causal 2).
 - [`../hospital-devolucion-batch-parse/SKILL.md`](../hospital-devolucion-batch-parse/SKILL.md) — separa un Excel multi-glosa en tasks individuales (upstream de este skill).
-- Resolución 3047/2008 Anexo 6 — causales de glosa (1–7) y plazos de respuesta.
+
+### Marco normativo
+
+- Resolución 3047/2008 + Resolución 416/2009 — Manual Único de Glosas, Devoluciones y Respuestas. Causales 1–7 y plazos.
+- Resolución 2481/2020 — Plan de Beneficios en Salud (PBS).
+- Resolución 5993/2018 — Manual Único Tarifario SOAT 2024.
+- Acuerdo 256/2001 CNSSS — Manual ISS 2001.
+- Resolución 5928/2017 — auditoría concurrente y posterior.
+- Resolución 866/2017 — Anexo Técnico de cuentas médicas (RIPS).
 - Resolución 1536/2022 — estructura RIPS.
 - Resolución 1995/1999 — historia clínica mínima.
+- Ley 1438/2011 — Art. 67 (urgencias sin autorización previa).
+- Ley 1581/2012 — protección de datos personales.

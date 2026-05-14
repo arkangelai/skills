@@ -1,0 +1,173 @@
+{
+  "$schema": "Per-pagador operational parameters. Looked up by pagador_id from GlosaContext. Rule descriptions in dama_uk.json / pert_clin.json / fin_ctr.json reference these keys (e.g. 'vigencia_aut_dias', 'pbs_no_cubierto_vias').",
+  "version": "2026.1",
+  "updated_at": "2026-01-01",
+  "fuente": "Convenios bilaterales Clínica Arkangel S.A.S. — vigencia 2026",
+  "pagadores": {
+    "sura": {
+      "nombre": "EPS Sura",
+      "razon_social": "EPS y Medicina Prepagada Suramericana S.A.",
+      "nit": "800.088.702-2",
+      "convenio_no": "SURA-2026-00892",
+
+      "tarifario_file": "tarifario_sura_2026.csv",
+      "tarifa_base": "SOAT 2024",
+      "tarifa_incremento_alta_complejidad": 0.30,
+      "margen_insumos_no_pactados": 0.08,
+      "modalidad_contratacion": ["evento"],
+      "cups_excluidos": [],
+
+      "aut_format_regex": "^AUT-\\d{4}-\\d{5}$",
+      "aut_format_ejemplo": "AUT-2026-03891",
+      "vigencia_aut_dias": 30,
+
+      "pbs_no_cubierto_vias": ["mipres", "ctc"],
+      "ctc_plazo_decision_dias": 7,
+
+      "facturacion_electronica_obligatoria": true,
+      "rips_formato": "XML",
+      "rips_obligatorio": true,
+      "consentimiento_informado_qx_obligatorio": true,
+
+      "portal_radicacion": "activa",
+      "naming_convention_respuesta": "{NIT}_{NUM_FACTURA}_{CASO_ID}_RESP.pdf",
+      "plazo_radicacion_dias_calendario": 30,
+      "plazo_respuesta_glosa_habiles": 15,
+      "plazo_decision_eps_habiles": 15,
+      "plazo_conciliacion_calendario": 30,
+      "plazo_objecion_prestador_calendario": 5,
+      "plazo_pago_dias_calendario": 30,
+
+      "soportes_minimos": ["factura_dian", "hc_completa", "ordenes_medicas", "autorizacion_vigente", "descripcion_quirurgica"],
+      "notas": "Convenio quirúrgico estándar. Tarifa SOAT 2024 + 30% para alta complejidad y UCI."
+    },
+    "nueva-eps": {
+      "nombre": "Nueva EPS",
+      "razon_social": "Nueva EPS S.A.",
+      "nit": "900.156.264-2",
+      "convenio_no": "NEPS-2026-01184",
+
+      "tarifario_file": "tarifario_nueva-eps_2026.csv",
+      "tarifa_base": "ISS 2001 + IPC",
+      "tarifa_fallback": "SOAT 2024",
+      "tarifa_incremento_alta_complejidad": 0.0,
+      "margen_insumos_no_pactados": 0.0,
+      "modalidad_contratacion": ["evento", "capitacion"],
+      "cups_excluidos": [],
+
+      "aut_format_regex": "^AUT-NEPS-\\d{4}-\\d{6}$",
+      "aut_format_ejemplo": "AUT-NEPS-2026-001184",
+      "vigencia_aut_dias": 45,
+
+      "pbs_no_cubierto_vias": ["mipres"],
+      "ctc_plazo_decision_dias": 7,
+
+      "facturacion_electronica_obligatoria": true,
+      "rips_formato": "XML",
+      "rips_obligatorio": true,
+      "consentimiento_informado_qx_obligatorio": true,
+
+      "portal_radicacion": "iq",
+      "naming_convention_respuesta": "{NIT}_{CONVENIO}_{CASO}_RESP_{VERSION}.pdf",
+      "metadata_pdf_obligatoria": ["author", "title", "subject", "keywords"],
+      "indice_soportes_obligatorio": true,
+      "plazo_radicacion_dias_calendario": 30,
+      "plazo_respuesta_glosa_habiles": 15,
+      "plazo_decision_eps_habiles": 15,
+      "plazo_conciliacion_calendario": 30,
+      "plazo_objecion_prestador_calendario": 5,
+      "plazo_pago_dias_calendario": 30,
+
+      "soportes_minimos": ["factura_dian", "hc_completa", "ordenes_medicas", "autorizacion_vigente"],
+      "notas": "Régimen subsidiado + contributivo. Tarifa principal ISS 2001 actualizada con IPC anual. Insumos al costo, sin margen. No-PBS sólo vía MIPRES (no acepta CTC)."
+    },
+    "compensar": {
+      "nombre": "Compensar EPS",
+      "razon_social": "Compensar Entidad Promotora de Salud S.A.",
+      "nit": "860.066.942-7",
+      "convenio_no": "COMP-2026-00547",
+
+      "tarifario_file": "tarifario_compensar_2026.csv",
+      "tarifa_base": "SOAT 2024",
+      "tarifa_incremento_alta_complejidad": 0.22,
+      "margen_insumos_no_pactados": 0.05,
+      "modalidad_contratacion": ["evento"],
+      "cups_excluidos": [],
+      "cotizaciones_insumos_minimas": 3,
+
+      "aut_format_regex": "^AUT-CMP-\\d{4}-\\d{5}$",
+      "aut_format_ejemplo": "AUT-CMP-2026-03891",
+      "vigencia_aut_dias": 30,
+      "consultas_postop_estrictas_por_aut": true,
+
+      "pbs_no_cubierto_vias": ["mipres", "ctc"],
+      "ctc_plazo_decision_dias": 7,
+
+      "facturacion_electronica_obligatoria": true,
+      "rips_formato": "XML",
+      "rips_obligatorio": true,
+      "consentimiento_informado_qx_obligatorio": false,
+
+      "portal_radicacion": "compensar_propio",
+      "plazo_radicacion_dias_calendario": 30,
+      "plazo_respuesta_glosa_habiles": 15,
+      "plazo_decision_eps_habiles": 15,
+      "plazo_conciliacion_calendario": 30,
+      "plazo_objecion_prestador_calendario": 5,
+      "plazo_pago_dias_calendario": 30,
+
+      "soportes_minimos": ["factura_dian", "hc_completa", "ordenes_medicas", "autorizacion_vigente"],
+      "notas": "Caja de compensación familiar autorizada como EPS. Tarifa SOAT 2024 + 22%, menor que Sura. Insumos requieren 3 cotizaciones de respaldo. Acepta consentimiento de ingreso para Qx (no exige consentimiento explícito por procedimiento)."
+    },
+    "sanitas": {
+      "nombre": "EPS Sanitas",
+      "razon_social": "Entidad Promotora de Salud Sanitas S.A.S.",
+      "nit": "800.251.440-6",
+      "convenio_no": "SAN-2026-02018",
+
+      "tarifario_file": "tarifario_sanitas_2026.csv",
+      "tarifa_base": "SOAT 2024",
+      "tarifa_incremento_alta_complejidad": 0.25,
+      "modalidad_contratacion": ["evento"],
+      "cups_excluidos": [],
+
+      "aut_format_regex": "^AUT-SAN-\\d{4}-\\d{6}$",
+      "aut_format_ejemplo": "AUT-SAN-2026-003891",
+      "vigencia_aut_dias": 60,
+
+      "pbs_no_cubierto_vias": ["mipres", "ctc"],
+      "ctc_plazo_decision_dias": 7,
+
+      "facturacion_electronica_obligatoria": true,
+      "factura_qr_obligatorio": true,
+      "decreto_factura_referenciado": "Decreto 358 de 2020",
+      "duplicidad_prohibida_explicita": true,
+      "rips_formato": "XML",
+      "rips_obligatorio": true,
+      "consentimiento_informado_qx_obligatorio": true,
+
+      "portal_radicacion": "tami",
+      "plazo_radicacion_dias_calendario": 30,
+      "plazo_respuesta_glosa_habiles": 15,
+      "plazo_decision_eps_habiles": 15,
+      "plazo_conciliacion_calendario": 30,
+      "plazo_objecion_prestador_calendario": 5,
+      "plazo_pago_dias_calendario": 30,
+
+      "soportes_minimos": ["factura_dian_qr", "hc_completa", "ordenes_medicas", "autorizacion_vigente"],
+      "notas": "Tarifa SOAT 2024 + 25%. Factura electrónica con QR (Dec. 358/2020) obligatoria. Vigencia de autorización extendida a 60 días."
+    }
+  },
+  "marco_normativo_comun": {
+    "manual_unico_glosas": "Res. 3047 de 2008 + Res. 416 de 2009",
+    "pbs": "Res. 2481 de 2020 (compila Res. 5269 de 2017)",
+    "manual_tarifario_soat_vigente": "Res. 5993 de 2018 (actualizada 2024)",
+    "manual_iss_2001": "Acuerdo 256 de 2001 CNSSS",
+    "anexo_tecnico_cuentas": "Res. 866 de 2017",
+    "auditoria": "Res. 5928 de 2017",
+    "sgsss_decreto_compilatorio": "Decreto 780 de 2016",
+    "urgencias_sin_autorizacion": "Art. 67 Ley 1438 de 2011",
+    "datos_personales": "Ley 1581 de 2012",
+    "historia_clinica": "Res. 1995 de 1999"
+  }
+}
