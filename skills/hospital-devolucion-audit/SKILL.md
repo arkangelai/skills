@@ -266,7 +266,7 @@ Para sincronización desde Supabase Storage, ver el issue [`arkangelai/tasks-ark
 
 - Resolución 3047/2008 + Resolución 416/2009 — Manual Único de Glosas, Devoluciones y Respuestas. Causales 1–7 y plazos.
 - Resolución 2481/2020 — Plan de Beneficios en Salud (PBS).
-- Resolución 5993/2018 — Manual Único Tarifario SOAT 2024.
+- Decreto 2423 de 1996 y sus modificaciones — Manual Único Tarifario SOAT (base supletoria de tarifa en convenios IPS-EPS).
 - Acuerdo 256/2001 CNSSS — Manual ISS 2001.
 - Resolución 5928/2017 — auditoría concurrente y posterior.
 - Resolución 866/2017 — Anexo Técnico de cuentas médicas (RIPS).
