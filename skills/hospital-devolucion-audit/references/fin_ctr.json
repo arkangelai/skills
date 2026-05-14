@@ -511,7 +511,7 @@
           "descripcion": "El paciente no aparece simultáneamente facturado en otra IPS en las mismas fechas — chequeo anti-fraude (la IPS debe poder demostrar prestación efectiva).",
           "evidencia_requerida": "HC, registro de admisión, RIPS-AT.",
           "dimensiones": ["Unicidad"],
-          "causales_aplicables": ["1", "2"],
+          "causales_aplicables": ["1"],
           "resultado": null,
           "evidencia": null,
           "observaciones": null,
