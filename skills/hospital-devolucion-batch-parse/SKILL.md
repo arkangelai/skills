@@ -29,17 +29,42 @@ La pregunta que responde: **¿cómo separar el archivo que envió la EPS en unid
 
 ## Input Contract
 
+### Required environment variables
+
+- `LOCAL_DEVOLUCION_REF_PATH` — Ruta absoluta al directorio de referencias de devolución en el host. Default si no está definida: `/root/.hermes/ref-data/hospital-devolucion/`. Debe contener `prestador.json` (datos de la IPS) y `aseguradoras.json` (catálogo de pagadores). Si la ruta no existe o estos archivos faltan, abortar con `error_missing_ref_data`.
+
+### Tenant configuration (external)
+
+El skill es IPS-agnóstico — no asume ningún prestador ni pagador específico. Los datos del tenant se cargan en tiempo de ejecución:
+
+- `$LOCAL_DEVOLUCION_REF_PATH/prestador.json` — datos de la IPS que opera el skill. Estructura:
+
+  ```json
+  {
+    "nombre": "<razón social IPS>",
+    "nit": "<NIT IPS>"
+  }
+  ```
+
+  Schema canónico bundled en `../hospital-devolucion-audit/references/prestador.schema.json`.
+
+- `$LOCAL_DEVOLUCION_REF_PATH/aseguradoras.json` — catálogo de pagadores con sus parámetros operativos (looked up by `pagador_id`). Estructura definida por `../hospital-devolucion-audit/references/aseguradoras.schema.json`.
+
+### Task input
+
 Task del tipo `hospital_devolucion_batch`. Su `context` contiene metadata del lote (no datos de la glosa):
 
 ```json
 {
-  "batch_id": "BATCH-20260513-XYZ12",
-  "documentos": ["sura_glosas_2026-05.xlsx"],
-  "pagador_nombre": "EPS SURA",
-  "email_origen": "glosas@sura.com.co",
+  "batch_id": "BATCH-YYYYMMDD-XXXXX",
+  "documentos": ["<nombre_archivo>.xlsx"],
+  "pagador_nombre": "<EPS según email/intake>",
+  "email_origen": "<remitente>",
   "message_id": "..."
 }
 ```
+
+`context.pagador_nombre` es una etiqueta humana del email/intake; el `pagador_id` definitivo se resuelve por fila al construir el GlosaContext (matching contra las claves de `aseguradoras.json.pagadores`).
 
 Los inputs de la task incluyen al menos un Excel o CSV con las glosas. **No usar librerías de parsing.** Leer el archivo con las capacidades nativas del modelo.
 
@@ -76,11 +101,11 @@ Al final, transitar el envelope a `archived`.
    | `valor_glosado` | Lo que la EPS objeta (entero COP, puede ser ≤ valor_facturado) |
    | `causal_num` | "1"–"7" según Res. 3047/2008. Inferir del texto si el archivo no lo declara explícitamente |
    | `motivo_glosa` | Texto literal con que la EPS justifica la objeción |
-   | `prestador_nombre` | "Clínica del Country" (o lo que indique el contrato) |
-   | `prestador_nit` | "860.008.600-4" (o el del contrato) |
-   | `pagador_id` | Slug del pagador derivado del nombre: "sura", "compensar", "sanitas", etc. |
-   | `pagador_nombre` | Nombre completo de la EPS |
-   | `pagador_nit` | NIT de la EPS |
+   | `prestador_nombre` | Leer de `$LOCAL_DEVOLUCION_REF_PATH/prestador.json` campo `nombre` |
+   | `prestador_nit` | Leer de `$LOCAL_DEVOLUCION_REF_PATH/prestador.json` campo `nit` |
+   | `pagador_id` | Slug lowercase derivado del nombre de la EPS. **Debe** existir como clave en `aseguradoras.json.pagadores`. Si el matching es ambiguo o no hay coincidencia, omitir la fila y documentar en un comentario del envelope. |
+   | `pagador_nombre` | `aseguradoras.json.pagadores[pagador_id].nombre` (autoritativo, sobre lo que diga el Excel) |
+   | `pagador_nit` | `aseguradoras.json.pagadores[pagador_id].nit` |
    | `paciente_alias` | "Paciente X-NNNN" donde NNNN = últimos 4 dígitos del documento del paciente |
    | `paciente_documento_alias` | "CC ***NNNN" (TI/CE/PA según tipo) |
    | `fecha_ingreso` / `fecha_egreso` / `fecha_glosa` / `fecha_vencimiento` | Fechas YYYY-MM-DD |
@@ -138,7 +163,18 @@ Al final, transitar el envelope a `archived`.
 
 ## References
 
+### Schemas bundled in `hospital-devolucion-audit/references/`
+
+- `prestador.schema.json` — forma esperada de `$LOCAL_DEVOLUCION_REF_PATH/prestador.json`.
+- `aseguradoras.schema.json` — forma esperada de `$LOCAL_DEVOLUCION_REF_PATH/aseguradoras.json`.
+- `glosa-context-template.json` — ejemplo del output construido por este skill.
+
+### Skills relacionados
+
 - [`../hospital-devolucion-gmail-intake/SKILL.md`](../hospital-devolucion-gmail-intake/SKILL.md) — upstream: crea el envelope task desde un email de la EPS.
 - [`../hospital-devolucion-audit/SKILL.md`](../hospital-devolucion-audit/SKILL.md) — downstream: procesa cada task hija.
+
+### Marco normativo
+
 - Resolución 3047/2008 Anexo 6 — causales de glosa (1–7).
 - Issue [`arkangelai/salmona-api#210`](https://github.com/arkangelai/salmona-api/issues/210) — modelo de datos único-glosa.

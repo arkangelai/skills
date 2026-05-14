@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.arkangel.ai/hospital-devolucion/aseguradoras.schema.json",
+  "title": "aseguradoras.json",
+  "description": "Per-pagador operational parameters consumed by the hospital-devolucion-audit skill. The instance lives on the host filesystem at $LOCAL_DEVOLUCION_REF_PATH/aseguradoras.json (not bundled with the skill). Rule descriptions in dama_uk.json / pert_clin.json / fin_ctr.json reference pagadores[pagador_id].<field>; pagador_id is taken from GlosaContext.pagador_id.",
+  "type": "object",
+  "required": ["version", "pagadores"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of the data set, e.g. '2026.1'."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date",
+      "description": "Last update date in ISO-8601."
+    },
+    "fuente": {
+      "type": "string",
+      "description": "Free-form provenance note (e.g. 'Convenios bilaterales 2026')."
+    },
+    "marco_normativo_comun": {
+      "type": "object",
+      "description": "Map of regulatory references shared across all pagadores. Free-form keys, string values.",
+      "additionalProperties": { "type": "string" }
+    },
+    "pagadores": {
+      "type": "object",
+      "description": "Map of pagador_id (lowercase slug from GlosaContext.pagador_id) to pagador parameters.",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/pagador" }
+    }
+  },
+  "$defs": {
+    "pagador": {
+      "type": "object",
+      "required": [
+        "nombre", "nit", "convenio_no",
+        "tarifa_base", "modalidad_contratacion",
+        "vigencia_aut_dias", "aut_format_regex",
+        "portal_radicacion",
+        "plazo_radicacion_dias_calendario",
+        "plazo_respuesta_glosa_habiles"
+      ],
+      "properties": {
+        "nombre": { "type": "string", "description": "Display name of the EPS." },
+        "razon_social": { "type": "string" },
+        "nit": { "type": "string", "description": "Colombian NIT format, e.g. '800.088.702-2'." },
+        "convenio_no": { "type": "string", "description": "Contract identifier with this pagador." },
+
+        "tarifario_file": { "type": "string", "description": "Filename in $LOCAL_DEVOLUCION_REF_PATH/tarifarios/<pagador_id>/ ." },
+        "tarifa_base": { "type": "string", "enum": ["SOAT 2024", "ISS 2001 + IPC", "ISS 2001", "Propio"] },
+        "tarifa_fallback": { "type": "string", "description": "Optional fallback base for CUPS not listed in tarifa_base." },
+        "tarifa_incremento_alta_complejidad": { "type": "number", "minimum": 0, "maximum": 1, "description": "Decimal increment (e.g. 0.30 = 30%)." },
+        "margen_insumos_no_pactados": { "type": "number", "minimum": 0, "maximum": 1, "description": "Decimal margin over acquisition cost (e.g. 0.08 = 8%)." },
+        "modalidad_contratacion": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["evento", "capitacion", "paquete_integral"] },
+          "minItems": 1
+        },
+        "cups_excluidos": { "type": "array", "items": { "type": "string" } },
+        "cotizaciones_insumos_minimas": { "type": "integer", "minimum": 1 },
+
+        "aut_format_regex": { "type": "string", "description": "JS-flavored regex matching valid authorization codes." },
+        "aut_format_ejemplo": { "type": "string" },
+        "vigencia_aut_dias": { "type": "integer", "minimum": 1, "description": "Calendar days of authorization validity from emission." },
+        "consultas_postop_estrictas_por_aut": { "type": "boolean", "description": "True = only consultations expressly listed in the AUT are covered." },
+
+        "pbs_no_cubierto_vias": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["mipres", "ctc", "tutela"] },
+          "description": "Methods this pagador accepts to authorize non-PBS technologies."
+        },
+        "ctc_plazo_decision_dias": { "type": "integer", "minimum": 0 },
+
+        "facturacion_electronica_obligatoria": { "type": "boolean" },
+        "factura_qr_obligatorio": { "type": "boolean" },
+        "decreto_factura_referenciado": { "type": "string" },
+        "duplicidad_prohibida_explicita": { "type": "boolean" },
+        "rips_formato": { "type": "string", "enum": ["XML", "JSON", "both"] },
+        "rips_obligatorio": { "type": "boolean" },
+        "consentimiento_informado_qx_obligatorio": { "type": "boolean", "description": "True = explicit signed consent per Qx procedure required; false = admission consent suffices." },
+
+        "portal_radicacion": { "type": "string", "description": "Slug of the radicación portal (e.g. 'activa', 'iq', 'tami')." },
+        "naming_convention_respuesta": { "type": "string", "description": "Template for response PDF filename." },
+        "metadata_pdf_obligatoria": { "type": "array", "items": { "type": "string" } },
+        "indice_soportes_obligatorio": { "type": "boolean" },
+
+        "plazo_radicacion_dias_calendario": { "type": "integer", "minimum": 1 },
+        "plazo_respuesta_glosa_habiles": { "type": "integer", "minimum": 1 },
+        "plazo_decision_eps_habiles": { "type": "integer", "minimum": 1 },
+        "plazo_conciliacion_calendario": { "type": "integer", "minimum": 1 },
+        "plazo_objecion_prestador_calendario": { "type": "integer", "minimum": 0 },
+        "plazo_pago_dias_calendario": { "type": "integer", "minimum": 1 },
+
+        "soportes_minimos": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of soporte-type slugs required for a complete radicación (e.g. 'factura_dian', 'hc_completa', 'autorizacion_vigente')."
+        },
+        "notas": { "type": "string", "description": "Free-form human comment." }
+      },
+      "additionalProperties": true
+    }
+  }
+}
