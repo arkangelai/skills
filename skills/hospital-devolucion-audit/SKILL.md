@@ -44,10 +44,12 @@ Antes de aplicar reglas, el skill resuelve dos jerarquías de referencias:
 
 - `references/dama_uk.json` — 24 reglas A01–A24 para causales 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones).
 - `references/pert_clin.json` — 29 reglas M01–M29 para causales 5 (Cobertura), 6 (Pertinencia).
-- `references/fin_ctr.json` — 42 reglas F01–F42 para causal 2 (Tarifas).
+- `references/fin_ctr.json` — 42 reglas F01–F42 para causal 2 (Tarifas), con reglas antifraude (Categoría 10) que también marcan causales 1 y 7.
 - `references/aseguradoras.schema.json` — JSON Schema que documenta la forma esperada del archivo per-tenant `aseguradoras.json`.
 
 Las reglas son **EPS-agnósticas**: nunca mencionan nombres de pagadores específicos. Cuando una regla varía por pagador, su `descripcion` referencia `aseguradoras.json.pagadores[pagador_id].<field>`. El valor real se resuelve a runtime cargando el archivo externo (siguiente sección).
+
+**Selección de reglas por causal — `causales_aplicables`.** Cada regla de cada instrumento lleva un campo `causales_aplicables` (array de strings `"1"`–`"7"`). Este campo es la **fuente de verdad** para decidir qué reglas son pertinentes a una glosa. El skill **NO** aplica el instrumento completo: aplica únicamente las reglas cuyo `causales_aplicables` contiene `context.causal_num`. Una glosa de causal 2 (Tarifas) nunca debe arrastrar reglas de pertinencia clínica ni controles antifraude que no marquen `"2"`; una glosa de causal 6 nunca debe arrastrar reglas de tarifa. El filtro se aplica en el paso 2 del procedimiento y acota el universo de reglas antes de cualquier evaluación.
 
 **2. Datos per-tenant (externos, via `$LOCAL_DEVOLUCION_REF_PATH`):**
 
@@ -178,16 +180,28 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
    - Cargar `$LOCAL_DEVOLUCION_REF_PATH/aseguradoras.json`. Opcionalmente validar contra `references/aseguradoras.schema.json` (bundled). Si `context.pagador_id` no existe como clave en `pagadores`, abortar con `error_unknown_pagador`.
    - Verificar `context.fecha_vencimiento`. Si hoy > vencimiento, documentar en `argumentacion` el número de días de mora pero continuar.
 
-2. **Determinar la capa y el instrumento principal** según `context.causal_num` (ver tabla arriba). Cargar el instrumento JSON correspondiente (`references/dama_uk.json`, `references/pert_clin.json`, o `references/fin_ctr.json`). Filtrar reglas por `causales_aplicables` para considerar solo las relevantes a `context.causal_num`.
+2. **Determinar la capa y seleccionar el subconjunto de reglas scoped a la causal.**
 
-   **Carga suplementaria FIN-CTR antifraude (Cat 10).** Para `causal_num` ∈ {`1`, `7`}, además del instrumento principal (DAMA-UK), cargar también las reglas de `fin_ctr.json` Categoría 10 (controles antifraude y duplicidad — F29–F42) y filtrar por `causales_aplicables`. Estas reglas cruzan capa financiera y administrativa (ej. F34 servicios post-mortem, F35 doble cobro SOAT/EPS/ARL, F36 phantom billing) y son el anchor antifraude de causal 7 incluso cuando la causal principal es administrativa. La `capa` del veredicto sigue siendo la del instrumento principal (`administrativo`); las reglas FIN-CTR cargadas como suplemento aportan evidencia adicional en `reglas_aplicadas[]` sin cambiar la capa.
+   a. **Capa e instrumento principal** según `context.causal_num` (ver tabla arriba). El instrumento principal define la `capa` del veredicto:
+      - causal `2` → `financiero`, instrumento principal `references/fin_ctr.json`.
+      - causal `5` o `6` → `medico`, instrumento principal `references/pert_clin.json`.
+      - causal `1`, `3`, `4` o `7` → `administrativo`, instrumento principal `references/dama_uk.json`.
+
+   b. **Construir el conjunto de reglas candidatas (`reglas_scoped`).** Recorrer **los tres** instrumentos JSON y seleccionar **únicamente** las reglas cuyo `causales_aplicables` contiene `context.causal_num`. Esta es la regla de oro: una regla entra al análisis si y solo si su `causales_aplicables` incluye la causal de la glosa. NO se carga el instrumento completo. Concretamente:
+      - La mayoría de las reglas scoped vendrán del instrumento principal de la capa (paso a).
+      - Algunas reglas de `fin_ctr.json` Categoría 10 (controles antifraude — F29–F42) marcan también causales `1`, `2` o `7` en su `causales_aplicables`. Para esas causales, las reglas antifraude que marquen la causal entran en `reglas_scoped` **por el mismo filtro** — no como una "carga suplementaria" aparte. Ej.: una glosa causal `7` recoge F34 y F36 (ambas marcan `"7"`); una glosa causal `1` recoge F29–F36/F39/F40 según su tag; una glosa causal `2` recoge solo las F* que marcan `"2"`, **nunca** F36 ni F33 (que no marcan `"2"`).
+      - Reglas que no marcan `context.causal_num` quedan **fuera** del análisis y no aparecen en `reglas_aplicadas[]`, aunque pertenezcan al instrumento principal.
+
+   c. **La `capa` del veredicto es siempre la del paso a**, aunque `reglas_scoped` incluya reglas de FIN-CTR cargadas por el filtro en una glosa administrativa. Las reglas antifraude aportan evidencia en `reglas_aplicadas[]` sin cambiar la capa.
+
+   El resultado de este paso es `reglas_scoped`: el universo cerrado de reglas que el análisis puede usar. Los pasos siguientes no pueden invocar reglas fuera de este conjunto.
 
 3. **Resolver documentos contractuales y clínicos** según la causal:
    - **Causal 2 (Tarifas)** → cargar `tarifarios/INDEX.md`, resolver el tarifario por `pagador_id`, abrir el PDF y localizar la fila del CUPS (`context.codigo`). Citar literalmente en evidencia.
    - **Causales 5/6 (Cobertura/Pertinencia)** → cargar `guias_clinicas/INDEX.md`, resolver la GPC por CIE-10 (extraer del HC o RIPS-AC). Cargar también `soportes_clinicos/INDEX.md` y el checklist del escenario (UCI/Qx/Hosp). Poblar `meta.gpc_aplicada` y `meta.checklist_aplicado`.
    - **Causales 1/3/4/7 (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json.pagadores[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
 
-4. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json.pagadores[pagador_id].field`, sustituir el valor correspondiente al pagador real.
+4. **Aplicar las reglas relevantes dentro de `reglas_scoped`.** El universo de reglas ya está acotado a la causal por el paso 2b — aquí solo se decide cuáles de esas reglas scoped son pertinentes al servicio y al `motivo_glosa` concretos. NO ampliar el conjunto: si una regla no está en `reglas_scoped` no se aplica, aunque el motivo de glosa la sugiera (ese caso es una causal mixta — ver Pitfalls). Para cada regla aplicada completar `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json.pagadores[pagador_id].field`, sustituir el valor correspondiente al pagador real.
 
 5. **Determinar `evidence_status`.**
    - Si todas las reglas de soporte tienen `confianza ≥ 0.80` y la evidencia es citable → `sufficient`.
@@ -220,7 +234,7 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 ## Pitfalls
 
-- **Causal mixta:** si el `motivo_glosa` sugiere dos capas (ej: tarifa Y pertinencia), elegir la causal dominante por impacto económico y documentar la secundaria en `observaciones`.
+- **Causal mixta:** si el `motivo_glosa` sugiere dos capas (ej: tarifa Y pertinencia), elegir la causal dominante por impacto económico — esa es la `context.causal_num` que determina `reglas_scoped` y la `capa`. La causal secundaria se documenta narrativamente en `observaciones`; **no** se amplía `reglas_scoped` para incluir reglas de la otra causal. Si la causal secundaria es material, lo correcto es que la EPS haya emitido (o la IPS solicite) una glosa separada para ese ítem.
 - **Causal 5 (no PBS):** verificar si el servicio está fuera del PBS antes de argumentar pertinencia. Si está excluido, la glosa puede ser válida independientemente de la HC.
 - **`confianza` inflada en F-CTR:** para reglas de tarifa, máximo `0.80` sin el anexo tarifario del contrato vigente. Con el anexo a la vista, `≥ 0.95` exige cita literal de la fila tarifaria.
 - **`fecha_vencimiento` vencida:** advertir en `argumentacion` con los días de mora pero no bloquear — la IPS puede radicar extemporáneamente con justificación.
@@ -230,6 +244,7 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 - [ ] `glosa-response.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/glosa-response`.
 - [ ] `instrumento == "RESPUESTA-GLOSA"`.
 - [ ] `capa` coincide con la causal según la tabla.
+- [ ] Toda regla en `reglas_aplicadas[]` tiene `context.causal_num` dentro de su `causales_aplicables` en el instrumento de origen — no se coló ninguna regla fuera del scope de la causal.
 - [ ] Si `evidence_status == 'pending'`: `decision == null`, `argumentacion` puede ser null, `evidencia_requerida` no vacío.
 - [ ] Si `evidence_status == 'sufficient'`: `decision` ∈ `{disputar, aceptar}`, `valor_a_defender + valor_a_aceptar == valor_glosado`.
 - [ ] Si `decision == 'aceptar'`: `valor_a_defender == 0` y `valor_a_aceptar == valor_glosado`.
@@ -243,7 +258,7 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 - [`references/dama_uk.json`](references/dama_uk.json) — 24 reglas A01–A24 para causales 1, 3, 4, 7 (administrativo).
 - [`references/pert_clin.json`](references/pert_clin.json) — 29 reglas M01–M29 para causales 5, 6 (médico).
-- [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para causal 2 (financiero).
+- [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para causal 2 (financiero); las reglas antifraude de la Categoría 10 (F29–F42) marcan además causales 1 y 7 en su `causales_aplicables`.
 - [`references/aseguradoras.schema.json`](references/aseguradoras.schema.json) — JSON Schema del archivo per-tenant `aseguradoras.json` (vive externamente).
 - [`references/glosa-context-template.json`](references/glosa-context-template.json) — schema de input.
 - [`references/glosa-response-template.json`](references/glosa-response-template.json) — schema de output.
