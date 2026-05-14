@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.arkangel.ai/hospital-devolucion/prestador.schema.json",
+  "title": "prestador.json",
+  "description": "Tenant identity for the IPS running the hospital-devolucion-* skills. The instance lives on the host filesystem at $LOCAL_DEVOLUCION_REF_PATH/prestador.json (not bundled with the skill). Used by hospital-devolucion-batch-parse to populate prestador_nombre and prestador_nit on every GlosaContext it builds, and by hospital-devolucion-audit when generating the response letter.",
+  "type": "object",
+  "required": ["nombre", "nit"],
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Razón social completa de la IPS (e.g. 'Clínica Ejemplo S.A.S.')."
+    },
+    "nit": {
+      "type": "string",
+      "pattern": "^[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]$",
+      "description": "NIT en formato colombiano con puntos y dígito de verificación (e.g. '901.123.456-7')."
+    },
+    "razon_social": {
+      "type": "string",
+      "description": "Razón social legal completa cuando difiere del nombre comercial. Si no se especifica, se asume igual a `nombre`."
+    },
+    "habilitacion_reps": {
+      "type": "string",
+      "description": "Código de habilitación REPS (Registro Especial de Prestadores de Servicios de Salud)."
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Dirección sede principal."
+    },
+    "ciudad": {
+      "type": "string"
+    },
+    "nivel_complejidad": {
+      "type": "string",
+      "enum": ["I", "II", "III", "IV"],
+      "description": "Nivel de complejidad habilitado para servicios de salud."
+    },
+    "auditor_responsable": {
+      "type": "object",
+      "description": "Default para firma del auditor médico en las cartas de respuesta. Plantillas pueden sobreescribir por task.",
+      "properties": {
+        "nombre": { "type": "string" },
+        "reg_profesional": { "type": "string" },
+        "cargo": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": true
+}
