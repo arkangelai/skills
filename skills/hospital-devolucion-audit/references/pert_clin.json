@@ -1,6 +1,6 @@
 {
   "instrumento": "PERT-CLIN",
-  "descripcion": "Auditoría de pertinencia clínica, lado IPS. Sustenta la respuesta a glosas por causales 5 (Cobertura / no-PBS) y 6 (Pertinencia) del Manual Único de Glosas (Res. 3047/2008 + 416/2009). Las reglas referencian aseguradoras.json.pagadores[pagador_id] para parámetros operativos, $DEVOLUCION_GPCS_PATH para guías de práctica clínica MinSalud (recuperar archivo según CIE-10) y $DEVOLUCION_SOPORTES_PATH para checklists internos del Comité de Auditoría Médica de Clínica Arkangel.",
+  "descripcion": "Auditoría de pertinencia clínica, lado IPS. Sustenta la respuesta a glosas por causales 5 (Cobertura / no-PBS) y 6 (Pertinencia) del Manual Único de Glosas (Res. 3047/2008 + 416/2009). Las reglas referencian aseguradoras.json.pagadores[pagador_id] para parámetros operativos, $LOCAL_DEVOLUCION_REF_PATH/guias_clinicas/ para guías de práctica clínica MinSalud (recuperar archivo según CIE-10) y $LOCAL_DEVOLUCION_REF_PATH/soportes_clinicos/ para checklists internos del Comité de Auditoría Médica de la IPS.",
   "perspectiva": "ips_defensora",
   "meta": {
     "caso_id": null,
@@ -83,7 +83,7 @@
           "nombre": "Protocolo institucional alineado",
           "severidad": "mayor",
           "peso": 2,
-          "descripcion": "Existe checklist interno de Clínica Arkangel en $DEVOLUCION_SOPORTES_PATH que cubre el escenario clínico (ej. Checklist-Pertinencia-UCI-Adulto, Checklist-Soportes-Quirúrgicos). El protocolo institucional debe estar alineado con la GPC.",
+          "descripcion": "Existe checklist interno de la IPS en $LOCAL_DEVOLUCION_REF_PATH/soportes_clinicos/ que cubre el escenario clínico (ej. Checklist-Pertinencia-UCI-Adulto, Checklist-Soportes-Quirúrgicos). El protocolo institucional debe estar alineado con la GPC.",
           "evidencia_requerida": "Checklist institucional vigente.",
           "dimensiones": ["Consistencia"],
           "causales_aplicables": ["6"],
@@ -283,7 +283,7 @@
           "nombre": "Medicamentos no-PBS con autorización vía permitida",
           "severidad": "critica",
           "peso": 3,
-          "descripcion": "Tecnologías no incluidas en el PBS (Res. 2481/2020) requieren autorización por alguna de aseguradoras.json.pagadores[pagador_id].pbs_no_cubierto_vias: MIPRES (todas las EPS), CTC interno (excepto Nueva EPS que sólo acepta MIPRES) o sentencia judicial. CTC puede tardar hasta aseguradoras.json.pagadores[pagador_id].ctc_plazo_decision_dias días.",
+          "descripcion": "Tecnologías no incluidas en el PBS (Res. 2481/2020) requieren autorización por alguna de las vías listadas en aseguradoras.json.pagadores[pagador_id].pbs_no_cubierto_vias (típicamente: MIPRES, CTC interno, o sentencia judicial). CTC puede tardar hasta aseguradoras.json.pagadores[pagador_id].ctc_plazo_decision_dias días.",
           "evidencia_requerida": "Soporte MIPRES o CTC; sentencia si aplica.",
           "dimensiones": ["Validez", "Trazabilidad"],
           "causales_aplicables": ["5"],

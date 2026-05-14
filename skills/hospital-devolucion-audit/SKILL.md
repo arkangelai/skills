@@ -38,27 +38,32 @@ La pregunta que responde: **¿cuál es la posición defensiva de la IPS frente a
 
 ### Reference data resolution
 
-Antes de aplicar reglas, el skill resuelve tres jerarquías de referencias:
+Antes de aplicar reglas, el skill resuelve dos jerarquías de referencias:
 
-**1. Parámetros operativos por aseguradora** (bundle, no env var):
-- `references/aseguradoras.json` — mapa `pagador_id → { tarifa_base, vigencia_aut_dias, aut_format_regex, portal_radicacion, plazos, soportes_minimos, ... }`. Toda regla con variación per-EPS lee de aquí.
+**1. Instrumentos de reglas (bundled en este skill, no env var):**
 
-**2. Instrumentos de reglas** (bundle, no env var):
 - `references/dama_uk.json` — 24 reglas A01–A24 para causales 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones).
 - `references/pert_clin.json` — 29 reglas M01–M29 para causales 5 (Cobertura), 6 (Pertinencia).
 - `references/fin_ctr.json` — 42 reglas F01–F42 para causal 2 (Tarifas).
+- `references/aseguradoras.schema.json` — JSON Schema que documenta la forma esperada del archivo per-tenant `aseguradoras.json`.
 
-**3. Documentos contractuales y clínicos** (externos, via `$LOCAL_DEVOLUCION_REF_PATH`, enrutados por `INDEX.md` en cada subdirectorio):
+Las reglas son **EPS-agnósticas**: nunca mencionan nombres de pagadores específicos. Cuando una regla varía por pagador, su `descripcion` referencia `aseguradoras.json.pagadores[pagador_id].<field>`. El valor real se resuelve a runtime cargando el archivo externo (siguiente sección).
+
+**2. Datos per-tenant (externos, via `$LOCAL_DEVOLUCION_REF_PATH`):**
 
 ```
 $LOCAL_DEVOLUCION_REF_PATH/
-  contratos/INDEX.md          ← pagador_id → Contrato-{EPS}-2026.pdf
-  tarifarios/INDEX.md         ← pagador_id → Tarifario-{EPS}-2026.pdf
-  radicacion/INDEX.md         ← portal → Reglas-Empaquetado-{portal}.pdf
+  aseguradoras.json           ← mapa pagador_id → parámetros operativos
+                                (valida contra references/aseguradoras.schema.json)
+  contratos/INDEX.md          ← pagador_id → Contrato-*.pdf
+  tarifarios/INDEX.md         ← pagador_id → Tarifario-*.pdf
+  radicacion/INDEX.md         ← portal → Reglas-Empaquetado-*.pdf
   soportes_clinicos/INDEX.md  ← escenario (UCI/Qx/Hosp) → Checklist-*.pdf
-  guias_clinicas/INDEX.md     ← rango CIE-10 → GPC-MinSalud-*.pdf
+  guias_clinicas/INDEX.md     ← rango CIE-10 → GPC-*.pdf
   plantillas/INDEX.md         ← (evidence_status, decision) → Carta-*.pdf
 ```
+
+Cada IPS deploya su propio `aseguradoras.json` y sus propios PDFs en esta ruta. El skill no asume ninguna IPS ni ningún pagador específico — solo asume que el `pagador_id` del GlosaContext esté presente como clave en `aseguradoras.json.pagadores`.
 
 Cada `INDEX.md` documenta el algoritmo de selección y la tabla de routing. El skill DEBE cargar el `INDEX.md` correspondiente antes de cargar archivos individuales.
 
@@ -169,9 +174,9 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
 1. **Cargar inputs y referencias.**
    - Leer el `context` de la task (GlosaContext).
    - Leer todos los documentos del directorio de trabajo (HC, autorización, RIPS, factura, etc.).
-   - Cargar `references/aseguradoras.json`. Validar que `context.pagador_id` exista como clave. Si no, abortar con `error_unknown_pagador`.
+   - Validar que `$LOCAL_DEVOLUCION_REF_PATH` (o el default `/root/.hermes/ref-data/hospital-devolucion/`) exista y contenga `aseguradoras.json` y los 6 `INDEX.md`. Si no, abortar con `error_missing_ref_data` y listar las rutas faltantes.
+   - Cargar `$LOCAL_DEVOLUCION_REF_PATH/aseguradoras.json`. Opcionalmente validar contra `references/aseguradoras.schema.json` (bundled). Si `context.pagador_id` no existe como clave en `pagadores`, abortar con `error_unknown_pagador`.
    - Verificar `context.fecha_vencimiento`. Si hoy > vencimiento, documentar en `argumentacion` el número de días de mora pero continuar.
-   - Validar que `$LOCAL_DEVOLUCION_REF_PATH` (o el default `/root/.hermes/ref-data/hospital-devolucion/`) exista y contenga los 6 `INDEX.md`. Si no, abortar con `error_missing_ref_data` y listar las rutas faltantes.
 
 2. **Determinar la capa y el instrumento principal** según `context.causal_num` (ver tabla arriba). Cargar el instrumento JSON correspondiente (`references/dama_uk.json`, `references/pert_clin.json`, o `references/fin_ctr.json`). Filtrar reglas por `causales_aplicables` para considerar solo las relevantes a `context.causal_num`.
 
@@ -197,7 +202,7 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
    - `decision = 'disputar'` total: `valor_a_defender = valor_glosado`, `valor_a_aceptar = 0`.
    - `decision = 'disputar'` parcial: ambos > 0, suma = `valor_glosado`. Ej: 600k defendidos, 400k aceptados.
 
-8. **Redactar `argumentacion`** — texto en español, apto para incluir directamente en la carta respuesta a la EPS. Citar evidencia con formato `{archivo} [p.{página}] ["{cita literal}"]`. Cuando `evidence_status = pending`, `argumentacion` puede ser `null` o un mensaje breve indicando los documentos pendientes. Para citas del tarifario o de cláusulas contractuales, usar el nombre del PDF cargado en el paso 3 (ej: `Tarifario-Sura-Quirurgicos-2026.pdf Sección C fila S55201`).
+8. **Redactar `argumentacion`** — texto en español, apto para incluir directamente en la carta respuesta a la EPS. Citar evidencia con formato `{archivo} [p.{página}] ["{cita literal}"]`. Cuando `evidence_status = pending`, `argumentacion` puede ser `null` o un mensaje breve indicando los documentos pendientes. Para citas del tarifario o de cláusulas contractuales, usar el nombre del PDF cargado en el paso 3 (ej: `Tarifario-{pagador_id}-2026.pdf Sección C fila {CUPS}`).
 
 9. **Emitir `glosa-response.json`** con el schema exacto y subirlo como output con label `report`. La task transita automáticamente:
    - `evidence_status = pending` → `status = review` (espera subsanación).
@@ -236,16 +241,19 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 ### Bundled in this skill (`references/`)
 
-- [`references/aseguradoras.json`](references/aseguradoras.json) — parámetros operativos per pagador (tarifa_base, vigencia_aut_dias, plazos, soportes_minimos, etc.). Looked up by `pagador_id`.
 - [`references/dama_uk.json`](references/dama_uk.json) — 24 reglas A01–A24 para causales 1, 3, 4, 7 (administrativo).
 - [`references/pert_clin.json`](references/pert_clin.json) — 29 reglas M01–M29 para causales 5, 6 (médico).
 - [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para causal 2 (financiero).
+- [`references/aseguradoras.schema.json`](references/aseguradoras.schema.json) — JSON Schema del archivo per-tenant `aseguradoras.json` (vive externamente).
 - [`references/glosa-context-template.json`](references/glosa-context-template.json) — schema de input.
 - [`references/glosa-response-template.json`](references/glosa-response-template.json) — schema de output.
 
 ### External (via `$LOCAL_DEVOLUCION_REF_PATH`)
 
-Documentos contractuales y clínicos en el filesystem del host, organizados por categoría con `INDEX.md` de routing. Para sincronización desde Supabase Storage, ver el issue [`arkangelai/tasks-ark-cli#32`](https://github.com/arkangelai/tasks-ark-cli/issues/32).
+- `aseguradoras.json` — datos per-tenant (qué pagadores tiene esta IPS y con qué parámetros). Validable contra el schema bundled.
+- `contratos/`, `tarifarios/`, `radicacion/`, `soportes_clinicos/`, `guias_clinicas/`, `plantillas/` — documentos contractuales y clínicos en el filesystem del host, organizados por categoría con `INDEX.md` de routing.
+
+Para sincronización desde Supabase Storage, ver el issue [`arkangelai/tasks-ark-cli#32`](https://github.com/arkangelai/tasks-ark-cli/issues/32).
 
 ### Skills relacionados
 
