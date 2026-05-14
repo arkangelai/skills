@@ -173,14 +173,16 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
    - Verificar `context.fecha_vencimiento`. Si hoy > vencimiento, documentar en `argumentacion` el número de días de mora pero continuar.
    - Validar que `$LOCAL_DEVOLUCION_REF_PATH` (o el default `/root/.hermes/ref-data/hospital-devolucion/`) exista y contenga los 6 `INDEX.md`. Si no, abortar con `error_missing_ref_data` y listar las rutas faltantes.
 
-2. **Determinar la capa y el instrumento** según `context.causal_num` (ver tabla arriba). Cargar el instrumento JSON correspondiente (`references/dama_uk.json`, `references/pert_clin.json`, o `references/fin_ctr.json`). Filtrar reglas por `causales_aplicables` para considerar solo las relevantes a `context.causal_num`.
+2. **Determinar la capa y el instrumento principal** según `context.causal_num` (ver tabla arriba). Cargar el instrumento JSON correspondiente (`references/dama_uk.json`, `references/pert_clin.json`, o `references/fin_ctr.json`). Filtrar reglas por `causales_aplicables` para considerar solo las relevantes a `context.causal_num`.
+
+   **Carga suplementaria FIN-CTR antifraude (Cat 10).** Para `causal_num` ∈ {`1`, `7`}, además del instrumento principal (DAMA-UK), cargar también las reglas de `fin_ctr.json` Categoría 10 (controles antifraude y duplicidad — F29–F42) y filtrar por `causales_aplicables`. Estas reglas cruzan capa financiera y administrativa (ej. F34 servicios post-mortem, F35 doble cobro SOAT/EPS/ARL, F36 phantom billing) y son el anchor antifraude de causal 7 incluso cuando la causal principal es administrativa. La `capa` del veredicto sigue siendo la del instrumento principal (`administrativo`); las reglas FIN-CTR cargadas como suplemento aportan evidencia adicional en `reglas_aplicadas[]` sin cambiar la capa.
 
 3. **Resolver documentos contractuales y clínicos** según la causal:
    - **Causal 2 (Tarifas)** → cargar `tarifarios/INDEX.md`, resolver el tarifario por `pagador_id`, abrir el PDF y localizar la fila del CUPS (`context.codigo`). Citar literalmente en evidencia.
    - **Causales 5/6 (Cobertura/Pertinencia)** → cargar `guias_clinicas/INDEX.md`, resolver la GPC por CIE-10 (extraer del HC o RIPS-AC). Cargar también `soportes_clinicos/INDEX.md` y el checklist del escenario (UCI/Qx/Hosp). Poblar `meta.gpc_aplicada` y `meta.checklist_aplicado`.
-   - **Causales 1/3/4/7 (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
+   - **Causales 1/3/4/7 (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json.pagadores[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
 
-4. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json[pagador_id].field`, sustituir el valor correspondiente al pagador real.
+4. **Aplicar las reglas relevantes** del instrumento al ítem. No aplicar todas las reglas — solo las pertinentes al servicio y al motivo de glosa. Para cada regla completa `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json.pagadores[pagador_id].field`, sustituir el valor correspondiente al pagador real.
 
 5. **Determinar `evidence_status`.**
    - Si todas las reglas de soporte tienen `confianza ≥ 0.80` y la evidencia es citable → `sufficient`.
