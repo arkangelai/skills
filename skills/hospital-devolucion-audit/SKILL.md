@@ -157,7 +157,7 @@ El skill genera **un solo archivo**: `glosa-response.json`. Schema `hospitals/de
 
 - `≥ 0.95` — cita literal del documento o consulta de sistema verificable.
 - `0.80–0.94` — referencia específica sin cita literal.
-- `< 0.80` en todas las reglas de soporte → `evidence_status = pending` (no comprometer `disputar` sin evidencia firme).
+- `< 0.80` en todas las reglas de soporte → `evidence_status = pending`. No comprometer **ni `disputar` ni `aceptar`** sin evidencia firme: la barra es la misma en ambas direcciones. Sin evidencia determinante en mano no se defiende ni se acepta dinero — se va a `pending`.
 
 ### `evidencia_requerida`
 
@@ -204,12 +204,31 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
 4. **Aplicar las reglas relevantes dentro de `reglas_scoped`.** El universo de reglas ya está acotado a la causal por el paso 2b — aquí solo se decide cuáles de esas reglas scoped son pertinentes al servicio y al `motivo_glosa` concretos. NO ampliar el conjunto: si una regla no está en `reglas_scoped` no se aplica, aunque el motivo de glosa la sugiera (ese caso es una causal mixta — ver Pitfalls). Para cada regla aplicada completar `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json.pagadores[pagador_id].field`, sustituir el valor correspondiente al pagador real.
 
 5. **Determinar `evidence_status`.**
-   - Si todas las reglas de soporte tienen `confianza ≥ 0.80` y la evidencia es citable → `sufficient`.
-   - Si faltan documentos críticos para llegar a una conclusión firme → `pending`. Listar los documentos faltantes en `evidencia_requerida`. **Saltar al paso 8.**
+
+   `sufficient` exige que la **evidencia determinante** del veredicto esté efectivamente en mano. "En mano" significa una de dos cosas, y solo dos:
+   - **(a) Datos de referencia en disco** — el tarifario, el contrato, la GPC o `aseguradoras.json` resueltos vía `$LOCAL_DEVOLUCION_REF_PATH`. Estos siempre están disponibles y pueden cerrar un veredicto por sí solos cuando la causal se adjudica con ellos.
+   - **(b) Un documento del caso presente en los archivos de entrada de la task** — HC, RIPS, autorización (AUT), detalle de cargos, descripción quirúrgica, registros PACS, etc., adjuntos al directorio de trabajo de la task.
+
+   **NO son evidencia suficiente por sí solos:**
+   - **La afirmación de la EPS en el Excel de la glosa** (`motivo_glosa`, o lo que diga una fila del Excel). La acusación de la EPS *es lo que se está auditando* — no es evidencia independiente para adjudicarla. Citar el `motivo_glosa` y marcar una regla `fail` con alta `confianza` sobre esa base **no** habilita `sufficient`.
+   - **La ausencia de un documento.** Que falte el detalle de cargos, la autorización o el folio relevante no prueba el cargo de la EPS; solo significa que el caso aún no se puede adjudicar.
+
+   Decisión:
+   - Si la evidencia determinante es (a) o (b) y todas las reglas de soporte pertinentes tienen `confianza ≥ 0.80` → `sufficient`.
+   - Si el veredicto depende de un documento del caso que **no** está en los archivos de entrada de la task → `evidence_status = pending`. Listar esos documentos en `evidencia_requerida`. **Saltar al paso 8.**
+   - Si no se puede refutar la glosa con lo que hay en mano, el resultado es `pending` — **nunca** `aceptar` (ver paso 6).
+
+   **Por fase del pipeline.** En fase 1 (solo Excel de la glosa + datos de referencia en disco, sin documentos del caso) la mayoría de las glosas debe terminar `pending`. Solo las glosas cuyo veredicto queda totalmente determinado por datos de referencia en disco — el caso clásico es una glosa causal 2 (Tarifas) resuelta por el tarifario en disco — pueden alcanzar `sufficient` en fase 1.
+
+   **Por causal** (consistente con el paso 3):
+   - **Causal 2 (Tarifas):** puede legítimamente alcanzar `sufficient` en fase 1, porque el tarifario en disco es la evidencia determinante (la fila del CUPS adjudica el valor pactado vs. el facturado).
+   - **Causales 1, 3, 4, 5, 6, 7:** casi siempre requieren un documento del caso para adjudicar — detalle de cargos (1), soportes/RIPS (3), autorización (4), HC + GPC del escenario (5/6), descripción quirúrgica o PACS o registro de anulación (7). El contrato y la GPC en disco **enmarcan** la regla (qué formato de AUT, qué plazo, qué criterio clínico) pero **no sustituyen** al documento del caso. Si ese documento no está en los archivos de entrada → `pending`.
 
 6. **Determinar `decision`** (solo si `sufficient`):
    - Si alguna regla tiene `resultado = pass` con `confianza ≥ 0.80` y el argumento es completo → `disputar`.
-   - Si la evidencia confirma la objeción → `aceptar`.
+   - Si la evidencia determinante en mano **confirma activamente** la objeción → `aceptar`.
+
+   `disputar` y `aceptar` tienen la **misma barra probatoria**, y es simétrica. `aceptar` **no** es un fallback ni un "default seguro": compromete `valor_a_aceptar` en dinero real de la IPS exactamente igual que `disputar` compromete `valor_a_defender`. "No puedo refutar la glosa con lo que tengo" **no** es base para `aceptar` — es base para `pending` (`evidence_status = pending`, `decision = null`, poblar `evidencia_requerida`). `aceptar` solo procede cuando la evidencia determinante en mano demuestra que la objeción de la EPS es válida, no cuando simplemente falta con qué rebatirla.
 
 7. **Calcular `valor_a_defender` y `valor_a_aceptar`** (solo si `sufficient`):
    - `decision = 'aceptar'`: `valor_a_defender = 0`, `valor_a_aceptar = valor_glosado`.
@@ -249,6 +268,7 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 - [ ] Si `evidence_status == 'sufficient'`: `decision` ∈ `{disputar, aceptar}`, `valor_a_defender + valor_a_aceptar == valor_glosado`.
 - [ ] Si `decision == 'aceptar'`: `valor_a_defender == 0` y `valor_a_aceptar == valor_glosado`.
 - [ ] Si `decision == 'disputar'`: `valor_a_defender > 0`.
+- [ ] Si `evidence_status == 'sufficient'`: el veredicto cita al menos un documento que **realmente existe** — un dato de referencia en disco (tarifario, contrato, GPC, `aseguradoras.json`) o un documento del caso presente en los archivos de entrada de la task. No vale citar la afirmación de la EPS en el Excel de la glosa, ni la ausencia de un documento. Si el veredicto depende de un documento del caso que no está en los inputs, debió ser `pending`.
 - [ ] Cada `evidencia` contiene archivo + página/sección + cita o justificación específica.
 - [ ] No se exporta más de un output por corrida (label `report`).
 
