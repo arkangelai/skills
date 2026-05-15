@@ -17,6 +17,13 @@ required_environment_variables:
   - name: GMAIL_SENDER_ADDRESS
     prompt: Address the glosa response is sent from (e.g. glosas@ipsabc.com)
     required_for: full functionality
+  - name: SALMONA_API_URL
+    prompt: Base URL of the Salmona API (e.g. https://salmona.arkangel.ai)
+    required_for: full functionality
+  - name: SALMONA_API_KEY
+    prompt: Salmona API key with agent role
+    help: Must be able to read tasks, read task outputs, PATCH task context, and upload task outputs.
+    required_for: full functionality
 ---
 
 # hospital-devolucion-response-sender
@@ -44,8 +51,10 @@ The question it answers: **how do I formally deliver the IPS's consolidated resp
 
 ### Required environment variables
 
-In addition to the frontmatter env vars (`GOGCLI_CREDENTIALS_PATH`, `GMAIL_SENDER_ADDRESS`), the skill talks to Salmona and needs:
+All four are declared in the frontmatter so a runtime that provisions on `required_environment_variables` launches the skill with everything it needs:
 
+- `GOGCLI_CREDENTIALS_PATH` — gogcli OAuth credentials with `gmail.send` scope.
+- `GMAIL_SENDER_ADDRESS` — the address the response is sent from.
 - `SALMONA_API_URL` — Base URL of the Salmona API (e.g. `https://salmona.arkangel.ai`).
 - `SALMONA_API_KEY` — Salmona API key with agent role. Must be able to read tasks, read task outputs, PATCH task context, and upload task outputs.
 
@@ -182,6 +191,13 @@ The skill returns a JSON summary block:
 
    Record the final row count — it becomes `total_glosas_respondidas`.
 
+   **Abort if the row count is 0.** If every caso was skipped (missing `report`
+   outputs, pagador mismatches), there is nothing to send. Do **not** compose or
+   send an email, and do **not** set `reply_sent`. Fail the sender task with a
+   clear message listing the skipped `caso_id`s so a human can investigate —
+   sending a "0 glosas" email and marking the batch sent would permanently hide
+   the unanswered glosas.
+
 4. **Compose and send the email via `gogcli`.**
 
    **Subject:**
@@ -268,6 +284,7 @@ The skill returns a JSON summary block:
 ## Pitfalls
 
 - **Symptom:** the whole batch aborts because one caso has no response. **Cause:** a `hospital_devolucion` task still in `review`/`pending` has no `report` output. **Fix:** skip that caso, log it, keep going — never let one missing response block the send for the others.
+- **Symptom:** the EPS receives a "0 glosas" email and the batch is marked sent, hiding unanswered glosas. **Cause:** *every* caso was skipped, but the skill still sent and set `reply_sent`. **Fix:** the row-count check at the end of step 3 aborts the task when the count is 0 — nothing is sent and `reply_sent` stays false.
 - **Symptom:** a pending glosa is left out of the Excel. **Cause:** filtering out `decision: null`. **Fix:** pending glosas still go in the Excel with `RESPUESTA_IPS = "Pendiente de soportes"` and `EVIDENCIA_REQUERIDA` populated — the EPS needs to see them.
 - **Symptom:** the EPS receives two emails for the same group. **Cause:** retry without checking `context.reply_sent` on the sender task. **Fix:** the first pre-flight step aborts if `reply_sent` is already `true`.
 - **Symptom:** the Excel mixes glosas from two different EPSs. **Cause:** the sender task context was built wrong. **Fix:** the route groups by pagador so this should not happen, but validate `pagador_nit` consistency across all matched `GlosaContext`s (step 2) and exclude + warn on any mismatch.
