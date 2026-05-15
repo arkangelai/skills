@@ -76,7 +76,7 @@ Task of type `hospital_devolucion_response_mail`. Its `context` is the sender en
 }
 ```
 
-The `caso_ids` are the `caso_id` values of the `hospital_devolucion` glosa tasks whose responses must be sent. The orchestrator may instead hand the glosa task ids directly; in that case match by `caso_id` anyway (see Procedure step 2) so the lookup path is uniform.
+Each entry in `caso_ids` is normally a `GlosaContext.caso_id` (e.g. `HOSP-GL-20260514-A1B2C`), but the orchestrator may instead hand a raw `hospital_devolucion` task UUID. Procedure step 2 resolves both forms.
 
 `reply_sent`, `sent_at`, `excel_filename` and `total_glosas_respondidas` start null/false and are written back by this skill.
 
@@ -119,13 +119,34 @@ The skill returns a JSON summary block:
 
 2. **Resolve each glosa task and its response.**
 
-   For each `caso_id` in `context.caso_ids`, locate the `hospital_devolucion` task and read its data:
-   ```bash
-   curl -s -H "Authorization: Bearer $SALMONA_API_KEY" \
-     "$SALMONA_API_URL/api/tasks?task_type=hospital_devolucion&limit=200" \
-     | jq --arg cid "$CASO_ID" '.data[] | select(.context.caso_id == $cid)'
-   ```
-   From the matched task read:
+   Each entry in `context.caso_ids` is either a `GlosaContext.caso_id` or a raw
+   `hospital_devolucion` task UUID — resolve both forms:
+
+   - **UUID** → fetch the task directly, no search needed:
+     ```bash
+     curl -s -H "Authorization: Bearer $SALMONA_API_KEY" "$SALMONA_API_URL/api/tasks/$VALUE"
+     ```
+   - **caso_id** → find the matching `hospital_devolucion` task. `/api/tasks`
+     caps `limit` at 100 and paginates by **cursor**, so a single page is not
+     enough — follow `meta.next_cursor` until it is null, collecting every task,
+     then match by `context.caso_id`:
+     ```bash
+     CURSOR=""; ALL='[]'
+     while :; do
+       PAGE=$(curl -s -H "Authorization: Bearer $SALMONA_API_KEY" \
+         "$SALMONA_API_URL/api/tasks?task_type=hospital_devolucion&limit=100${CURSOR:+&cursor=$CURSOR}")
+       ALL=$(jq -s '.[0] + .[1].data' <<<"$ALL"$'\n'"$PAGE")
+       CURSOR=$(jq -r '.meta.next_cursor // empty' <<<"$PAGE")
+       [ -z "$CURSOR" ] && break
+     done
+     jq --arg cid "$CASO_ID" '.[] | select(.context.caso_id == $cid)' <<<"$ALL"
+     ```
+
+   A `caso_id` (or task UUID) that is never resolved is recorded as **missing**
+   in the run log — it must not silently shrink the batch toward a zero-row send
+   (see step 3).
+
+   From each resolved task read:
    - `context` — the `GlosaContext` (see `../hospital-devolucion-audit/references/glosa-context-template.json`). Source of the EPS-side columns.
    - The `report` output — the `GlosaResponse` (`glosa-response.json`, see `../hospital-devolucion-audit/references/glosa-response-template.json`):
      ```bash
