@@ -93,13 +93,15 @@ Al final, transitar el envelope a `archived`.
    |---|---|
    | `caso_id` | Generar nuevo: `HOSP-GL-YYYYMMDD-XXXXX` (fecha actual + 5 chars en mayúsculas) |
    | `num_factura_original` | Columna de "factura" / "FC-" en el archivo |
+   | `item_position` | Número de línea (1-indexado) del ítem objetado en la factura original |
+   | `glosa_id` | Construir: `{num_factura_original}_{item_position}_g{seq}`, p.ej. `FC-982144_3_g1`. `seq` = 1 para la primera glosa de ese ítem |
    | `batch_id` | Heredar del context del envelope |
    | `codigo` | Código CUPS/SOAT del ítem |
    | `descripcion` | Descripción literal del ítem |
    | `cantidad` | Unidades facturadas |
    | `valor_facturado` | Lo que la IPS cobró por el ítem (entero COP) |
    | `valor_glosado` | Lo que la EPS objeta (entero COP, puede ser ≤ valor_facturado) |
-   | `causal_num` | "1"–"7" según Res. 3047/2008. Inferir del texto si el archivo no lo declara explícitamente |
+   | `codigo_completo` | Código causal de 6 dígitos del Manual Único (Res. 2284/2023 Anexo 3), p.ej. `FA0101`, `TA0601`, `CL0101`. Extraer de la columna de causal / código de glosa del archivo. Si el archivo no lo declara, inferir del `motivo_glosa` |
    | `motivo_glosa` | Texto literal con que la EPS justifica la objeción |
    | `prestador_nombre` | Leer de `$LOCAL_DEVOLUCION_REF_PATH/prestador.json` campo `nombre` |
    | `prestador_nit` | Leer de `$LOCAL_DEVOLUCION_REF_PATH/prestador.json` campo `nit` |
@@ -108,6 +110,7 @@ Al final, transitar el envelope a `archived`.
    | `pagador_nit` | `aseguradoras.json.pagadores[pagador_id].nit` |
    | `paciente_alias` | "Paciente X-NNNN" donde NNNN = últimos 4 dígitos del documento del paciente |
    | `paciente_documento_alias` | "CC ***NNNN" (TI/CE/PA según tipo) |
+   | `plan_afiliado` | Plan o régimen del afiliado si el archivo lo trae; si no, `null` (lo completa el hospital desde sus registros) |
    | `fecha_ingreso` / `fecha_egreso` / `fecha_glosa` / `fecha_vencimiento` | Fechas YYYY-MM-DD |
 
 4. **Crear la task hija como `draft`** (sin status — el agente no la recoge hasta que tenga el input cargado). Capturar el `id` retornado por el API:
@@ -145,10 +148,10 @@ Al final, transitar el envelope a `archived`.
 ## Pitfalls
 
 - **`num_documento` no es atómico:** un Excel puede traer varias filas bajo el mismo `num_documento` (la EPS agrupó). Cada fila igual es una glosa independiente. No fusionar filas.
-- **Causal ausente:** si el archivo no trae `causal_num` explícito, inferir del texto del `motivo_glosa`. Default seguro: causal `1` (Facturación) para administrativo, `2` (Tarifas) para discrepancias de precio, `6` (Pertinencia) para clínico.
+- **Código causal ausente:** si el archivo no trae el código de 6 dígitos explícito, inferir del texto del `motivo_glosa` usando los prefijos del Manual Único (Res. 2284): `FA` Facturación, `TA` Tarifas, `SO` Soportes, `AU` Autorización, `CO` Cobertura, `CL` Calidad, `SA` Seguimiento a Acuerdos. Elegir el código de 6 dígitos más específico que respalde la evidencia. Si no hay forma de determinarlo con confianza, tratar la fila como dato faltante (ver "Sin datos").
 - **Valor parcial:** si `valor_glosado < valor_facturado`, registrar ambos. No reemplazar uno por el otro.
 - **PII:** generar siempre el alias de paciente (`Paciente X-NNNN`) y nunca incluir el nombre real ni el número completo del documento.
-- **Sin datos:** si una fila no tiene los campos requeridos del schema (codigo, valor_glosado, causal_num), NO crear la task. Anotar en un comentario del envelope qué filas se omitieron y por qué.
+- **Sin datos:** si una fila no tiene los campos requeridos del schema (codigo, valor_glosado, codigo_completo), NO crear la task. Anotar en un comentario del envelope qué filas se omitieron y por qué.
 
 ## Verification
 
@@ -176,5 +179,6 @@ Al final, transitar el envelope a `archived`.
 
 ### Marco normativo
 
-- Resolución 3047/2008 Anexo 6 — causales de glosa (1–7).
+- Resolución 2284 de 2023, Anexo Técnico 3 — Manual Único de Devoluciones, Glosas y Respuestas (códigos causales de 6 dígitos).
 - Issue [`arkangelai/salmona-api#210`](https://github.com/arkangelai/salmona-api/issues/210) — modelo de datos único-glosa.
+- Issue [`arkangelai/salmona-api#251`](https://github.com/arkangelai/salmona-api/issues/251) — códigos Res. 2284 y forma unificada del GlosaContext.
