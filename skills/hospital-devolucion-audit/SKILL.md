@@ -1,6 +1,6 @@
 ---
 name: hospital-devolucion-audit
-description: Analiza UNA glosa recibida de una EPS (un ítem objetado sobre una factura) y produce la respuesta argumental — disputar o aceptar, con valor a defender y a aceptar, y la justificación clínica/administrativa/financiera. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según la causal. Emite glosa-response.json. Usar cuando la IPS recibe una glosa y necesita construir su respuesta dentro del plazo de 15 días hábiles (Res. 3047/2008).
+description: Analiza UNA glosa recibida de una EPS (un ítem objetado sobre una factura) y produce la respuesta argumental — disputar o aceptar, con valor a defender y a aceptar, y la justificación clínica/administrativa/financiera. Aplica DAMA-UK, PERT-CLIN o FIN-CTR según el prefijo del código causal. Emite glosa-response.json. Usar cuando la IPS recibe una glosa y necesita construir su respuesta dentro del plazo de 15 días hábiles (Res. 2284/2023).
 version: 2.0.0
 author: claudio@arkangel.ai
 platforms: [macos, linux]
@@ -42,14 +42,14 @@ Antes de aplicar reglas, el skill resuelve dos jerarquías de referencias:
 
 **1. Instrumentos de reglas (bundled en este skill, no env var):**
 
-- `references/dama_uk.json` — 24 reglas A01–A24 para causales 1 (Facturación), 3 (Soportes), 4 (Autorización), 7 (Anulaciones).
-- `references/pert_clin.json` — 29 reglas M01–M29 para causales 5 (Cobertura), 6 (Pertinencia).
-- `references/fin_ctr.json` — 42 reglas F01–F42 para causal 2 (Tarifas), con reglas antifraude (Categoría 10) que también marcan causales 1 y 7.
+- `references/dama_uk.json` — 24 reglas A01–A24 para los prefijos `FA` (Facturación), `SO` (Soportes), `AU` (Autorización).
+- `references/pert_clin.json` — 29 reglas M01–M29 para los prefijos `CO` (Cobertura), `CL` (Calidad / pertinencia).
+- `references/fin_ctr.json` — 42 reglas F01–F42 para el prefijo `TA` (Tarifas), con reglas antifraude (Categoría 10) que también marcan `FA`.
 - `references/aseguradoras.schema.json` — JSON Schema que documenta la forma esperada del archivo per-tenant `aseguradoras.json`.
 
 Las reglas son **EPS-agnósticas**: nunca mencionan nombres de pagadores específicos. Cuando una regla varía por pagador, su `descripcion` referencia `aseguradoras.json.pagadores[pagador_id].<field>`. El valor real se resuelve a runtime cargando el archivo externo (siguiente sección).
 
-**Selección de reglas por causal — `causales_aplicables`.** Cada regla de cada instrumento lleva un campo `causales_aplicables` (array de strings `"1"`–`"7"`). Este campo es la **fuente de verdad** para decidir qué reglas son pertinentes a una glosa. El skill **NO** aplica el instrumento completo: aplica únicamente las reglas cuyo `causales_aplicables` contiene `context.causal_num`. Una glosa de causal 2 (Tarifas) nunca debe arrastrar reglas de pertinencia clínica ni controles antifraude que no marquen `"2"`; una glosa de causal 6 nunca debe arrastrar reglas de tarifa. El filtro se aplica en el paso 2 del procedimiento y acota el universo de reglas antes de cualquier evaluación.
+**Selección de reglas por causal — `causales_aplicables`.** Cada regla de cada instrumento lleva un campo `causales_aplicables` (array de prefijos del Manual Único Res. 2284: `FA`, `TA`, `SO`, `AU`, `CO`, `CL`, `SA`). Este campo es la **fuente de verdad** para decidir qué reglas son pertinentes a una glosa. El prefijo de la glosa son los dos primeros caracteres de `context.codigo_completo` (ej. `FA0101` → `FA`). El skill **NO** aplica el instrumento completo: aplica únicamente las reglas cuyo `causales_aplicables` contiene el prefijo de la glosa. Una glosa `TA` (Tarifas) nunca debe arrastrar reglas de pertinencia clínica ni controles antifraude que no marquen `TA`; una glosa `CL` nunca debe arrastrar reglas de tarifa. El filtro se aplica en el paso 2 del procedimiento y acota el universo de reglas antes de cualquier evaluación.
 
 **2. Datos per-tenant (externos, via `$LOCAL_DEVOLUCION_REF_PATH`):**
 
@@ -84,7 +84,7 @@ Campos clave:
 | `cantidad` | `number` | Unidades facturadas |
 | `valor_facturado` | `integer` (COP) | Lo que la IPS cobró por este ítem |
 | `valor_glosado` | `integer` (COP) | Lo que la EPS objeta. Puede ser ≤ valor_facturado |
-| `causal_num` | `"1"`–`"7"` | Causal según Res. 3047/2008 |
+| `codigo_completo` | `string` | Código causal de 6 dígitos del Manual Único Res. 2284/2023, ej. `FA0101`. El prefijo (2 primeros chars) selecciona las reglas |
 | `motivo_glosa` | `string` | Texto literal con el que la EPS justifica la objeción |
 | `pagador_*` | — | Datos de la EPS |
 | `prestador_*` | — | Datos de la IPS |
@@ -125,14 +125,15 @@ El skill genera **un solo archivo**: `glosa-response.json`. Schema `hospitals/de
 }
 ```
 
-### Capa por causal
+### Capa por prefijo causal
 
-| `causal_num` | Nombre | Capa | Instrumento |
+| Prefijo (`codigo_completo`) | Nombre | Capa | Instrumento |
 |---|---|---|---|
-| 2 | Tarifas | `financiero` | FIN-CTR (reglas F01–F42) |
-| 5 | Cobertura / no-PBS | `medico` | PERT-CLIN (reglas M01–M29) |
-| 6 | Pertinencia | `medico` | PERT-CLIN (reglas M01–M29) |
-| 1, 3, 4, 7 | Facturación / Soportes / Autorización / Anulaciones | `administrativo` | DAMA-UK (reglas A01–A27) |
+| `TA` | Tarifas | `financiero` | FIN-CTR (reglas F01–F42) |
+| `CO` | Cobertura | `medico` | PERT-CLIN (reglas M01–M29) |
+| `CL` | Calidad / pertinencia | `medico` | PERT-CLIN (reglas M01–M29) |
+| `FA`, `SO`, `AU` | Facturación / Soportes / Autorización | `administrativo` | DAMA-UK (reglas A01–A24) |
+| `SA` | Seguimiento a Acuerdos | `financiero` | sin reglas dedicadas — ver Pitfalls |
 
 ### Campos del veredicto
 
@@ -182,24 +183,25 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
 
 2. **Determinar la capa y seleccionar el subconjunto de reglas scoped a la causal.**
 
-   a. **Capa e instrumento principal** según `context.causal_num` (ver tabla arriba). El instrumento principal define la `capa` del veredicto:
-      - causal `2` → `financiero`, instrumento principal `references/fin_ctr.json`.
-      - causal `5` o `6` → `medico`, instrumento principal `references/pert_clin.json`.
-      - causal `1`, `3`, `4` o `7` → `administrativo`, instrumento principal `references/dama_uk.json`.
+   a. **Capa e instrumento principal** según el prefijo de `context.codigo_completo` (ver tabla arriba). El instrumento principal define la `capa` del veredicto:
+      - prefijo `TA` → `financiero`, instrumento principal `references/fin_ctr.json`.
+      - prefijo `CO` o `CL` → `medico`, instrumento principal `references/pert_clin.json`.
+      - prefijo `FA`, `SO` o `AU` → `administrativo`, instrumento principal `references/dama_uk.json`.
+      - prefijo `SA` → `financiero`; no hay instrumento de reglas dedicado (ver Pitfalls).
 
-   b. **Construir el conjunto de reglas candidatas (`reglas_scoped`).** Recorrer **los tres** instrumentos JSON y seleccionar **únicamente** las reglas cuyo `causales_aplicables` contiene `context.causal_num`. Esta es la regla de oro: una regla entra al análisis si y solo si su `causales_aplicables` incluye la causal de la glosa. NO se carga el instrumento completo. Concretamente:
+   b. **Construir el conjunto de reglas candidatas (`reglas_scoped`).** Sea `prefijo` los dos primeros caracteres de `context.codigo_completo`. Recorrer **los tres** instrumentos JSON y seleccionar **únicamente** las reglas cuyo `causales_aplicables` contiene ese `prefijo`. Esta es la regla de oro: una regla entra al análisis si y solo si su `causales_aplicables` incluye el prefijo de la glosa. NO se carga el instrumento completo. Concretamente:
       - La mayoría de las reglas scoped vendrán del instrumento principal de la capa (paso a).
-      - Algunas reglas de `fin_ctr.json` Categoría 10 (controles antifraude — F29–F42) marcan también causales `1`, `2` o `7` en su `causales_aplicables`. Para esas causales, las reglas antifraude que marquen la causal entran en `reglas_scoped` **por el mismo filtro** — no como una "carga suplementaria" aparte. Ej.: una glosa causal `7` recoge F34 y F36 (ambas marcan `"7"`); una glosa causal `1` recoge F29–F36/F39/F40 según su tag; una glosa causal `2` recoge solo las F* que marcan `"2"`, **nunca** F36 ni F33 (que no marcan `"2"`).
-      - Reglas que no marcan `context.causal_num` quedan **fuera** del análisis y no aparecen en `reglas_aplicadas[]`, aunque pertenezcan al instrumento principal.
+      - Algunas reglas de `fin_ctr.json` Categoría 10 (controles antifraude — F29–F42) marcan también `FA` en su `causales_aplicables`. Para una glosa `FA`, esas reglas antifraude entran en `reglas_scoped` **por el mismo filtro** — no como una "carga suplementaria" aparte. Una glosa `TA` recoge solo las F* que marcan `TA`, **nunca** las antifraude que solo marcan `FA`.
+      - Reglas que no marcan el `prefijo` de la glosa quedan **fuera** del análisis y no aparecen en `reglas_aplicadas[]`, aunque pertenezcan al instrumento principal.
 
    c. **La `capa` del veredicto es siempre la del paso a**, aunque `reglas_scoped` incluya reglas de FIN-CTR cargadas por el filtro en una glosa administrativa. Las reglas antifraude aportan evidencia en `reglas_aplicadas[]` sin cambiar la capa.
 
    El resultado de este paso es `reglas_scoped`: el universo cerrado de reglas que el análisis puede usar. Los pasos siguientes no pueden invocar reglas fuera de este conjunto.
 
-3. **Resolver documentos contractuales y clínicos** según la causal:
-   - **Causal 2 (Tarifas)** → cargar `tarifarios/INDEX.md`, resolver el tarifario por `pagador_id`, abrir el PDF y localizar la fila del CUPS (`context.codigo`). Citar literalmente en evidencia.
-   - **Causales 5/6 (Cobertura/Pertinencia)** → cargar `guias_clinicas/INDEX.md`, resolver la GPC por CIE-10 (extraer del HC o RIPS-AC). Cargar también `soportes_clinicos/INDEX.md` y el checklist del escenario (UCI/Qx/Hosp). Poblar `meta.gpc_aplicada` y `meta.checklist_aplicado`.
-   - **Causales 1/3/4/7 (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json.pagadores[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
+3. **Resolver documentos contractuales y clínicos** según el prefijo:
+   - **Prefijo `TA` (Tarifas)** → cargar `tarifarios/INDEX.md`, resolver el tarifario por `pagador_id`, abrir el PDF y localizar la fila del CUPS (`context.codigo`). Citar literalmente en evidencia.
+   - **Prefijos `CO`/`CL` (Cobertura/Calidad)** → cargar `guias_clinicas/INDEX.md`, resolver la GPC por CIE-10 (extraer del HC o RIPS-AC). Cargar también `soportes_clinicos/INDEX.md` y el checklist del escenario (UCI/Qx/Hosp). Poblar `meta.gpc_aplicada` y `meta.checklist_aplicado`.
+   - **Prefijos `FA`/`SO`/`AU` (Administrativas)** → cargar `contratos/INDEX.md` y el contrato del pagador. Usar `aseguradoras.json.pagadores[pagador_id]` como fuente primaria para vigencia, formato AUT, plazos. Recurrir al PDF del contrato solo si necesita cita literal de cláusula.
 
 4. **Aplicar las reglas relevantes dentro de `reglas_scoped`.** El universo de reglas ya está acotado a la causal por el paso 2b — aquí solo se decide cuáles de esas reglas scoped son pertinentes al servicio y al `motivo_glosa` concretos. NO ampliar el conjunto: si una regla no está en `reglas_scoped` no se aplica, aunque el motivo de glosa la sugiera (ese caso es una causal mixta — ver Pitfalls). Para cada regla aplicada completar `resultado`, `evidencia`, `observaciones`, `confianza`. Cuando la regla referencia `aseguradoras.json.pagadores[pagador_id].field`, sustituir el valor correspondiente al pagador real.
 
@@ -218,11 +220,11 @@ Campo opcional. **Obligatorio cuando `evidence_status = pending`**. Lista de doc
    - Si el veredicto depende de un documento del caso que **no** está en los archivos de entrada de la task → `evidence_status = pending`. Listar esos documentos en `evidencia_requerida`. **Saltar al paso 8.**
    - Si no se puede refutar la glosa con lo que hay en mano, el resultado es `pending` — **nunca** `aceptar` (ver paso 6).
 
-   **Por fase del pipeline.** En fase 1 (solo Excel de la glosa + datos de referencia en disco, sin documentos del caso) la mayoría de las glosas debe terminar `pending`. Solo las glosas cuyo veredicto queda totalmente determinado por datos de referencia en disco — el caso clásico es una glosa causal 2 (Tarifas) resuelta por el tarifario en disco — pueden alcanzar `sufficient` en fase 1.
+   **Por fase del pipeline.** En fase 1 (solo Excel de la glosa + datos de referencia en disco, sin documentos del caso) la mayoría de las glosas debe terminar `pending`. Solo las glosas cuyo veredicto queda totalmente determinado por datos de referencia en disco — el caso clásico es una glosa de prefijo `TA` (Tarifas) resuelta por el tarifario en disco — pueden alcanzar `sufficient` en fase 1.
 
-   **Por causal** (consistente con el paso 3):
-   - **Causal 2 (Tarifas):** puede legítimamente alcanzar `sufficient` en fase 1, porque el tarifario en disco es la evidencia determinante (la fila del CUPS adjudica el valor pactado vs. el facturado).
-   - **Causales 1, 3, 4, 5, 6, 7:** casi siempre requieren un documento del caso para adjudicar — detalle de cargos (1), soportes/RIPS (3), autorización (4), HC + GPC del escenario (5/6), descripción quirúrgica o PACS o registro de anulación (7). El contrato y la GPC en disco **enmarcan** la regla (qué formato de AUT, qué plazo, qué criterio clínico) pero **no sustituyen** al documento del caso. Si ese documento no está en los archivos de entrada → `pending`.
+   **Por prefijo** (consistente con el paso 3):
+   - **Prefijo `TA` (Tarifas):** puede legítimamente alcanzar `sufficient` en fase 1, porque el tarifario en disco es la evidencia determinante (la fila del CUPS adjudica el valor pactado vs. el facturado).
+   - **Prefijos `FA`, `SO`, `AU`, `CO`, `CL`:** casi siempre requieren un documento del caso para adjudicar — detalle de cargos (`FA`), soportes/RIPS (`SO`), autorización (`AU`), HC + GPC del escenario (`CO`/`CL`). El contrato y la GPC en disco **enmarcan** la regla (qué formato de AUT, qué plazo, qué criterio clínico) pero **no sustituyen** al documento del caso. Si ese documento no está en los archivos de entrada → `pending`.
 
 6. **Determinar `decision`** (solo si `sufficient`):
    - Si alguna regla tiene `resultado = pass` con `confianza ≥ 0.80` y el argumento es completo → `disputar`.
@@ -253,8 +255,9 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 ## Pitfalls
 
-- **Causal mixta:** si el `motivo_glosa` sugiere dos capas (ej: tarifa Y pertinencia), elegir la causal dominante por impacto económico — esa es la `context.causal_num` que determina `reglas_scoped` y la `capa`. La causal secundaria se documenta narrativamente en `observaciones`; **no** se amplía `reglas_scoped` para incluir reglas de la otra causal. Si la causal secundaria es material, lo correcto es que la EPS haya emitido (o la IPS solicite) una glosa separada para ese ítem.
-- **Causal 5 (no PBS):** verificar si el servicio está fuera del PBS antes de argumentar pertinencia. Si está excluido, la glosa puede ser válida independientemente de la HC.
+- **Causal mixta:** si el `motivo_glosa` sugiere dos capas (ej: tarifa Y pertinencia), elegir la causal dominante por impacto económico — ese es el `context.codigo_completo` que determina `reglas_scoped` y la `capa`. La causal secundaria se documenta narrativamente en `observaciones`; **no** se amplía `reglas_scoped` para incluir reglas de la otra causal. Si la causal secundaria es material, lo correcto es que la EPS haya emitido (o la IPS solicite) una glosa separada para ese ítem.
+- **Glosa con prefijo `SA` (Seguimiento a Acuerdos):** los instrumentos de reglas no cubren `SA` todavía. Una glosa `SA` produce `reglas_scoped` vacío; resolver con los datos contractuales en disco si alcanzan, de lo contrario `evidence_status = pending` documentando que no hay instrumento para esa causal.
+- **Prefijo `CO` (no PBS):** verificar si el servicio está fuera del PBS antes de argumentar pertinencia. Si está excluido, la glosa puede ser válida independientemente de la HC.
 - **`confianza` inflada en F-CTR:** para reglas de tarifa, máximo `0.80` sin el anexo tarifario del contrato vigente. Con el anexo a la vista, `≥ 0.95` exige cita literal de la fila tarifaria.
 - **`fecha_vencimiento` vencida:** advertir en `argumentacion` con los días de mora pero no bloquear — la IPS puede radicar extemporáneamente con justificación.
 
@@ -262,8 +265,8 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 - [ ] `glosa-response.json` existe en el directorio de trabajo y es válido contra `hospitals/devolucion/glosa-response`.
 - [ ] `instrumento == "RESPUESTA-GLOSA"`.
-- [ ] `capa` coincide con la causal según la tabla.
-- [ ] Toda regla en `reglas_aplicadas[]` tiene `context.causal_num` dentro de su `causales_aplicables` en el instrumento de origen — no se coló ninguna regla fuera del scope de la causal.
+- [ ] `capa` coincide con el prefijo causal según la tabla.
+- [ ] Toda regla en `reglas_aplicadas[]` tiene el prefijo de `context.codigo_completo` dentro de su `causales_aplicables` en el instrumento de origen — no se coló ninguna regla fuera del scope de la causal.
 - [ ] Si `evidence_status == 'pending'`: `decision == null`, `argumentacion` puede ser null, `evidencia_requerida` no vacío.
 - [ ] Si `evidence_status == 'sufficient'`: `decision` ∈ `{disputar, aceptar}`, `valor_a_defender + valor_a_aceptar == valor_glosado`.
 - [ ] Si `decision == 'aceptar'`: `valor_a_defender == 0` y `valor_a_aceptar == valor_glosado`.
@@ -276,9 +279,9 @@ Ej (UCI 3 días glosados, 2 días defendibles):
 
 ### Bundled in this skill (`references/`)
 
-- [`references/dama_uk.json`](references/dama_uk.json) — 24 reglas A01–A24 para causales 1, 3, 4, 7 (administrativo).
-- [`references/pert_clin.json`](references/pert_clin.json) — 29 reglas M01–M29 para causales 5, 6 (médico).
-- [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para causal 2 (financiero); las reglas antifraude de la Categoría 10 (F29–F42) marcan además causales 1 y 7 en su `causales_aplicables`.
+- [`references/dama_uk.json`](references/dama_uk.json) — 24 reglas A01–A24 para los prefijos `FA`, `SO`, `AU` (administrativo).
+- [`references/pert_clin.json`](references/pert_clin.json) — 29 reglas M01–M29 para los prefijos `CO`, `CL` (médico).
+- [`references/fin_ctr.json`](references/fin_ctr.json) — 42 reglas F01–F42 para el prefijo `TA` (financiero); las reglas antifraude de la Categoría 10 (F29–F42) marcan además `FA` en su `causales_aplicables`.
 - [`references/aseguradoras.schema.json`](references/aseguradoras.schema.json) — JSON Schema del archivo per-tenant `aseguradoras.json` (vive externamente).
 - [`references/glosa-context-template.json`](references/glosa-context-template.json) — schema de input.
 - [`references/glosa-response-template.json`](references/glosa-response-template.json) — schema de output.
@@ -292,14 +295,14 @@ Para sincronización desde Supabase Storage, ver el issue [`arkangelai/tasks-ark
 
 ### Skills relacionados
 
-- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — versión EPS-side de DAMA-UK (causales 1, 3, 4, 7).
-- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — versión EPS-side de PERT-CLIN (causales 5, 6).
-- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — versión EPS-side de FIN-CTR (causal 2).
+- [`../medical-invoice-admin-audit/SKILL.md`](../medical-invoice-admin-audit/SKILL.md) — versión EPS-side de DAMA-UK (prefijos `FA`, `SO`, `AU`).
+- [`../medical-invoice-medical-audit/SKILL.md`](../medical-invoice-medical-audit/SKILL.md) — versión EPS-side de PERT-CLIN (prefijos `CO`, `CL`).
+- [`../medical-invoice-financial-audit/SKILL.md`](../medical-invoice-financial-audit/SKILL.md) — versión EPS-side de FIN-CTR (prefijo `TA`).
 - [`../hospital-devolucion-batch-parse/SKILL.md`](../hospital-devolucion-batch-parse/SKILL.md) — separa un Excel multi-glosa en tasks individuales (upstream de este skill).
 
 ### Marco normativo
 
-- Resolución 3047/2008 + Resolución 416/2009 — Manual Único de Glosas, Devoluciones y Respuestas. Causales 1–7 y plazos.
+- Resolución 2284 de 2023, Anexo Técnico 3 — Manual Único de Devoluciones, Glosas y Respuestas. Códigos causales de 6 dígitos y plazos.
 - Resolución 2481/2020 — Plan de Beneficios en Salud (PBS).
 - Decreto 2423 de 1996 y sus modificaciones — Manual Único Tarifario SOAT (base supletoria de tarifa en convenios IPS-EPS).
 - Acuerdo 256/2001 CNSSS — Manual ISS 2001.
