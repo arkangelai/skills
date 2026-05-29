@@ -28,14 +28,29 @@ const isTest = (uid) => (uid ?? "").trim().toLowerCase().endsWith("@arkangel.ai"
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const leadInt = (v) => { const m = String(v ?? "").match(/^\s*(\d+)/); return m ? Number(m[1]) : null; };
 
-const u = new URL(`${url}/rest/v1/predictions`);
-u.searchParams.set("select", "user_id,prediction_label,prediction_metadata");
-u.searchParams.set("project_name", `eq.${project}`);
-u.searchParams.set("limit", "5000");
-const rows = (await (await fetch(u, { headers: { apikey: key, Authorization: `Bearer ${key}` } })).json())
+async function fetchAllPredictions() {
+  const acc = [];
+  const pageSize = 1000;
+  for (let page = 0; ; page++) {
+    const u = new URL(`${url}/rest/v1/predictions`);
+    u.searchParams.set("select", "user_id,prediction_label,prediction_metadata");
+    u.searchParams.set("project_name", `eq.${project}`);
+    u.searchParams.set("order", "created_at.asc");
+    u.searchParams.set("limit", String(pageSize));
+    u.searchParams.set("offset", String(page * pageSize));
+    const resp = await fetch(u, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    if (!resp.ok) { console.error("query failed", resp.status, await resp.text()); process.exit(1); }
+    const batch = await resp.json();
+    acc.push(...batch);
+    if (batch.length < pageSize) break; // ultima pagina
+  }
+  return acc;
+}
+const rows = (await fetchAllPredictions())
   .filter((r) => BIOS.has(norm(readMeta(r.prediction_metadata, "company_name"))) && !isTest(r.user_id));
 
-const ageFromDob = (dob) => { if (!dob) return null; const t = new Date(dob); if (isNaN(t)) return null; const now = new Date("2026-06-15"); let a = now.getFullYear() - t.getFullYear(); if (now.getMonth() < t.getMonth() || (now.getMonth() === t.getMonth() && now.getDate() < t.getDate())) a--; return a >= 0 && a < 130 ? a : null; };
+const CUTOFF = process.env.CUTOFF || new Date().toISOString().slice(0, 10); // fecha de reporte (default: hoy)
+const ageFromDob = (dob) => { if (!dob) return null; const t = new Date(dob); if (isNaN(t)) return null; const now = new Date(CUTOFF); let a = now.getFullYear() - t.getFullYear(); if (now.getMonth() < t.getMonth() || (now.getMonth() === t.getMonth() && now.getDate() < t.getDate())) a--; return a >= 0 && a < 130 ? a : null; };
 const get = (r, k) => readMeta(r.prediction_metadata, k);
 const isRet = (r) => r.prediction_label === "RETIRADO";
 
