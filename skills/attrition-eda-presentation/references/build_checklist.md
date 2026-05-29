@@ -1,35 +1,34 @@
-# Checklist: armar el HTML cliente desde la plantilla
+# Checklist: agregar una empresa al repo base multi-empresa
 
-Plantilla viva: `comfama-bios-summary/` (predicciones, N pequeno).
-Referencia de estructura: `comfama-employees-client-summary/` (ARQ).
+Repo base: `comfama-employees-client-summary/` (un HTML por empresa).
+Patrón de estructura: empresa `arquitectura-concreto` (true labels).
+Patrón por predicciones: empresa `grupo-bios` (N pequeno, sin etiquetas reales).
 
-## 1. Clonar la plantilla
-- Copiar la fuente (sin `node_modules`/`dist`/`.git`) a `comfama-<empresa>-summary/`.
-- `npm install`.
+## 1. Datos
+- Copia `extract_company_eda.mjs` a `comfama-employee-retention/scripts/diagnostics/`, edita `GROUP`, corre `node ... > eda.json`.
+- **Excluye `@arkangel.ai`** (trafico de prueba). Aliases sin datos = 0 (no excluir).
 
-## 2. Quitar Lovable (no es dependencia de runtime)
-- `vite.config.ts`: borrar el import de `lovable-tagger` y la linea `mode === "development" && componentTagger()`.
-- `package.json`: borrar `lovable-tagger` de devDependencies; renombrar `name`.
-- `index.html`: title/description propios; quitar `meta name=author Lovable`, `twitter:site @Lovable` y la `og:image` de gpt-engineer.
+## 2. Modulo de empresa (no se clona un repo nuevo)
+- Crea `src/companies/<slug>/Analysis.tsx` copiando el de la empresa mas parecida
+  (`grupo-bios` si es por predicciones, `arquitectura-concreto` si hay true labels).
+  Reemplaza los datos con `eda.json`.
+- Registra en `src/companies/registry.tsx`:
+  `"<slug>": { slug, hero: { titlePre, titleAccent, subtitle, date }, Analysis }`.
+- Lovable y LoginGate ya estan fuera de la base — no repetir.
 
-## 3. Quitar el LoginGate (entregable de lectura directa)
-- `src/App.tsx`: eliminar el wrapper `<LoginGate>...</LoginGate>` y su import.
-
-## 4. Contenido
-- `HeroSection.tsx`: titulo "<Empresa> · Analisis de la Encuesta SST" (o "Lectura Temprana de Retencion" si es por predicciones), subtitulo con N + "basado en predicciones del modelo", fecha.
-- `SSTAnalysis.tsx`: reemplazar los datos con el `eda.json` de `extract_company_eda.mjs`.
-
-## 5. Estructura de secciones (igual que ARQ)
-Resumen -> Arquetipos -> Arquetipos vs Retiro (predicho) -> Perfil de cada Arquetipo ->
+## 3. Estructura de secciones (igual que ARQ)
+Resumen -> Arquetipos -> Arquetipos vs Retiro -> Perfil de cada Arquetipo ->
 Plan de Bienestar -> Recomendaciones -> Variables Numericas -> Variables Categoricas ->
 Relacion entre Variables -> Hallazgos Clave -> Hablemos.
-Si es grupo/predicciones, antepon: Nota metodologica, Composicion, Nivel de atencion. Cierra con Limitaciones.
+Si es por predicciones: antepon Nota metodologica, Composicion, Nivel de atencion;
+cierra con Limitaciones; incluye alertas "Arquetipos a vigilar".
 
-## 6. Compilar
-- `npm run build:single` -> `dist/index.html` autocontenido.
-- Ajustar `scripts/rename-html.mjs` al nombre del cliente.
-- Copiar el HTML a `Clients/Comfama/docs/cliente/<empresa>/`.
+## 4. Compilar (un HTML por empresa)
+- `COMPANY=<slug> npm run build:single` -> `dist/<slug>.html`.
+- Vite vacia `dist/` en cada build: copia el HTML a `Clients/Comfama/docs/cliente/<empresa>/`
+  ANTES de compilar otra empresa.
 
-## 7. Verificar (obligatorio)
-- `node verify_render.mjs <ruta-html>`: 0 errores de consola, sin "Acceso restringido", h2 en orden ARQ.
+## 5. Verificar (obligatorio)
+- `node verify_render.mjs <ruta-html>`: 0 errores de consola, sin "Acceso restringido",
+  h2 en orden ARQ.
 - `grep -i lovable` y `grep gpt-engineer` = 0. Sin PII en el HTML.

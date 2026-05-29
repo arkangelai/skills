@@ -24,11 +24,11 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 
 ## Referencias canónicas (en `Repositorios/`)
 
-- **Estructura/diseño de referencia:** `comfama-employees-client-summary/` (ARQ, con true labels, 1.008 empleados). Su `src/components/SSTAnalysis.tsx` define el ORDEN de secciones a calcar.
-- **Implementación de ejemplo (predicciones, N pequeño):** `comfama-bios-summary/` (Grupo BIOS, 14 empleados). Es la plantilla viva de esta skill.
+- **Repo base multi-empresa:** `comfama-employees-client-summary/`. Una sola base; **un HTML por empresa**. Cada empresa vive en `src/companies/<slug>/Analysis.tsx`, registrada en `src/companies/registry.tsx`, y se elige en build con la variable `COMPANY=<slug>`. Lovable y el LoginGate **ya están removidos** en la base (no hay que repetirlo por empresa).
+- **Empresas existentes (úsalas de patrón):** `arquitectura-concreto` (true labels, 1.008 empleados — define el ORDEN de secciones a calcar) y `grupo-bios` (predicciones, N=14 — patrón para escenarios sin etiquetas reales, con Nota metodológica/Composición/Nivel de atención y alertas "Arquetipos a vigilar").
 - **Datos:** tabla `predictions` de Supabase, proyecto `comfama-employee-retention`. Credenciales en `comfama-employee-retention/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `COMFAMA_PROJECT_NAME`).
 - **Catálogo de empresas + aliases:** `comfama-employee-retention/src/data/companies.ts` (nombre canónico + NIT) y `src/lib/companyNormalize.ts` (lógica de normalización).
-- **Scripts reutilizables:** `references/extract_company_eda.mjs` (extrae+agrega) y `references/verify_render.mjs` (verifica el render). Cópialos al repo del entregable y edita el `GROUP`.
+- **Scripts reutilizables:** `references/extract_company_eda.mjs` (extrae+agrega) y `references/verify_render.mjs` (verifica el render). Copia el extractor a `comfama-employee-retention/scripts/diagnostics/` y edita el `GROUP`.
 
 ## When to Use
 
@@ -54,12 +54,11 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 - **No hay true labels** ⇒ todo es "predicho". Nunca presentes tasas como hechos: "retiro predicho", "predichos activos / predichos en riesgo de retiro".
 - **N pequeño** ⇒ lectura **exploratoria**, no concluyente. Box-plots, correlaciones y perfil-por-arquetipo con N<~30 son frágiles: etiquétalos "orientativos". Si una categoría tiene 1 caso, dilo (ej. "50% = 1 persona").
 
-### Fase 3 — Armar el entregable
-- Copia `comfama-bios-summary/` (o `comfama-employees-client-summary/`) a `comfama-<empresa>-summary/` (sin `node_modules`/`dist`). `npm install`.
-- **Quita Lovable:** borra `lovable-tagger` de `vite.config.ts` (import + uso) y de `package.json`; limpia `index.html` (title/description propios, sin `author=Lovable`, sin la `og:image` de gpt-engineer). No hay dependencia de runtime de Lovable.
-- **Quita el LoginGate:** en `src/App.tsx` elimina el wrapper `<LoginGate>` (y su import). Si no, el HTML abre en "Acceso restringido".
-- Edita `HeroSection.tsx`: título, subtítulo (N + "basado en predicciones del modelo"), fecha.
-- Reemplaza los datos en `SSTAnalysis.tsx` con los agregados de la Fase 1.
+### Fase 3 — Agregar la empresa al repo base (NO se clona un repo nuevo)
+En `comfama-employees-client-summary/`:
+- Crea `src/companies/<slug>/Analysis.tsx`. Copia el de la empresa más parecida como punto de partida: `grupo-bios/Analysis.tsx` si es por **predicciones** (trae Nota metodológica/Composición/Nivel de atención + alertas), o `arquitectura-concreto/Analysis.tsx` si hay **true labels**. Reemplaza los datos con los agregados de la Fase 1.
+- Regístrala en `src/companies/registry.tsx`: añade una entrada `"<slug>": { slug, hero: { titlePre, titleAccent, subtitle, date }, Analysis }` importando el componente.
+- Lovable y el LoginGate ya están fuera en la base — **no** hay que volver a quitarlos.
 
 ### Fase 4 — Estructura de secciones (calcar ARQ exactamente)
 Orden obligatorio (mismo que `comfama-employees-client-summary`):
@@ -73,8 +72,8 @@ Orden obligatorio (mismo que `comfama-employees-client-summary`):
 - Categóricas: tabs `Distribución` / `Tasa de retiro` (la 2ª solo si hay cruce con label).
 - **Un insight de una frase debajo de cada gráfico**, en tono de analista (dato concreto + lectura), **sin muletillas de IA** ("se puede observar que", "es importante notar", "en resumen").
 
-### Fase 6 — Compilar
-- `npm run build:single` → `dist/index.html` autocontenido (lo renombra `rename-html.mjs`; ajústalo al nombre del cliente). Copia el HTML a `Clients/Comfama/docs/cliente/<empresa>/`.
+### Fase 6 — Compilar (un HTML por empresa)
+- `COMPANY=<slug> npm run build:single` → `dist/<slug>.html` autocontenido (`rename-html.mjs` lo nombra por `COMPANY`). Por **privacidad** cada empresa compila a su propio archivo; al cliente solo le llega el suyo. **Vite vacía `dist/` en cada build**, así que copia cada salida a `Clients/Comfama/docs/cliente/<empresa>/` ANTES de compilar la siguiente empresa.
 
 ### Fase 7 — Verificar el render (obligatorio)
 - Corre `references/verify_render.mjs` (puppeteer headless) sobre el HTML final. **grep sobre el bundle NO prueba que renderice** — un LoginGate o un error de runtime ocultan todo.
@@ -85,8 +84,8 @@ Orden obligatorio (mismo que `comfama-employees-client-summary`):
 - **Predicciones ≠ datos de entrenamiento.** El EDA rico de ARQ (1.008, true labels) salió del dataset de training; un EDA por-empresa sobre predicciones es N pequeño y "predicho". No copies las cifras de ARQ.
 - **Olvidar excluir `@arkangel.ai`.** Tráfico de prueba interno infla el N (en BIOS: 20 crudo → 14 neto). Siempre fíltralo y reporta cuántas filas quitaste.
 - **"Aparece en el grep" ≠ "se renderiza".** Verifica SIEMPRE con render headless; un error en un chart nuevo o el LoginGate dejan la página casi vacía con 0 errores aparentes.
-- **El LoginGate heredado de la plantilla** bloquea el HTML ("Acceso restringido"). Quítalo para entregables de lectura directa.
-- **Lovable no es dependencia de runtime** — es solo herramienta de autoría + plugin de dev + meta tags. Quitarlo no rompe nada.
+- **LoginGate / Lovable ya están fuera de la base.** No los reintroduzcas; si reaparecen (al traer una plantilla vieja), el HTML abre en "Acceso restringido" o trae meta de Lovable. Lovable no es dependencia de runtime — solo autoría + plugin de dev + meta tags.
+- **Vite vacía `dist/` en cada build** (`COMPANY=...`): copia cada HTML al entregable ANTES de compilar la siguiente empresa, o se sobrescribe.
 - **Orden de secciones.** Plan de bienestar + Recomendaciones van antes de variables (como ARQ), no al final.
 - **Caché del navegador con `file://`.** Al revisar, abre en incógnito o `Ctrl+Shift+R`; si no, ves la versión vieja y crees que faltan secciones.
 - **Aliases sin datos** se reportan como `0`, no se omiten.
