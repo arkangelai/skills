@@ -1,0 +1,4 @@
+.cache/
+data/*.pdf
+scripts/__pycache__/
+scripts/*.pyc

@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "fuente": "Manual Tarifario ISS 2001 — Acuerdo 256 de 2001, ISS",
+    "total_codigos_unicos": 5643,
+    "total_filas": 5964,
+    "fecha_generacion": "2026-05-29"
+  },
+
+  "validate": {
+    "validos_uvr": [
+      { "codigo": "020101", "descripcion_contiene": "CRANEO SINOSTOSIS", "tipo": "UVR" },
+      { "codigo": "862327", "descripcion_contiene": "ESCARECTOMIA TANGENCIAL", "tipo": "UVR" },
+      { "codigo": "202301", "descripcion_contiene": "TIMPANOTOM", "tipo": "UVR" },
+      { "codigo": "015408", "descripcion_contiene": "TUMOR DE LA BASE DEL CRANEO", "tipo": "UVR" },
+      { "codigo": "322200", "descripcion_contiene": "VOLUMEN PULMONAR", "tipo": "UVR" },
+      { "codigo": "335200", "descripcion_contiene": "TRASPLANTE BILATERAL DE PULMON", "tipo": "UVR" },
+      { "codigo": "471100", "descripcion_contiene": "APENDICECTOM", "tipo": "UVR" }
+    ],
+    "validos_valor": [
+      { "codigo": "903841", "descripcion_contiene": "GLUCOSA EN SUERO", "tipo": "VALOR" },
+      { "codigo": "904201", "descripcion_contiene": "HORMONA DEL CRECIMIENTO", "tipo": "VALOR" },
+      { "codigo": "901221", "descripcion_contiene": "HEMOCULTIVO AEROBIO", "tipo": "VALOR" },
+      { "codigo": "906223", "descripcion_contiene": "Hepatitis B", "tipo": "VALOR" }
+    ],
+    "validos_apendice": [
+      { "codigo": "829910", "descripcion_contiene": "EXTRACCI", "tipo": "UVR", "_nota": "Duplicado: existe en UVR y apéndice, el índice usa la primera ocurrencia (UVR)" },
+      { "codigo": "935100", "descripcion_contiene": "VENDAJE", "tipo": "APENDICE", "_nota": "Código exclusivo del apéndice" }
+    ],
+    "validos_prefijados": [
+      { "codigo": "M07661", "descripcion_contiene": "GASTROYEYUNOSTOM", "tipo": "UVR" },
+      { "codigo": "E09373", "descripcion_contiene": "VESICAL", "tipo": "UVR" },
+      { "codigo": "C40415", "descripcion_contiene": "QUISTE PILONIDAL", "tipo": "VALOR" },
+      { "codigo": "S23309", "descripcion_contiene": "UVR", "tipo": "VALOR" }
+    ],
+    "invalidos": [
+      "000000",
+      "999999",
+      "XXXXXX",
+      "123",
+      "AB1234"
+    ]
+  },
+
+  "lookup": {
+    "casos": [
+      {
+        "codigo": "020101",
+        "esperado": {
+          "descripcion": "CORRECION DE CRANEO SINOSTOSIS, POR CRANIECTOMIA SIN AVANCES",
+          "uvr": 380,
+          "valor": null,
+          "capitulo": "ARTICULO 1",
+          "tipo": "UVR"
+        }
+      },
+      {
+        "codigo": "903841",
+        "esperado": {
+          "descripcion": "GLUCOSA EN SUERO, LCR U OTRO FLUIDO DIFERENTE A ORINA",
+          "uvr": null,
+          "valor": 3095,
+          "capitulo": "ARTICULO 19",
+          "tipo": "VALOR"
+        }
+      },
+      {
+        "codigo": "C40583",
+        "esperado": {
+          "uvr": null,
+          "valor": 89464325,
+          "capitulo": "ARTICULO 95",
+          "tipo": "VALOR"
+        }
+      },
+      {
+        "codigo": "935100",
+        "esperado": {
+          "uvr": null,
+          "valor": null,
+          "tipo": "APENDICE",
+          "capitulo": "ARTICULO 132"
+        }
+      },
+      {
+        "codigo": "M07142",
+        "esperado": {
+          "descripcion": "DRENAJE PERITONITIS GENERALIZADA",
+          "uvr": 110,
+          "valor": null,
+          "tipo": "UVR"
+        }
+      }
+    ]
+  },
+
+  "search": {
+    "casos": [
+      { "terminos": ["apendicectomia"], "min_resultados": 3, "debe_contener_codigo": "471100" },
+      { "terminos": ["biopsia", "cerebro"], "min_resultados": 1, "debe_contener_codigo": "011302" },
+      { "terminos": ["glucosa"], "min_resultados": 1, "debe_contener_codigo": "903841" },
+      { "terminos": ["trasplante", "pulmon"], "min_resultados": 1, "debe_contener_codigo": "335200" },
+      { "terminos": ["hemocultivo"], "min_resultados": 1, "debe_contener_codigo": "901221" },
+      { "terminos": ["timpanotomia"], "min_resultados": 1, "debe_contener_codigo": "202301" },
+      { "terminos": ["xyznoexiste"], "min_resultados": 0, "max_resultados": 0 }
+    ]
+  },
+
+  "seccion": {
+    "casos": [
+      { "prefijo": "02", "min_codigos": 10 },
+      { "prefijo": "47", "min_codigos": 3 },
+      { "prefijo": "90", "min_codigos": 100 },
+      { "prefijo": "C4", "min_codigos": 50 },
+      { "prefijo": "M0", "min_codigos": 5 },
+      { "prefijo": "ZZ", "min_codigos": 0, "max_codigos": 0 }
+    ]
+  },
+
+  "tarifa": {
+    "casos_uvr": [
+      { "codigo": "020101", "valor_uvr": 29000, "uvr_esperado": 380, "tarifa_esperada": 11020000 },
+      { "codigo": "471100", "valor_uvr": 29000, "uvr_esperado": 80, "tarifa_esperada": 2320000 },
+      { "codigo": "335200", "valor_uvr": 12000, "uvr_esperado": 2500, "tarifa_esperada": 30000000 },
+      { "codigo": "862327", "valor_uvr": 29000, "uvr_esperado": 145, "tarifa_esperada": 4205000 }
+    ],
+    "casos_valor_directo": [
+      { "codigo": "903841", "valor_esperado": 3095 }
+    ],
+    "casos_error": [
+      { "codigo": "935100", "tipo_error": "APENDICE" },
+      { "codigo": "020101", "valor_uvr": "-100", "tipo_error": "valor_negativo" },
+      { "codigo": "020101", "valor_uvr": "abc", "tipo_error": "valor_no_numerico" }
+    ]
+  },
+
+  "normalizacion": {
+    "casos": [
+      { "input": "190201", "esperado": "190201" },
+      { "input": "19.02.01", "esperado": "190201" },
+      { "input": "19-02-01", "esperado": "190201" },
+      { "input": "  190201  ", "esperado": "190201" },
+      { "input": "c40685", "esperado": "C40685" },
+      { "input": "m07661", "esperado": "M07661" },
+      { "input": "e09373", "esperado": "E09373" },
+      { "input": "s23309", "esperado": "S23309" }
+    ]
+  },
+
+  "edge_cases": {
+    "coma_en_descripcion": { "codigo": "020101" },
+    "primer_codigo": { "codigo": "020101" },
+    "valor_maximo_uvr": { "codigo": "335200", "uvr_esperado": 2500 },
+    "valor_maximo_pesos": { "codigo": "C40583", "valor_esperado": 89464325 }
+  }
+}
