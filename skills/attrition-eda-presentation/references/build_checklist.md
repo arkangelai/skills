@@ -5,7 +5,7 @@ Patrón de estructura: empresa `arquitectura-concreto` (true labels).
 Patrón por predicciones: empresa `grupo-bios` (N pequeno, sin etiquetas reales).
 
 ## 1. Datos
-- Copia `extract_company_eda.mjs` a `comfama-employee-retention/scripts/diagnostics/`, edita `GROUP`, corre `node ... > eda.json`.
+- Copia `extract_company_eda.mjs` a `comfama-employee-retention/scripts/diagnostics/`, define `GROUP_NAMES`/`GROUP_NITS` por entorno (no hardcodear en repo publico), corre `GROUP_NAMES="..." GROUP_NITS="..." node ... > eda.json`.
 - **Excluye `@arkangel.ai`** (trafico de prueba). Aliases sin datos = 0 (no excluir).
 
 ## 2. Modulo de empresa (no se clona un repo nuevo)

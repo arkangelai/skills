@@ -1,6 +1,6 @@
 ---
 name: attrition-eda-presentation
-description: Produce a client-ready EDA presentation (self-contained HTML) for a single company or company-group from the Comfama employee-retention model's PREDICTIONS (no true labels), mirroring the ARQUITECTURA Y CONCRETO deliverable. Use when asked to build, refresh, or recreate the retention EDA / client presentation for a specific company or grupo empresarial from existing predictions (e.g. "haz el EDA de Grupo BIOS", "presentación de retención para CONTEGRAL", "recrea este análisis para la empresa X"). NOT for training a model (use attrition-model-trainer) — this consumes predictions already in Supabase.
+description: Produce a client-ready EDA presentation (self-contained HTML) for a single company or company-group from the employee-retention model's PREDICTIONS (no true labels), mirroring the reference deliverable. Use when asked to build, refresh, or recreate the retention EDA / client presentation for a specific company or grupo empresarial from existing predictions (e.g. "haz el EDA de la empresa X", "presentación de retención para el grupo X", "recrea este análisis para la empresa X"). NOT for training a model (use attrition-model-trainer) — this consumes predictions already in Supabase.
 version: 1.0.0
 author: laura.bellon@arkangel.ai
 platforms: [macos, linux, windows]
@@ -28,7 +28,7 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 - **Empresas existentes (úsalas de patrón):** `arquitectura-concreto` (true labels, 1.008 empleados — define el ORDEN de secciones a calcar) y `grupo-bios` (predicciones, N=14 — patrón para escenarios sin etiquetas reales, con Nota metodológica/Composición/Nivel de atención y alertas "Arquetipos a vigilar").
 - **Datos:** tabla `predictions` de Supabase, proyecto `comfama-employee-retention`. Credenciales en `comfama-employee-retention/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `COMFAMA_PROJECT_NAME`).
 - **Catálogo de empresas + aliases:** `comfama-employee-retention/src/data/companies.ts` (nombre canónico + NIT) y `src/lib/companyNormalize.ts` (lógica de normalización).
-- **Scripts reutilizables:** `references/extract_company_eda.mjs` (extrae+agrega) y `references/verify_render.mjs` (verifica el render). Copia el extractor a `comfama-employee-retention/scripts/diagnostics/` y edita el `GROUP`.
+- **Scripts reutilizables:** `references/extract_company_eda.mjs` (extrae+agrega) y `references/verify_render.mjs` (verifica el render). Copia el extractor a `comfama-employee-retention/scripts/diagnostics/` y define el grupo con las variables de entorno `GROUP_NAMES` / `GROUP_NITS` (separadas por coma). **Repo público:** no hardcodees nombres ni NITs reales de clientes en los scripts.
 
 ## When to Use
 
@@ -41,12 +41,12 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 ## Procedure
 
 ### Fase 0 — Definir el scope (empresa o grupo)
-- Si es **grupo**, lista los `company_name` canónicos + NIT (revísalos en `companies.ts`). Ej. Grupo BIOS = `CONTEGRAL`, `ALIMENTOS FINCA`, `SERVICIOS GRUPO BIOS`, `COMERCIAL + BIOS`.
-- Normaliza para el match: NFD, quitar diacríticos, trim, **quitar puntos/espacios al final**, uppercase, **conservar `+`** (ej. "COMERCIAL + BIOS"). Match por NIT primero, luego por nombre normalizado.
+- Si es **grupo**, lista los `company_name` canónicos + NIT de sus filiales (revísalos en `companies.ts`) y pásalos por `GROUP_NAMES` / `GROUP_NITS`. No los escribas en el repo público de skills.
+- Normaliza para el match: NFD, quitar diacríticos, trim, **quitar puntos/espacios al final**, uppercase, **conservar `+`** (p. ej. nombres tipo "EMPRESA + FILIAL"). Match por NIT primero, luego por nombre normalizado.
 - Aliases que existan en el catálogo pero **no tengan predicciones se reportan como `0`, nunca se excluyen**.
 
 ### Fase 1 — Extraer + agregar (read-only)
-- Copia `references/extract_company_eda.mjs` a `comfama-employee-retention/scripts/diagnostics/`, edita el set `GROUP`, y córrelo (`node ...`). Lee `.env.local` de ese repo.
+- Copia `references/extract_company_eda.mjs` a `comfama-employee-retention/scripts/diagnostics/`, define `GROUP_NAMES` / `GROUP_NITS` por entorno, y córrelo (`GROUP_NAMES="..." GROUP_NITS="..." node ...`). Lee `.env.local` de ese repo.
 - **CRÍTICO: excluye el tráfico de prueba interno** — filas cuyo `user_id` termina en `@arkangel.ai`. Reporta cuántas excluiste (cambia el N real).
 - Produce: composición por empresa (activos vs. en riesgo **predichos**), arquetipo×label, perfil por arquetipo, numéricas (media/mediana/cuartiles/buckets + split por label predicho), categóricas (distribución + tasa de retiro predicho por categoría), correlaciones, y el perfil de los casos predichos RETIRADO.
 
@@ -82,7 +82,7 @@ Orden obligatorio (mismo que `comfama-employees-client-summary`):
 ## Pitfalls
 
 - **Predicciones ≠ datos de entrenamiento.** El EDA rico de ARQ (1.008, true labels) salió del dataset de training; un EDA por-empresa sobre predicciones es N pequeño y "predicho". No copies las cifras de ARQ.
-- **Olvidar excluir `@arkangel.ai`.** Tráfico de prueba interno infla el N (en BIOS: 20 crudo → 14 neto). Siempre fíltralo y reporta cuántas filas quitaste.
+- **Olvidar excluir `@arkangel.ai`.** Tráfico de prueba interno infla el N (p. ej. 20 crudo → 14 neto). Siempre fíltralo y reporta cuántas filas quitaste.
 - **"Aparece en el grep" ≠ "se renderiza".** Verifica SIEMPRE con render headless; un error en un chart nuevo o el LoginGate dejan la página casi vacía con 0 errores aparentes.
 - **LoginGate / Lovable ya están fuera de la base.** No los reintroduzcas; si reaparecen (al traer una plantilla vieja), el HTML abre en "Acceso restringido" o trae meta de Lovable. Lovable no es dependencia de runtime — solo autoría + plugin de dev + meta tags.
 - **Vite vacía `dist/` en cada build** (`COMPANY=...`): copia cada HTML al entregable ANTES de compilar la siguiente empresa, o se sobrescribe.

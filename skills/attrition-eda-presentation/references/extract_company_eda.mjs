@@ -1,4 +1,4 @@
-// Read-only: agregados completos para el entregable BIOS (paridad con ARQ).
+// Read-only: agregados completos para el entregable del grupo objetivo.
 // Imprime JSON con: arquetipo×label, perfil por arquetipo, variables numéricas
 // (media/mediana/cuartiles/rango + split activo/retiro predicho + buckets) y
 // correlaciones. N pequeño => orientativo.
@@ -21,7 +21,6 @@ const env = loadEnv();
 const url = env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
 const project = env.COMFAMA_PROJECT_NAME || "comfama-employee-retention";
-const BIOS = new Set(["CONTEGRAL", "ALIMENTOS FINCA", "SERVICIOS GRUPO BIOS", "COMERCIAL + BIOS"]);
 // Solo predicciones exitosas: las filas de fallback (status=0, label="PENDIENTE")
 // no tienen resultado del modelo y, si entraran, inflarían el denominador "activo".
 const VALID = new Set(["ACTIVO", "RETIRADO"]);
@@ -30,6 +29,19 @@ const readMeta = (m, k) => { if (!Array.isArray(m)) return null; const e = m.fin
 const isTest = (uid) => (uid ?? "").trim().toLowerCase().endsWith("@arkangel.ai");
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const leadInt = (v) => { const m = String(v ?? "").match(/^\s*(\d+)/); return m ? Number(m[1]) : null; };
+
+// Grupo objetivo. Repo PÚBLICO: NO hardcodear nombres ni NITs reales de clientes.
+// Configúralos por entorno (separados por coma) o edita estos placeholders en tu copia local:
+//   GROUP_NAMES="EMPRESA UNO,EMPRESA DOS"  GROUP_NITS="123456789-0,987654321-0"
+const GROUP_NAMES = new Set((process.env.GROUP_NAMES || "EMPRESA EJEMPLO").split(",").map((s) => norm(s)).filter(Boolean));
+const GROUP_NITS = new Set((process.env.GROUP_NITS || "").split(",").map((s) => s.trim()).filter(Boolean));
+// Match por NIT primero (autoritativo), luego por nombre normalizado: así una fila con
+// alias/variante de nombre pero el NIT del catálogo no se pierde del grupo.
+const inGroup = (r) => {
+  const nit = String(readMeta(r.prediction_metadata, "nit_empresa") ?? "").trim();
+  if (nit && GROUP_NITS.has(nit)) return true;
+  return GROUP_NAMES.has(norm(readMeta(r.prediction_metadata, "company_name")));
+};
 
 async function fetchAllPredictions() {
   const acc = [];
@@ -50,7 +62,7 @@ async function fetchAllPredictions() {
   return acc;
 }
 const rows = (await fetchAllPredictions())
-  .filter((r) => BIOS.has(norm(readMeta(r.prediction_metadata, "company_name"))) && !isTest(r.user_id) && VALID.has(r.prediction_label));
+  .filter((r) => inGroup(r) && !isTest(r.user_id) && VALID.has(r.prediction_label));
 
 const CUTOFF = process.env.CUTOFF || new Date().toISOString().slice(0, 10); // fecha de reporte (default: hoy)
 const ageFromDob = (dob) => { if (!dob) return null; const t = new Date(dob); if (isNaN(t)) return null; const now = new Date(CUTOFF); let a = now.getFullYear() - t.getFullYear(); if (now.getMonth() < t.getMonth() || (now.getMonth() === t.getMonth() && now.getDate() < t.getDate())) a--; return a >= 0 && a < 130 ? a : null; };
@@ -116,7 +128,7 @@ for (const r of rows) {
   (out.composition[name] ??= { total: 0, retiro: 0, activo: 0 });
   const c = out.composition[name]; c.total++; if (isRet(r)) c.retiro++; else c.activo++;
 }
-for (const g of BIOS) if (!Object.keys(out.composition).some((n) => norm(n) === g)) out.composition[g] = { total: 0, retiro: 0, activo: 0 };
+for (const g of GROUP_NAMES) if (!Object.keys(out.composition).some((n) => norm(n) === g)) out.composition[g] = { total: 0, retiro: 0, activo: 0 };
 
 // Variables categóricas: distribución + tasa de retiro predicho por categoría.
 const CATEGORICAL = ["tipo_examen", "archetype", "plan_5_futuro", "endeudamiento", "estudios_futuros", "educacion_relevante", "inversiones_5_futuro", "cansancio_emocional", "fatiga_fisica", "company_name"];
