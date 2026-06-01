@@ -107,4 +107,38 @@ out.correlations = [];
 const colData = Object.fromEntries(corrVars.map((v) => [v, rows.map(VARS[v])]));
 for (let i = 0; i < corrVars.length; i++) for (let j = i + 1; j < corrVars.length; j++) { const c = pearson(colData[corrVars[i]], colData[corrVars[j]]); if (c != null) out.correlations.push({ var1: corrVars[i], var2: corrVars[j], corr: c }); }
 
+// Composición del grupo: activos vs. en riesgo (RETIRADO) predichos, por empresa.
+// Incluye cada miembro del GROUP aunque tenga 0 filas (los aliases sin datos se
+// reportan como 0, no se omiten) — requisito de la sección Composición.
+out.composition = {};
+for (const r of rows) {
+  const name = String(get(r, "company_name") ?? "(sin empresa)");
+  (out.composition[name] ??= { total: 0, retiro: 0, activo: 0 });
+  const c = out.composition[name]; c.total++; if (isRet(r)) c.retiro++; else c.activo++;
+}
+for (const g of BIOS) if (!Object.keys(out.composition).some((n) => norm(n) === g)) out.composition[g] = { total: 0, retiro: 0, activo: 0 };
+
+// Variables categóricas: distribución + tasa de retiro predicho por categoría.
+const CATEGORICAL = ["tipo_examen", "archetype", "plan_5_futuro", "endeudamiento", "estudios_futuros", "educacion_relevante", "inversiones_5_futuro", "cansancio_emocional", "fatiga_fisica", "company_name"];
+out.categorical = {};
+for (const key of CATEGORICAL) {
+  const m = new Map();
+  for (const r of rows) {
+    const raw = get(r, key);
+    const v = raw === null || raw === undefined ? "(sin dato)" : String(raw);
+    if (!m.has(v)) m.set(v, { total: 0, retiro: 0 });
+    const b = m.get(v); b.total++; if (isRet(r)) b.retiro++;
+  }
+  out.categorical[key] = [...m.entries()].sort((a, b) => b[1].total - a[1].total)
+    .map(([value, b]) => ({ value, total: b.total, retiro: b.retiro, retiroPct: +((b.retiro / b.total) * 100).toFixed(1) }));
+}
+
+// Perfil de los casos predichos RETIRADO (sin identificadores; alimenta la sección de riesgo).
+out.retiredProfile = rows.filter(isRet).map((r) => ({
+  empresa: get(r, "company_name"), arquetipo: get(r, "archetype"), tipo_examen: get(r, "tipo_examen"),
+  retention_pct: get(r, "retention_pct"), ml_zone: get(r, "ml_zone"), edad: VARS["Edad"](r),
+  distancia_km: VARS["Distancia (km)"](r), antiguedad_meses: VARS["Antigüedad (meses)"](r),
+  plan_5_futuro: get(r, "plan_5_futuro"), endeudamiento: get(r, "endeudamiento"),
+}));
+
 console.log(JSON.stringify(out, null, 1));
