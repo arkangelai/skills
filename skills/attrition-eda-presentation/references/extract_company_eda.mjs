@@ -22,6 +22,9 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
 const project = env.COMFAMA_PROJECT_NAME || "comfama-employee-retention";
 const BIOS = new Set(["CONTEGRAL", "ALIMENTOS FINCA", "SERVICIOS GRUPO BIOS", "COMERCIAL + BIOS"]);
+// Solo predicciones exitosas: las filas de fallback (status=0, label="PENDIENTE")
+// no tienen resultado del modelo y, si entraran, inflarían el denominador "activo".
+const VALID = new Set(["ACTIVO", "RETIRADO"]);
 const norm = (s) => (s ?? "").normalize("NFD").replace(/\p{Mn}/gu, "").trim().replace(/[.\s]+$/, "").toUpperCase();
 const readMeta = (m, k) => { if (!Array.isArray(m)) return null; const e = m.find((x) => x?.variable === k); return e?.value == null ? null : e.value; };
 const isTest = (uid) => (uid ?? "").trim().toLowerCase().endsWith("@arkangel.ai");
@@ -47,7 +50,7 @@ async function fetchAllPredictions() {
   return acc;
 }
 const rows = (await fetchAllPredictions())
-  .filter((r) => BIOS.has(norm(readMeta(r.prediction_metadata, "company_name"))) && !isTest(r.user_id));
+  .filter((r) => BIOS.has(norm(readMeta(r.prediction_metadata, "company_name"))) && !isTest(r.user_id) && VALID.has(r.prediction_label));
 
 const CUTOFF = process.env.CUTOFF || new Date().toISOString().slice(0, 10); // fecha de reporte (default: hoy)
 const ageFromDob = (dob) => { if (!dob) return null; const t = new Date(dob); if (isNaN(t)) return null; const now = new Date(CUTOFF); let a = now.getFullYear() - t.getFullYear(); if (now.getMonth() < t.getMonth() || (now.getMonth() === t.getMonth() && now.getDate() < t.getDate())) a--; return a >= 0 && a < 130 ? a : null; };
