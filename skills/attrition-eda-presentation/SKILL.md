@@ -6,7 +6,7 @@ author: laura.bellon@arkangel.ai
 platforms: [macos, linux, windows]
 metadata:
   hermes:
-    tags: [eda, attrition, retention, presentation, client-deliverable, predictions, supabase, comfama]
+    tags: [eda, attrition, retention, presentation, client-deliverable, predictions, supabase]
     category: analysis-presentation
     requires_toolsets: [terminal]
 ---
@@ -14,7 +14,7 @@ metadata:
 # attrition-eda-presentation
 
 Recrea, para cualquier empresa o **grupo empresarial**, el EDA cliente de retención
-en el mismo estilo que el entregable de **ARQUITECTURA Y CONCRETO**, pero a partir
+en el mismo estilo que el entregable de referencia, pero a partir
 de las **predicciones del modelo** que ya viven en Supabase (no hay etiquetas reales
 de retiro). Salida: un **HTML autocontenido** (React + recharts compilado con
 `vite-plugin-singlefile`), sin dependencias de Lovable y sin puerta de acceso.
@@ -25,7 +25,7 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 ## Referencias canónicas (en `Repositorios/`)
 
 - **Repo base multi-empresa:** `comfama-employees-client-summary/`. Una sola base; **un HTML por empresa**. Cada empresa vive en `src/companies/<slug>/Analysis.tsx`, registrada en `src/companies/registry.tsx`, y se elige en build con la variable `COMPANY=<slug>`. Lovable y el LoginGate **ya están removidos** en la base (no hay que repetirlo por empresa).
-- **Empresas existentes (úsalas de patrón):** `arquitectura-concreto` (true labels, 1.008 empleados — define el ORDEN de secciones a calcar) y `grupo-bios` (predicciones, N=14 — patrón para escenarios sin etiquetas reales, con Nota metodológica/Composición/Nivel de atención y alertas "Arquetipos a vigilar").
+- **Módulos de ejemplo (úsalos de patrón):** uno con **true labels** (define el ORDEN de secciones a calcar) y otro por **predicciones** (patrón para escenarios sin etiquetas reales, con Nota metodológica/Composición/Nivel de atención y alertas "Arquetipos a vigilar"). Revisa `src/companies/` en el repo base para ver los slugs disponibles.
 - **Datos:** tabla `predictions` de Supabase, proyecto `comfama-employee-retention`. Credenciales en `comfama-employee-retention/.env.local` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `COMFAMA_PROJECT_NAME`).
 - **Catálogo de empresas + aliases:** `comfama-employee-retention/src/data/companies.ts` (nombre canónico + NIT) y `src/lib/companyNormalize.ts` (lógica de normalización).
 - **Scripts reutilizables:** `references/extract_company_eda.mjs` (extrae+agrega) y `references/verify_render.mjs` (verifica el render). Copia el extractor a `comfama-employee-retention/scripts/diagnostics/` y define el grupo con las variables de entorno `GROUP_NAMES` / `GROUP_NITS` (separadas por coma). **Repo público:** no hardcodees nombres ni NITs reales de clientes en los scripts.
@@ -33,7 +33,7 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 ## When to Use
 
 - "Haz/recrea el EDA de retención para <empresa o grupo>" sobre predicciones existentes.
-- "Genera la presentación cliente para <empresa>" en el estilo de ARQUITECTURA Y CONCRETO.
+- "Genera la presentación cliente para <empresa>" en el estilo del entregable de referencia.
 - Refrescar un entregable cuando entraron más encuestas (re-extraer → actualizar snapshot → recompilar).
 
 **No usar:** para entrenar/refrescar el modelo (usa `attrition-model-trainer`); para datos que no sean del proyecto `comfama-employee-retention`.
@@ -56,11 +56,11 @@ Contraparte de `attrition-model-trainer` (que ENTRENA el modelo). Esta skill sol
 
 ### Fase 3 — Agregar la empresa al repo base (NO se clona un repo nuevo)
 En `comfama-employees-client-summary/`:
-- Crea `src/companies/<slug>/Analysis.tsx`. Copia el de la empresa más parecida como punto de partida: `grupo-bios/Analysis.tsx` si es por **predicciones** (trae Nota metodológica/Composición/Nivel de atención + alertas), o `arquitectura-concreto/Analysis.tsx` si hay **true labels**. Reemplaza los datos con los agregados de la Fase 1.
+- Crea `src/companies/<slug>/Analysis.tsx`. Copia el módulo de ejemplo más parecido como punto de partida: el de **predicciones** (trae Nota metodológica/Composición/Nivel de atención + alertas) si no hay etiquetas reales, o el de **true labels** si las hay (los slugs disponibles están en `src/companies/` del repo base). Reemplaza los datos con los agregados de la Fase 1.
 - Regístrala en `src/companies/registry.tsx`: añade una entrada `"<slug>": { slug, hero: { titlePre, titleAccent, subtitle, date }, Analysis }` importando el componente.
 - Lovable y el LoginGate ya están fuera en la base — **no** hay que volver a quitarlos.
 
-### Fase 4 — Estructura de secciones (calcar ARQ exactamente)
+### Fase 4 — Estructura de secciones (calcar la referencia exactamente)
 Orden obligatorio (mismo que `comfama-employees-client-summary`):
 1. Resumen · 2. Arquetipos · 3. Arquetipos vs. retiro (predicho) · 4. Perfil de cada arquetipo · 5. **Plan de bienestar por arquetipo** · 6. **Recomendaciones** (generales + subsección por arquetipo) · 7. Variables numéricas · 8. Variables categóricas · 9. Relación entre variables · 10. Hallazgos clave · 11. Hablemos (contacto).
 - **Plan de bienestar y Recomendaciones van ANTES de las variables**, no después.
@@ -77,16 +77,16 @@ Orden obligatorio (mismo que `comfama-employees-client-summary`):
 
 ### Fase 7 — Verificar el render (obligatorio)
 - Corre `references/verify_render.mjs` (puppeteer headless) sobre el HTML final. **grep sobre el bundle NO prueba que renderice** — un LoginGate o un error de runtime ocultan todo.
-- Debe dar: **0 errores de consola**, sin "Acceso restringido", y los `h2` en el **mismo orden que ARQ**.
+- Debe dar: **0 errores de consola**, sin "Acceso restringido", y los `h2` en el **mismo orden que la referencia**.
 
 ## Pitfalls
 
-- **Predicciones ≠ datos de entrenamiento.** El EDA rico de ARQ (1.008, true labels) salió del dataset de training; un EDA por-empresa sobre predicciones es N pequeño y "predicho". No copies las cifras de ARQ.
+- **Predicciones ≠ datos de entrenamiento.** El EDA rico de referencia (cohorte grande con true labels) salió del dataset de training; un EDA por-empresa sobre predicciones es N pequeño y "predicho". No copies las cifras del entregable de referencia.
 - **Olvidar excluir `@arkangel.ai`.** Tráfico de prueba interno infla el N (p. ej. 20 crudo → 14 neto). Siempre fíltralo y reporta cuántas filas quitaste.
 - **"Aparece en el grep" ≠ "se renderiza".** Verifica SIEMPRE con render headless; un error en un chart nuevo o el LoginGate dejan la página casi vacía con 0 errores aparentes.
 - **LoginGate / Lovable ya están fuera de la base.** No los reintroduzcas; si reaparecen (al traer una plantilla vieja), el HTML abre en "Acceso restringido" o trae meta de Lovable. Lovable no es dependencia de runtime — solo autoría + plugin de dev + meta tags.
 - **Vite vacía `dist/` en cada build** (`COMPANY=...`): copia cada HTML al entregable ANTES de compilar la siguiente empresa, o se sobrescribe.
-- **Orden de secciones.** Plan de bienestar + Recomendaciones van antes de variables (como ARQ), no al final.
+- **Orden de secciones.** Plan de bienestar + Recomendaciones van antes de variables (como en la referencia), no al final.
 - **Caché del navegador con `file://`.** Al revisar, abre en incógnito o `Ctrl+Shift+R`; si no, ves la versión vieja y crees que faltan secciones.
 - **Aliases sin datos** se reportan como `0`, no se omiten.
 - **`?print=1`** salta el gate PERO oculta el ContactSection ("Hablemos") por diseño (modo PDF/slides).
@@ -94,7 +94,7 @@ Orden obligatorio (mismo que `comfama-employees-client-summary`):
 
 ## Verification
 
-- Render headless (`verify_render.mjs`): **0 errores de consola**, sin "Acceso restringido", `h2` en el orden de ARQ (Resumen → Arquetipos → Arquetipos vs Retiro → Perfil → Plan de Bienestar → Recomendaciones → Variables Numéricas → Variables Categóricas → Relación → Hallazgos → Hablemos).
+- Render headless (`verify_render.mjs`): **0 errores de consola**, sin "Acceso restringido", `h2` en el orden de la referencia (Resumen → Arquetipos → Arquetipos vs Retiro → Perfil → Plan de Bienestar → Recomendaciones → Variables Numéricas → Variables Categóricas → Relación → Hallazgos → Hablemos).
 - N neto = N crudo − filas `@arkangel.ai` (documentado).
 - Aliases con 0 predicciones aparecen como `0` en Composición.
 - Sin restos de Lovable (`grep -i lovable` y `gpt-engineer` = 0) y sin PII en el HTML.
